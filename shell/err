@@ -1,0 +1,10 @@
+Loaded dependency [gcc/8.4.0]: binutils/2.34
+Loaded dependency [python3/3.8.2]: gcc/8.4.0
+Loaded module: python3/3.8.2
+
+Loading python3/3.8.2
+  Loading requirement: binutils/2.34 gcc/8.4.0
+/zhome/e2/e/154260/cell/venv_1/lib/python3.8/site-packages/torch/functional.py:445: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at  ../aten/src/ATen/native/TensorShape.cpp:2157.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+../src/models/predict_model.py:117: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  boxes = torch.tensor(target['boxes'])

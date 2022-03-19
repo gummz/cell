@@ -1,0 +1,11 @@
+ssh -Y s203004@login.gbar.dtu.dk
+
+for opencv .imshow function to work properly:
+https://github.com/opencv/opencv/issues/18461
+
+Download files:
+
+scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
+
+Check status of storage allowance:
+getquota_zhome.sh
