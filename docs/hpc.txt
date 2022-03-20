@@ -4,6 +4,8 @@ for opencv .imshow function to work properly:
 https://github.com/opencv/opencv/issues/18461
 
 Download files:
+/zhome/e2/e/154260 (homedir)
+scp -r s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/ /home/gummz/cell_data/
 
 scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
 
