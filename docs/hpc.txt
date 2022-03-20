@@ -8,6 +8,7 @@ Download files:
 scp -r s203004@transfer.gbar.dtu.dk:/dtu-compute/tubes/test /home/gummz/dtu/cell_data/
 
 scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
+scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
 
 Check status of storage allowance:
 getquota_zhome.sh

@@ -91,6 +91,8 @@ target/
 # Project specific
 old/
 venv_1/
-data/
+/data/
 *.pkl
 *.jpg
+# Makefile is different by systems
+Makefile
