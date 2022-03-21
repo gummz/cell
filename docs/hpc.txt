@@ -12,3 +12,7 @@ scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP
 
 Check status of storage allowance:
 getquota_zhome.sh
+
+Get Source Control to work:
+Launch VSCode with:
+code . -n

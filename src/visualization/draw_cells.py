@@ -18,7 +18,7 @@ files = listdir(RAW_DATA_DIR)
 # Filter out already used files
 files = [file for file in files if file not in RAW_FILES]
 file_paths = [join(RAW_DATA_DIR, file) for file in files]
-file_paths_tiff = [file for file in file_paths if 'tiff' in file]
+file_paths_tiff = [file for file in file_paths if 'tif' in file]
 file_paths_czi = [file for file in file_paths if 'czi' in file]
 # file = 'LI_2019-01-17_emb7_pos3.lsm'
 # file_path = join(RAW_DATA_DIR, file)

@@ -15,7 +15,7 @@ from src.models.utils.utils import collate_fn
 from torch.utils.data import DataLoader, Subset
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
-from BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
+from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
 
 # Set working directory to file location
 abspath = os.path.abspath(__file__)
@@ -98,37 +98,37 @@ def get_prediction(model, device, image):
 
     return img, mask
 
+if __name__=='__main__':
+    model = get_model(time_str)
+    model.to(device)
 
-model = get_model(time_str)
-model.to(device)
-
-# Get image and target
-image, target = dataset[img_idx]
-# Get mask from target
-target_mask = get_mask(target)
+    # Get image and target
+    image, target = dataset[img_idx]
+    # Get mask from target
+    target_mask = get_mask(target)
 
 
-img, mask = get_prediction(model, device, image)
+    img, mask = get_prediction(model, device, image)
 
-# Get segmentations and bounding boxes
-pred_mask = get_mask(mask)
-# Change to RGB image
-pred_mask = pred_mask.repeat(3, 1, 1)
-boxes = torch.tensor(target['boxes'])
-bboxed_image = draw_bounding_boxes(pred_mask, boxes)
-bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
-print(bboxed_image.shape)
-debug_img = np.array(image)[0, :, :]
+    # Get segmentations and bounding boxes
+    pred_mask = get_mask(mask)
+    # Change to RGB image
+    pred_mask = pred_mask.repeat(3, 1, 1)
+    boxes = torch.tensor(target['boxes'])
+    bboxed_image = draw_bounding_boxes(pred_mask, boxes)
+    bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
+    print(bboxed_image.shape)
+    debug_img = np.array(image)[0, :, :]
 
-# Print mask from model output
+    # Print mask from model output
 
-plt.imsave(f'{folder}/pred_debug_mask.jpg',
-           bboxed_image.cpu().detach().numpy())
-# Print image that was fed into the model
-plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
-# Print target mask from dataset
-plt.imsave(f'{folder}/pred_debug_target_mask.jpg', target_mask)
+    plt.imsave(f'{folder}/pred_debug_mask.jpg',
+            bboxed_image.cpu().detach().numpy())
+    # Print image that was fed into the model
+    plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
+    # Print target mask from dataset
+    plt.imsave(f'{folder}/pred_debug_target_mask.jpg', target_mask)
 
-print(target['boxes'])
+    print(target['boxes'])
 
-print('predict_model.py complete')
+    print('predict_model.py complete')

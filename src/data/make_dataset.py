@@ -78,7 +78,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                 if i % (old_D * debug_every) == 0:
                     dirs = os.path.dirname(save)
                     file = os.path.basename(save)
-                    cv2.imwrite(f'{dirs}/_{file}.jpg', image_max)
+                    plt.imsave(f'{dirs}/_{file}.jpg', image_max)
 
             # -1 beacuse index was updated to +1 above
             # print(f'Image {idx-1} saved.')
