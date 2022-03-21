@@ -19,6 +19,9 @@
 - - - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
 - - - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
 
+- Investigate how much training data is needed
+
+
 - Draw the slices in 3D (or view them locally - save a small sample of a tiff file and download it)
 
 - ~~Breyta pickle gagnaskrám yfir í venjulegar skrár, eða tiff jafnvel~~
