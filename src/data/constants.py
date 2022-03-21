@@ -41,7 +41,7 @@ idx = [38, 33, 29, 33, 36, 33, 33]
 RAW_FILE_DIMENSIONS = dict(zip(RAW_FILES, idx))
 
 # number of timepoints of the raw data files, in order
-TIMEPOINTS = [280, 288, 295, 276, 290, 288, 276]
+TIMEPOINTS = [328, 288, 295, 276, 290, 288, 276]
 
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
