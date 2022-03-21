@@ -96,3 +96,7 @@ venv_1/
 *.jpg
 # Makefile is different by systems
 Makefile
+/shell/pyout
+/shell/err
+shell/err
+shell/pyout

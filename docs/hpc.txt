@@ -16,3 +16,14 @@ getquota_zhome.sh
 Get Source Control to work:
 Launch VSCode with:
 code . -n
+
+To set up SSH with GitHub:
+exec ssh-agent bash
+ssh-keygen ed25519 gb9@pm.me
+ssh-add path/to/key
+More info:
+https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
+
+
+Add password token:
+git remote add origin https://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@github.com/gummz/cell.git
