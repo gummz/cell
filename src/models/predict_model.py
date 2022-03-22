@@ -17,24 +17,6 @@ from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
 
-# Set working directory to file location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-
-# Running on CUDA?
-device = torch.device(
-    'cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f'Running on {device}.')
-
-# Get dataloaders
-size = 1024
-img_idx = 1700
-time_str = '12_03_18H_29M_39S'
-folder = f'interim/run_{time_str}'
-# data_tr, data_val = get_dataloaders(resize=size)
-dataset = BetaCellDataset(transforms=get_transform(train=False), resize=size)
-
 
 def get_model(time_str):
     # Load model
@@ -99,6 +81,24 @@ def get_prediction(model, device, image):
     return img, mask
 
 if __name__=='__main__':
+    # Set working directory to file location
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    os.chdir(dname)
+
+    # Running on CUDA?
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    print(f'Running on {device}.')
+
+    # Get dataloaders
+    size = 1024
+    img_idx = 1700
+    time_str = '12_03_18H_29M_39S'
+    folder = f'interim/run_{time_str}'
+    # data_tr, data_val = get_dataloaders(resize=size)
+    dataset = BetaCellDataset(transforms=get_transform(train=False), resize=size)
+
     model = get_model(time_str)
     model.to(device)
 
