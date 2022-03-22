@@ -2,7 +2,7 @@ import os
 from os import listdir, makedirs
 from os.path import join
 import pickle
-
+import sys
 import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -74,7 +74,8 @@ for i in range(1, 21, 2):
             cv2.imwrite(
                 f'{save}/{operation}_cv2_{img_name}_{i}_{j}_{k}.jpg', img_denoise)
             plt.imsave(
-                f'{save}/{operation}_plt_{img_name}_{i}_{j}_{k}.jpg', img_denoise)
+                f'{save}/_TEST_{operation}_plt_{img_name}_{i}_{j}_{k}.jpg', img_denoise)
+            sys.exit()
 
 # Operation
 # Simple Threshold
