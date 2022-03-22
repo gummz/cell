@@ -1,6 +1,6 @@
 import torch
 from tifffile.tifffile import TiffFile
-imoprt numpy as np
+import numpy as np
 
 
 def get_array(file_path, dimensions, every_second=True, sample=0.01):

@@ -24,7 +24,7 @@ C = 14
 DIR = RAW_DATA_DIR
 files = RAW_FILES
 KERNEL = MEDIAN_FILTER_KERNEL
-imgs_path = join(DATA_DIR, IMG_DIR)
+imgs_path = join(DATA_DIR, f'{IMG_DIR}_old')
 
 
 figures_dir = FIG_DIR
@@ -56,13 +56,25 @@ img = cv2.normalize(img, img, alpha=0, beta=255,
 # Median Blur
 operation = 'medianblur'
 for i in range(1, 21, 2):
-    img_blur = cv2.blur(img, (i, i))
+    img_blur = cv2.medianBlur(img, i)
     img_blur = np.array(img_blur)
     img_blur = np.where(img_blur > 5, img_blur, 0)
     cv2.imwrite(f'{save}/{operation}_{img_name}_{i}.jpg', img_blur)
 
-# cv2.imwrite(join(save, 'img.jpg'), np.load(path))
-plt.imsave(join(save, 'img.jpg'), np.int16(np.load(path)))
+cv2.imwrite(join(save, 'img_cv.jpg'), np.load(path))
+plt.imsave(join(save, 'img_plt.jpg'), np.int16(np.load(path)))
+
+# Operation
+# Denoise
+operation = 'denoise'
+for i in range(1, 21, 2):
+    for j in range(1, 10, 2):
+        for k in range(1, 30, 4):
+            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
+            cv2.imwrite(
+                f'{save}/{operation}_cv2_{img_name}_{i}_{j}_{k}.jpg', img_denoise)
+            plt.imsave(
+                f'{save}/{operation}_plt_{img_name}_{i}_{j}_{k}.jpg', img_denoise)
 
 # Operation
 # Simple Threshold

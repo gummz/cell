@@ -22,7 +22,7 @@ folder = f'../data/interim/{folder_name}'
 try:
     os.mkdir(folder)
 except FileExistsError:
-    print(f'Folder already exists: {folder}')
+    pass
 
 # Get files in imgs folder - need to know what's in there so
 # we don't start the index at 0
@@ -69,9 +69,10 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                               for page in pages[i: i + D]]
 
                 image_max = np.max(image_list, axis=0)
-                image_max = cv2.normalize(
-                    image_max, image_max, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-                image_max = cv2.medianBlur(image_max, MEDIAN_FILTER_KERNEL)
+                image_max = cv2.normalize(image_max, image_max, alpha=0, beta=255,
+                                          dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+                image_max = cv2.fastNlMeansDenoising(
+                    image_max, None, 11, 7, 21)
                 np.save(save, image_max)
 
                 # Save intermittently to .jpg for debugging
@@ -80,7 +81,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                     file = os.path.basename(save)
                     plt.imsave(f'{dirs}/_{file}.jpg', image_max)
 
-            # -1 beacuse index was updated to +1 above
+            # -1 because index was updated to +1 above
             # print(f'Image {idx-1} saved.')
 
 toc = time()

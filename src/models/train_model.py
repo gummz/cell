@@ -338,8 +338,8 @@ params = [p for p in model.parameters() if p.requires_grad]
 # losses = grid_search(model, params, data_tr, data_val, train,
 #                      num_epochs, learning_rates, optimizers, weight_decays)
 
-num_epochs = 50  # 500
-lr = 0.00001  # 0.0001
+num_epochs = 10  # 500
+lr = 0.00001  # 0.00001
 wd = 0.001  # 0.001
 opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
 
