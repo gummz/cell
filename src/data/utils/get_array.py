@@ -1,17 +1,26 @@
 import torch
 from tifffile.tifffile import TiffFile
-import numpy as np
+from src.data.constants import RAW_DATA_DIR, TIMEPOINTS, RAW_FILE_DIMENSIONS, TIMEPOINTS_TEST, RAW_FILE_DIMENSIONS_TEST, RAW_FILES, RAW_FILES_GENERALIZE
+from os.path import join
 
 
-def get_array(file_path, dimensions, every_second=True, sample=0.01):
+def get_raw_array(file_path, index, train=True, every_second=True, sample=0.01):
     '''
-    Returns an array of the full data, i.e., 
+    Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     '''
-    timepoints = dimensions[0]
-    # z-dimension
-    D = dimensions[1]
-    num_samples = int(timepoints*sample)
+    if train:
+        timepoints = TIMEPOINTS[index]
+        # z-dimension
+        D = RAW_FILE_DIMENSIONS[index]
+        file = RAW_FILES[index]
+    else:
+        timepoints = TIMEPOINTS_TEST[index]
+        D = RAW_FILE_DIMENSIONS_TEST[index]
+        file = RAW_FILES_GENERALIZE[index]
+
+    file_path = join(RAW_DATA_DIR, file)
+    num_samples = int(timepoints * sample)
 
     with TiffFile(file_path) as f:
         # If only every second image contains beta cells
