@@ -22,6 +22,7 @@ if type(items) == str:
     RAW_FILES_GENERALIZE = [generalize[1]]
 elif type(items) == list:
     RAW_FILES_GENERALIZE = generalize[1]
+RAW_FILES_GENERALIZE = generalize
 
 # RAW_FILES = RAW_FILES_GENERALIZE  # testing for generalization
 #  'LI_2020-06-17_emb3_pos5.czi']
@@ -38,8 +39,12 @@ RAW_CUTOFFS = dict(zip(RAW_FILES, cutoffs))
 idx = [29, 33, 29, 33, 36, 33, 33]
 RAW_FILE_DIMENSIONS = dict(zip(RAW_FILES, idx))
 
+idx_test = [38, 34]
+RAW_FILE_DIMENSIONS_TEST = dict(zip(RAW_FILES_GENERALIZE, idx_test))
+
 # number of timepoints of the raw data files, in order
 TIMEPOINTS = [328, 288, 295, 276, 290, 288, 276]
+TIMEPOINTS_TEST = [280, 289]
 
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
