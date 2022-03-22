@@ -24,7 +24,7 @@ C = 14
 DIR = RAW_DATA_DIR
 files = RAW_FILES
 KERNEL = MEDIAN_FILTER_KERNEL
-imgs_path = join(DATA_DIR, f'{IMG_DIR}_old')
+imgs_path = join(DATA_DIR, f'{IMG_DIR}')
 
 
 figures_dir = FIG_DIR
