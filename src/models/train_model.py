@@ -11,11 +11,15 @@ from time import time
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from src.models.predict_model import get_mask
 import src.models.utils.utils as utils
 import torch
 import torch.nn as nn
+from torch.utils.tensorboard import SummaryWriter
+
 import torch.nn.functional as F
 import torch.utils.data
+from torchvision.utils import make_grid
 import torchvision
 from PIL import Image
 from src.data.constants import (CV2_CONNECTED_ALGORITHM, DATA_DIR, IMG_DIR,
@@ -58,19 +62,20 @@ os.chdir(dname)
 # our dataset has two classes only - background and person
 num_classes = 2
 
-# get the model using our helper function
-model = get_instance_segmentation_model(pretrained=True)
-# move model to the right device
-model.to(device)
 
 # Get data
 # Size of image
-size = 1024
+size = 512
 batch_size = 8  # 1024, 8; 128, 16
+pretrained = True
 data_tr, data_val = get_dataloaders(
     batch_size=batch_size, num_workers=2, resize=size)
 # TODO: switch to batch_size=2, size=1024
 
+# get the model using our helper function
+model = get_instance_segmentation_model(pretrained=pretrained)
+# move model to the right device
+model.to(device)
 
 # Unique identifier for newly saved objects
 now = datetime.datetime.now()
@@ -78,7 +83,7 @@ time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second
 save = f'interim/run_{time_str}'
 
 
-def train(model, opt, epochs, data_tr, data_val, time_str):
+def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
 
@@ -90,14 +95,11 @@ def train(model, opt, epochs, data_tr, data_val, time_str):
     log_every = 1  # How often to print out losses
     save_every = 10  # How often to save model
     scaler = GradScaler()
-    loss_list = ['loss_mask', 'loss_rpn_box_reg',
-                 'loss_classifier', 'loss_objectness']
+    loss_list = hparam_dict['losses'].split(';')
     # loss_classifier, loss_objectness
     # TODO: remove loss_classifier from loss_list
     # and also objectness? if we don't care about detecting
     # objects, maybe the faint ones will be caught as well.
-
-    x_val, y_val = next(iter(data_val))
 
     # Transforms
     scale_jitter = T.ScaleJitter((size / 2, size / 2), scale_range=[0.7, 1.5])
@@ -107,76 +109,67 @@ def train(model, opt, epochs, data_tr, data_val, time_str):
     tot_train_losses = []
     tot_val_losses = []
 
+    writer = SummaryWriter(f'runs/{time_str}')
+
+    # print(x_val[0].unsqueeze(0).shape)
+    # writer.add_graph(model, [x_val[0].to(device)])
+
     for i, epoch in enumerate(range(epochs)):
         tic = time()
         print(f'\n* Epoch {epoch+1}/{epochs}')
 
         train_loss = 0
 
+        x_val, y_val = next(iter(data_val))
+
         model.train()  # train mode
         for j, (x_batch, y_batch) in enumerate(data_tr):
 
             with autocast():
-                print_unique(x_batch[0].cpu(), 'before to(device)')
                 x_batch = [x.to(device) for x in x_batch]
-                print_unique(x_batch[0].cpu(), 'after to(device)')
 
                 y_batch = [{k: v.to(device) for k, v in t.items()}
                            for t in y_batch]
 
                 # TODO: Invalid box coordinates
-                # "Found invalid box [68.75, 7.03125, 68.75, 7.8125]"
-                # print_unique(x_batch[0].cpu(), 'before transforms')
                 # Transforms that can't run parallel in dataloader
                 # need to be performed here
-                for (x, y) in zip(x_batch, y_batch):
-                    x, y = transforms_list[0](x.squeeze(0), y)
-                    print(np.unique(y['boxes'].cpu()), 'after crop')
-                    x, y = transforms_list[1](x.squeeze(0), y)
-                    print(np.unique(y['boxes'].cpu()), 'after scale jitter')
+                # for (x, y) in zip(x_batch, y_batch):
+                #     x, y = transforms_list[0](x.squeeze(0), y)
+                #     print(np.unique(y['boxes'].cpu()), 'after crop')
+                #     x, y = transforms_list[1](x.squeeze(0), y)
+                #     print(np.unique(y['boxes'].cpu()), 'after scale jitter')
 
                 x_batch = torch.stack(x_batch)
-                print_unique(x_batch[0].cpu(), 'after transforms')
-
                 x_batch.to(device)
-
-                # print(x_batch.shape)
 
                 # set parameter gradients to zero
                 opt.zero_grad(set_to_none=True)
 
-                # forward
-                # for i, image in enumerate(y_batch):
-                #     print(f'Image {i}:')
-                #     print(image['boxes'], '\n\n')
-                print_unique(x_batch[0].cpu(), 'before forward pass')
-
+                # forward pass
                 Y_pred = model(x_batch, y_batch)
-
-                # {'loss_classifier': tensor(0.8181, device='cuda:0', grad_fn=<NllLossBackward0>), 'loss_box_reg': tensor(0.0933, device='cuda:0', grad_fn=<DivBackward0>), 'loss_mask': tensor(1.2863, device='cuda:0',
-                #    grad_fn=<BinaryCrossEntropyWithLogitsBackward0>), 'loss_objectness': tensor(8.1862, device='cuda:0',
-                #    grad_fn=<BinaryCrossEntropyWithLogitsBackward0>), 'loss_rpn_box_reg': tensor(0.9159, device='cuda:0', grad_fn=<DivBackward0>)}
-                # print(Y_pred)
-                # sys.exit()
-                # sum(loss for loss in Y_pred.values())
-                # print(Y_pred)
-                # print(type(Y_pred.values()))
 
                 # Select only losses of interest
                 losses = [value for loss, value in Y_pred.items()
                           if loss in loss_list]
 
                 losses = sum(losses)
-            # losses = Y_pred['loss_mask']
-            # print(losses)
-            # losses.backward()
-            # opt.step()
+
+                if j % 100 == 0:
+                    writer.add_scalar('training loss',
+                                      float(losses) / 200,
+                                      epoch * len(data_tr) + j)
+
+                # End of training loop for mini-batch
+
             scaler.scale(losses).backward()
             scaler.step(opt)
             scaler.update()
 
             # calculate metrics to show the user
             train_loss += float(losses / len(data_tr))
+
+            # End training loop for epoch
 
         toc = time()
         tot_train_losses.append(train_loss)
@@ -188,18 +181,12 @@ def train(model, opt, epochs, data_tr, data_val, time_str):
 
         # Validation
         with torch.no_grad(), autocast():
+            # x_val, y_val = to_device([x_val, y_val], device)
             x_val = [x.to(device) for x in x_val]
-            y_val = [{k: v.to(device) for k, v in t.items()}
-                     for t in y_val]
+            y_val = [{k: v.to(device) for k, v in t.items()} for t in y_val]
 
-            # print(model(X_val), '\n'*5)
-            output = model(x_val, y_val)  # losses
-            # float(sum(loss for loss in output.values()))
-            val_losses = [value for loss, value
-                          in output.items() if loss in loss_list]
+            val_losses = get_loss(model, loss_list, x_val, y_val)
 
-            val_losses = sum(val_losses)
-            # val_losses = output['loss_mask']
             scheduler.step(val_losses)
             # TODO: make sure scheduler works
             # by printing out the learning rate each epoch
@@ -207,80 +194,117 @@ def train(model, opt, epochs, data_tr, data_val, time_str):
             # Get current learning rate
             if i % log_every == 0:
                 # print(f'Current learning rate: {scheduler}')
-                print(f'Validation loss: {val_losses:.3f}')
+                print(f'Validation loss: {float(val_losses):.3f}')
 
+            writer.add_scalar('validation loss', float(val_losses), epoch)
             tot_val_losses.append(float(val_losses))
 
-        # Save progress every 50 epochs
-        if i % save_every == 0:
-            # Make folder unique to this run in order to save model and loss
-            try:
-                mkdir(save)
-            except FileExistsError:
-                pass
+            # Save progress every `save_every` epochs
+            if i % save_every == 0:
+                dump_model(model, time_str)
 
-            pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
+            if i == save_every:
+                debug_opencv_mask()
 
-        if i == save_every:
-            # Visualize the masks generated by opencv
-            # for debugging purposes
-            dataset = BetaCellDataset(DATA_DIR)
-            img, target = dataset[500]
-            plt.subplot(1, 2, 1)
-            plt.imshow(img, cmap='viridis')
-            plt.subplot(1, 2, 2)
-            # Values in target['masks'] are either 0 or 1
-            # so multiply by 255 for image pixel values
-            plotted = torch.sum(target['masks'], dim=0) * 255
-            plt.imshow(plotted, cmap='gray')
-            plt.savefig(join(save, 'opencv_mask.jpg'))
+            model.eval()
+            y_hat = model(x_val)
 
-        # model.eval()
-        # y_hat = model(x_val)
-
-        # y_hat = [y['masks'] for y in y_hat]
-        # y_hat = [item.squeeze(1) for item in y_hat]
+            # Convert ys to masks
+            # yhat_boxes = [y['boxes']] .....
+            # Convert y_hat to CUDA
+            # y_hat = to_device([y_hat], device)
+            y_hat = [{k: v.to(device) for k, v in t.items()} for t in y_hat]
+            # Strip everything except masks
+            y_hat, y_val = y_to_mask([y_hat, y_val])
+            # Consolidate masks in batch
+            y_hat = [get_mask(y) for y in y_hat]
+            y_val = [get_mask(y) for y in y_val]
 
         # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
-        # print('yhat', y_hat.shape)
-        # for x in x_val:
-        #     print('first', x.shape)
-        #     x = np.array(x.cpu())
-        #     x = cv2.normalize(x, x, alpha=0, beta=255,
-        #                       dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-        #     print('after normalize', x.shape)
-        #     # x = np.expand_dims(x, 0)
-        #     # print('after expand', x.shape)
+        image_grid = make_grid([*y_val, *y_hat], nrow=batch_size, pad_value=150, padding=15)
+        image_grid = image_grid.squeeze().unsqueeze(1)
+        image_grid = (image_grid * 255).type(torch.uint8)
+        writer.add_image(f'epoch_{epoch}', image_grid,
+                         epoch, dataformats='NCHW')
 
-        #     x = cv2.cvtColor(x, cv2.COLOR_GRAY2RGB)
-        #     print('after cvtcolor', x.shape)
+        writer.add_hparams(
+            hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
+    # select random images and their target indices
+    # images, labels = select_n_random()
 
-        #     x = torch.tensor(x)
-        #     print(x.shape)
-        #     print(x)
-        #     y_hat = draw_segmentation_masks(x, y_hat)
-        # print('yhat_val', y_hat.shape)
+    # # get the class labels for each image
+    # # class_labels = [classes[lab] for lab in labels]
 
-        # #  y_batch = [{k: v.to(device) for k, v in t.items()}
-        # # for t in y_batch]
+    # # log embeddings
+    # # features = images.view(-1, 28 * 28)
+    # writer.add_embedding(images,
+    #                         label_img=images.unsqueeze(1))
 
-        # for k in range(batch_size):
-        #     plt.subplot(2, batch_size, k+1)
-        #     plt.imshow(np.rollaxis(x_val[k].numpy(), 0, 3), cmap='gray')
-        #     plt.title('Real')
-        #     plt.axis('off')
-
-        #     plt.subplot(2, batch_size, k+batch_size+1)
-        #     plt.imshow(y_hat[k], cmap='gray')
-        #     plt.title('Output')
-        #     plt.axis('off')
-        # plt.suptitle('%d / %d - loss: %f' % (epoch+1, epochs, val_losses))
-        # plt.show()
-        # plt.savefig(join(save, 'training_{i}.jpg'))
-
-        # pickle.dump([tot_train_losses, tot_val_losses], open('loss.pkl', 'wb'))
+    writer.close()
 
     return tot_train_losses, tot_val_losses
+
+
+def to_device(tensor_list, device):
+    '''
+    Moves data onto device.
+    '''
+    main_list = []
+    for batch in tensor_list:
+        if type(batch) == dict:
+            batch = [{k: v.to(device) for k, v in t.items()}
+                     for t in batch]
+        elif type(batch) == torch.Tensor:
+            batch = [x.to(device) for x in batch]
+        main_list.append(batch)
+    print(main_list[0][0].is_cuda)
+    return main_list
+
+
+def y_to_mask(ys):
+    if type(ys) == dict:
+        ys = [item['masks'] for item in ys]
+        ys = [item.squeeze(1) for item in ys]
+        return ys
+    for y in ys:
+        y = [item['masks'] for item in y]
+        y = [item.squeeze(1) for item in y]
+    return ys
+
+
+def get_loss(model, loss_list, x_val, y_val):
+    output = model(x_val, y_val)  # losses
+    # float(sum(loss for loss in output.values()))
+    val_losses = [value for loss, value
+                  in output.items() if loss in loss_list]
+
+    val_losses = sum(val_losses)
+    return val_losses
+
+
+def debug_opencv_mask():
+    # Visualize the masks generated by opencv
+    # for debugging purposes
+    dataset = BetaCellDataset(DATA_DIR)
+    img, target = dataset[500]
+    plt.subplot(1, 2, 1)
+    plt.imshow(img, cmap='viridis')
+    plt.subplot(1, 2, 2)
+    # Values in target['masks'] are either 0 or 1
+    # so multiply by 255 for image pixel values
+    plotted = torch.sum(target['masks'], dim=0) * 255
+    plt.imshow(plotted, cmap='gray')
+    plt.savefig(join(save, 'opencv_mask.jpg'))
+
+
+def dump_model(model, time_str):
+    # Make folder unique to this run in order to save model and loss
+    try:
+        mkdir(save)
+    except FileExistsError:
+        pass
+
+    pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
 
 
 def predict(model, data):
@@ -288,6 +312,22 @@ def predict(model, data):
     model.eval()  # testing mode
     Y_pred = [F.sigmoid(model(X_batch.to(device))) for X_batch, _ in data]
     return np.array(Y_pred)
+
+# helper function
+
+
+def select_n_random(n=100):
+    '''
+    Selects n random datapoints and their corresponding labels from a dataset
+    source:
+    https://pytorch.org/tutorials/intermediate/tensorboard_tutorial.html
+    '''
+    assert len(data) == len(labels)
+
+    data = BetaCellDataset()
+
+    perm = torch.randperm(len(data))
+    return data[perm][:n]
 
 
 def bce_loss(y_real, y_pred):
@@ -343,16 +383,31 @@ lr = 0.00001  # 0.00001
 wd = 0.001  # 0.001
 opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
 
-losses = train(model, opt, num_epochs, data_tr, data_val, time_str)
+loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
+             'loss_classifier', 'loss_objectness']
+loss_list = ['loss_mask', 'loss_rpn_box_reg']
+
+hparam_dict = {
+    'learning_rate': lr,
+    'weight_decay': wd,
+    'num_epochs': num_epochs,
+    'optimizer': f'{opt}',
+    'losses': ';'.join(loss_list),
+    'img_size': size if size else 1024,
+    'batch_size': batch_size,
+    'pretrained': pretrained
+}
+# TODO: add "how many weakly annotated"
+# TODO: add /pred/ folder in addition to /runs/
+# so...
+
+losses = train(model, opt, hparam_dict, num_epochs,
+               data_tr, data_val, time_str)
 losses = np.array(losses).T
 
-description = f'''{time_str}\n
-                Learning rate: {lr}\n
-                Weight decay: {wd}\n
-                Optimizer: {opt}\n
-               '''
+description = f'{time_str}\nLearning rate: {lr}\nWeight decay: {wd}\nOptimizer: {opt}\n'
 
-# Special note that is saved as the name of a file with 
+# Special note that is saved as the name of a file with
 # a name which is the value of the string `special_mark`
 special_mark = ''
 if special_mark:
