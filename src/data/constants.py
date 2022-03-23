@@ -67,3 +67,4 @@ SIMPLE_THRESHOLD = 80
 # How often to print out with matplotlib
 # for make_dataset.py and annotate.py
 DBG_EVERY = 70
+IMG_EXT = 'png'

@@ -8,7 +8,7 @@ import tifffile as tiff
 import matplotlib.pyplot as plt
 
 from constants import (MEDIAN_FILTER_KERNEL, RAW_DATA_DIR, RAW_FILE_DIMENSIONS,
-                       RAW_FILES, RAW_CUTOFFS, IMG_DIR, DBG_EVERY, START_IDX)
+                       RAW_FILES, RAW_CUTOFFS, IMG_DIR, DBG_EVERY, START_IDX, IMG_EXT)
 
 raw_data_dir = RAW_DATA_DIR
 files = RAW_FILES[START_IDX:]
@@ -69,17 +69,17 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                               for page in pages[i: i + D]]
 
                 image_max = np.max(image_list, axis=0)
-                image_max = cv2.normalize(image_max, image_max, alpha=0, beta=255,
+                image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
                                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
                 image_max = cv2.fastNlMeansDenoising(
                     image_max, None, 11, 7, 21)
                 np.save(save, image_max)
 
-                # Save intermittently to .jpg for debugging
-                if i % (old_D * debug_every) == 0:
-                    dirs = os.path.dirname(save)
-                    file = os.path.basename(save)
-                    plt.imsave(f'{dirs}/_{file}.jpg', image_max)
+            # Save intermittently to .jpg for debugging
+            if i % (D * debug_every) == 0:
+                dirs = os.path.dirname(save)
+                file = os.path.basename(save)
+                plt.imsave(f'{dirs}/_{file}.{IMG_EXT}', image_max)
 
             # -1 because index was updated to +1 above
             # print(f'Image {idx-1} saved.')
