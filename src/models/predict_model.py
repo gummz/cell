@@ -32,16 +32,34 @@ def get_mask(target):
     else:  # target is a tensor of masks
         mask = target
     mask = torch.squeeze(mask, dim=1)
-    mask = torch.sum(mask, dim=0)
-    mask = np.array(mask)
+
+    if mask.shape[0] != 0:
+        mask = torch.max(mask, dim=0).values
+    else:
+        try:
+            mask = torch.zeros((mask.shape[1], mask.shape[2])).to(
+                mask.get_device())
+        except RuntimeError:  # no GPU
+            mask = torch.zeros((mask.shape[1], mask.shape[2]))
+
+    # mask = np.array(mask)
     # mask = np.where(mask > 255, 255, mask)
     # mask = np.where(mask > 200, 255, 0)
-    mask = torch.tensor(mask, dtype=torch.uint8)
+    mask = mask.clone().detach().type(torch.uint8)
+    # torch.tensor(mask, dtype=torch.uint8)
 
     return mask
 
 
-def get_prediction(model, device, image):
+def get_predictions(model, device, inputs):
+
+    model.eval()
+
+    with torch.no_grad():
+        pred = model(input)
+
+
+def get_prediction(model, device, input):
 
     model.eval()
 
@@ -50,10 +68,10 @@ def get_prediction(model, device, image):
     with torch.no_grad():
         # only choose one image
         # visualize this exact image I'm sending to the model
-        img = image.to(device)
+        input = input.to(device)
         # print(np.unique(img.cpu()))
         # TODO: put target into model to see if it segments
-        pred = model([img])
+        pred = model([input])
 
     # pred list only has one item because we only chose one image
     mask = pred[0]['masks']
@@ -66,7 +84,7 @@ def get_prediction(model, device, image):
 
     # scores = np.array(pred[0]['scores'].cpu())
     # print('scores max/min', np.max(scores), np.min(scores), '\n')
-    img = cv2.normalize(img.cpu().numpy(), None, alpha=0,
+    img = cv2.normalize(input.cpu().numpy(), None, alpha=0,
                         beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     img = torch.tensor(img, dtype=torch.uint8)
     img = img.repeat(3, 1, 1)
@@ -80,7 +98,8 @@ def get_prediction(model, device, image):
 
     return img, mask
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     # Set working directory to file location
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
@@ -97,18 +116,18 @@ if __name__=='__main__':
     time_str = '12_03_18H_29M_39S'
     folder = f'interim/run_{time_str}'
     # data_tr, data_val = get_dataloaders(resize=size)
-    dataset = BetaCellDataset(transforms=get_transform(train=False), resize=size)
+    dataset = BetaCellDataset(
+        transforms=get_transform(train=False), resize=size)
 
     model = get_model(time_str)
     model.to(device)
 
     # Get image and target
-    image, target = dataset[img_idx]
+    input, target = dataset[img_idx]
     # Get mask from target
     target_mask = get_mask(target)
 
-
-    img, mask = get_prediction(model, device, image)
+    img, mask = get_prediction(model, device, input)
 
     # Get segmentations and bounding boxes
     pred_mask = get_mask(mask)
@@ -118,12 +137,12 @@ if __name__=='__main__':
     bboxed_image = draw_bounding_boxes(pred_mask, boxes)
     bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
     print(bboxed_image.shape)
-    debug_img = np.array(image)[0, :, :]
+    debug_img = np.array(input)[0, :, :]
 
     # Print mask from model output
 
     plt.imsave(f'{folder}/pred_debug_mask.jpg',
-            bboxed_image.cpu().detach().numpy())
+               bboxed_image.cpu().detach().numpy())
     # Print image that was fed into the model
     plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
     # Print target mask from dataset
