@@ -83,7 +83,7 @@ time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second
 save = f'interim/run_{time_str}'
 
 
-def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
+def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
 
@@ -108,8 +108,6 @@ def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
 
     tot_train_losses = []
     tot_val_losses = []
-
-    writer = SummaryWriter(f'runs/{time_str}')
 
     # print(x_val[0].unsqueeze(0).shape)
     # writer.add_graph(model, [x_val[0].to(device)])
@@ -194,10 +192,10 @@ def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
             # Get current learning rate
             if i % log_every == 0:
                 # print(f'Current learning rate: {scheduler}')
-                print(f'Validation loss: {float(val_losses):.3f}')
+                print(f'Validation loss: {val_losses.item():.3f}')
 
             writer.add_scalar('validation loss', float(val_losses), epoch)
-            tot_val_losses.append(float(val_losses))
+            tot_val_losses.append(val_losses.item())
 
             # Save progress every `save_every` epochs
             if i % save_every == 0:
@@ -221,7 +219,13 @@ def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
             y_val = [get_mask(y) for y in y_val]
 
         # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
-        image_grid = make_grid([*y_val, *y_hat], nrow=batch_size, pad_value=150, padding=15)
+        x_val = [x.squeeze() for x in x_val]
+        print([x.shape for x in x_val])
+        print([y.shape for y in y_hat])
+        print([y.shape for y in y_val], '\n\n')
+
+        image_grid = make_grid(
+            [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
         image_grid = image_grid.squeeze().unsqueeze(1)
         image_grid = (image_grid * 255).type(torch.uint8)
         writer.add_image(f'epoch_{epoch}', image_grid,
@@ -239,8 +243,6 @@ def train(model, opt, hparam_dict, epochs, data_tr, data_val, time_str):
     # # features = images.view(-1, 28 * 28)
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
-
-    writer.close()
 
     return tot_train_losses, tot_val_losses
 
@@ -336,47 +338,7 @@ def bce_loss(y_real, y_pred):
                       + torch.log(1 + torch.exp(-y_pred)))
 
 
-# and a learning rate scheduler which decreases the learning rate by
-# 10x every 3 epochs
-# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-#                                                step_size=3,
-#                                                gamma=0.1)
-
 params = [p for p in model.parameters() if p.requires_grad]
-
-# Start with learning rate of just 1
-# due to decreasing learning rate on plateau
-# num_epochs = 3
-# learning_rates = [1]  # [1e-8, 1e-6, 1e-4, 1e-2, 0.1, 1]
-# optimizers = ['SGD', 'Adam']
-# weight_decays = [1e-8, 1e-2, 0.1, 1]
-
-# def grid_search(model, params, data_tr, data_val, train, num_epochs, learning_rates, optimizers, weight_decays):
-#     '''Grid search for hyperparameters'''
-#     losses = []
-
-#     for learning_rate in learning_rates:
-#         for weight_decay in weight_decays:
-#             for name in optimizers:
-#                 if name == 'SGD':
-#                     opt = torch.optim.SGD(params, lr=learning_rate,
-#                                           momentum=0.9, weight_decay=weight_decay)
-#                 else:
-#                     opt = optim.Adam(params, lr=learning_rate,
-#                                      weight_decay=weight_decay)
-#                 print('____________________________________')
-#                 print('Training:')
-#                 grid = f'lr={learning_rate}, wd={weight_decay}, opt={name}'
-#                 print(grid)
-#                 loss = train(model, opt, num_epochs, data_tr, data_val)
-
-#                 losses.append([loss, grid])
-#     return np.array(losses)
-
-# losses = grid_search(model, params, data_tr, data_val, train, num_epochs, learning_rates, optimizers, weight_decays)
-
-# losses = grid_search(model, params, data_tr, data_val, train,
-#                      num_epochs, learning_rates, optimizers, weight_decays)
 
 num_epochs = 10  # 500
 lr = 0.00001  # 0.00001
@@ -385,7 +347,7 @@ opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
 
 loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
              'loss_classifier', 'loss_objectness']
-loss_list = ['loss_mask', 'loss_rpn_box_reg']
+# loss_list = ['loss_mask', 'loss_rpn_box_reg']
 
 hparam_dict = {
     'learning_rate': lr,
@@ -399,24 +361,35 @@ hparam_dict = {
 }
 # TODO: add "how many weakly annotated"
 # TODO: add /pred/ folder in addition to /runs/
-# so...
+# so make a writer in predict_model which saves images
+# add_video í SummaryWriter
 
-losses = train(model, opt, hparam_dict, num_epochs,
-               data_tr, data_val, time_str)
+description = f'''{time_str}\n
+                    Learning rate: {lr}\n
+                    Weight decay: {wd}\n
+                    Optimizer: {opt}\n
+                    Losses: {loss_list}
+                    
+                    Denoised training set
+
+                    '''
+
+with SummaryWriter(f'runs/{time_str}') as w:
+    losses = train(model, opt, num_epochs,
+                   data_tr, data_val, time_str, hparam_dict, w)
+    w.add_text('description', description)
+
 losses = np.array(losses).T
 
-description = f'{time_str}\nLearning rate: {lr}\nWeight decay: {wd}\nOptimizer: {opt}\n'
 
 # Special note that is saved as the name of a file with
 # a name which is the value of the string `special_mark`
-special_mark = ''
+special_mark = 'all_losses'
 if special_mark:
     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
 
-np.savetxt(join(save, f'descr_{time_str}.txt'), description)
 np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
 pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
-pickle.dump(np.array([]), open(join(save, f'loss_{losses[1][-1]:.3f}.pkl')))
 
 plt.subplot(121)
 plt.plot(losses[0])
