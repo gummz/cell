@@ -19,6 +19,8 @@
 - - - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
 - - - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
 
+- For faster debugging, have a small dataset in local environment
+
 - Investigate how much training data is needed
 
 
