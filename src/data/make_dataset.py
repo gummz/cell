@@ -69,10 +69,9 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                               for page in pages[i: i + D]]
 
                 image_max = np.max(image_list, axis=0)
-                image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
-                                          dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-                image_max = cv2.fastNlMeansDenoising(
-                    image_max, None, 11, 7, 21)
+                # image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
+                #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+                
                 np.save(save, image_max)
 
             # Save intermittently to .jpg for debugging
