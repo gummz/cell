@@ -47,9 +47,12 @@ class BetaCellDataset(torch.utils.data.Dataset):
         mask_path = join(self.root, MASK_DIR, self.masks[idx])
 
         img = np.int16(np.load(img_path))
-        print_unique(img, 'after first load')
-        img = cv2.normalize(img, img, alpha=0, beta=255,
-                            dtype=cv2.CV_16SC1, norm_type=cv2.NORM_MINMAX)
+        # PREPROCESSING
+        img = cv2.normalize(img, None, alpha=0, beta=255,
+                            dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+        img = cv2.fastNlMeansDenoising(
+            img, None, 11, 7, 21)
+        # END PREPROCESSING
 
         mask = np.load(mask_path)
         mask = np.array(mask)
@@ -73,6 +76,10 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # lower number of labels by 1 to account for
         # background removal
         numLabels = output[0] - 1
+        # TODO: preprocess inside __getitem__
+        # don't need to create a new dataset every time!
+        # easier to experiment this way.
+
         # `labels_out` denotes
         labels_out = np.array(output[1])
         # remove background label from stats
