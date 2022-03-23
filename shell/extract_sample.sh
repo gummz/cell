@@ -3,7 +3,7 @@
 ### -- specify queue -- 
 #BSUB -q hpc
 ### -- set the job Name -- 
-#BSUB -J make_dataset
+#BSUB -J extract_sample
 ### -- ask for number of cores (default: 1) -- 
 #BSUB -n 4 
 ### -- specify that the cores must be on the same host -- 
@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 -m cProfile -s tottime ../src/data/make_dataset.py > pyout
+python3 ../src/data/extract_sample.py > pyout

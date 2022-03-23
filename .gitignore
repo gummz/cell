@@ -95,6 +95,7 @@ venv_1/
 *.pkl
 *.jpg
 *.png
+*H_*
 # Makefile is different by systems
 Makefile
 /shell/pyout
@@ -105,3 +106,4 @@ Makefile
 **/masks*
 **/runs/
 descr_*
+shell/out
