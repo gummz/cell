@@ -40,6 +40,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.resize = resize
+        self.threshold = threshold
 
     def __getitem__(self, idx):
         # load images and mask
@@ -62,10 +63,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
             img = cv2.resize(img, size, cv2.INTER_AREA)
             mask = cv2.resize(mask, size, cv2.INTER_AREA)
 
-        # Convert to PIL image; requirement for the model
-        # img = Image.fromarray(img)
-        print_unique(img, 'after fromarray')
-
         output = cv2.connectedComponentsWithStatsWithAlgorithm(
             mask, conn, cv2.CV_32S, algo)
 
@@ -79,6 +76,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # TODO: preprocess inside __getitem__
         # don't need to create a new dataset every time!
         # easier to experiment this way.
+        # TODO: annotate inside __GETITEM__!!!! yeah!
 
         # `labels_out` denotes
         labels_out = np.array(output[1])
@@ -124,15 +122,11 @@ class BetaCellDataset(torch.utils.data.Dataset):
         target["area"] = area
         target["iscrowd"] = iscrowd
 
-        # print_unique(F.pil_to_tensor(img), 'before transforms, pil_to_tensor')
-
         if self.transforms is not None:
             # img, target = self.transforms(img, target)
             img = cv2.normalize(img, img, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
             img = F.pil_to_tensor(Image.fromarray(img))
-
-        print_unique(img, 'after transforms')
 
         # TODO:
         # https://stackoverflow.com/questions/66370250/how-does-pytorch-dataloader-interact-with-a-pytorch-dataset-to-transform-batches
@@ -141,24 +135,15 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # because the images in the batch have randomly different dimensions now.
         # issue isolated to ScaleJitter
 
-        # TODO:
-        # test newest model that was trained for 200 epochs
-        # predict_model.py
-
-        del mask
-        del output
-        del masks
-        print_unique(img, 'before return in __getitem__')
-
         return img, target
 
     def __len__(self):
         return len(self.imgs)
 
 
-def get_dataloaders(batch_size=4, num_workers=2, resize=False):
+def get_dataloaders(batch_size=4, num_workers=2, resize=1024):
     '''Get dataloaders.
-        If resize: resize image in __getitem__ method of dataset class.'''
+        resize: resize image in __getitem__ method of dataset class.'''
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
         DATA_DIR, get_transform(train=True), resize=resize)
@@ -167,11 +152,10 @@ def get_dataloaders(batch_size=4, num_workers=2, resize=False):
 
     # split the dataset in train and test set
     torch.manual_seed(1)
-    # Make last raw data file as test set
-    test_idx = len(dataset) - TIMEPOINTS[-1]
-    indices = torch.randperm(test_idx).tolist()
 
-    val_idx = int(0.10 * test_idx)
+    indices = torch.randperm(len(dataset)).tolist()
+
+    val_idx = int(0.1 * len(dataset))
 
     dataset = torch.utils.data.Subset(dataset, indices[:-val_idx])
     dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_idx:])

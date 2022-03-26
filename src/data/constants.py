@@ -49,9 +49,9 @@ TIMEPOINTS_TEST = [280, 289]
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
 IMG_DIR = 'imgs'
-IMG_TEST_DIR = 'imgs_test'
+IMG_DIR_TEST = 'imgs_test'
 MASK_DIR = 'masks'
-MASK_TEST_DIR = 'masks_test'
+MASK_DIR_TEST = 'masks_test'
 FIG_DIR = 'figures'
 
 NB_DIR = 'home/gummz/dtu/cell/cell/notebooks'

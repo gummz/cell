@@ -59,8 +59,8 @@ for i in range(1, 21, 2):
     img_blur = np.where(img_blur > 5, img_blur, 0)
     cv2.imwrite(f'{save}/{operation}_{img_name}_{i}.{IMG_EXT}', img_blur)
 
-cv2.imwrite(join(save, f'img_cv.{IMG_EXT}'), np.load(path))
-plt.imsave(join(save, f'img_plt.{IMG_EXT}'), np.int16(np.load(path)))
+cv2.imwrite(join(save, f'img_cv.{IMG_EXT}'), img)
+plt.imsave(join(save, f'img_plt.{IMG_EXT}'), img)
 
 # Operation
 # Denoise
@@ -73,7 +73,7 @@ for i in range(1, 21, 2):
                 f'{save}/{operation}_cv2_{img_name}_{i}_{j}_{k}.png', img_denoise)
             plt.imsave(
                 f'{save}/_TEST_{operation}_plt_{img_name}_{i}_{j}_{k}.png', img_denoise)
-            sys.exit()  
+            sys.exit()
 
 # Operation
 # Simple Threshold
