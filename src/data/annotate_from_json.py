@@ -39,6 +39,7 @@ masks_path = join(DATA_DIR, MASK_DIR_TEST)
 # List of filenames of the .npy images
 # .jpg files are for visualizing the process
 images = [image for image in listdir(imgs_path) if '.json' in image]
+print(imgs_path)
 print(images)
 masks = [mask for mask in listdir(masks_path) if '.npy' in mask]
 # Get full image paths from filename list `images`
@@ -80,4 +81,4 @@ for i, path in enumerate(image_paths):
 
 
 toc = time()
-print(f'annotate.py complete after {(toc-tic)/60: .1f} minutes.')
+print(f'annotate_from_json.py complete after {(toc-tic)/60: .1f} minutes.')
