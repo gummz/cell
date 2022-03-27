@@ -3,9 +3,15 @@ ssh -Y s203004@login.gbar.dtu.dk
 for opencv .imshow function to work properly:
 https://github.com/opencv/opencv/issues/18461
 
-Download files:
+Download files: (command entered in local terminal)
 /zhome/e2/e/154260 (homedir)
 scp -r s203004@transfer.gbar.dtu.dk:/dtu-compute/tubes/test /home/gummz/dtu/cell_data/
+
+scp -r s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/masks_test /home/gummz/dtu/cell_data/
+
+scp -r /home/gummz/dtu/cell_data/masks_test/mv s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/
+
+
 
 scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
 scp s20300@transfer.gbar.dtu.dk:/dtu-compute/tubes/raw_data/Muc1-mcherry_MIP-GFP_database_3.xlsx /home/gummz
