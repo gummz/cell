@@ -26,7 +26,7 @@ imgs_path = join(DATA_DIR, f'{IMG_DIR}')
 
 
 figures_dir = FIG_DIR
-folder = ' modify_single'
+folder = 'modify_single'
 modification = ''
 
 
