@@ -7,7 +7,7 @@ from os import listdir
 import matplotlib.pyplot as plt
 
 from src.data.constants import (
-    RAW_FILES, START_IDX,
+    IMG_DIR_TEST, MASK_DIR_TEST, RAW_FILES, RAW_FILES_GENERALIZE, START_IDX,
     MEDIAN_FILTER_KERNEL, SIMPLE_THRESHOLD, DATA_DIR,
     IMG_DIR, MASK_DIR, DBG_EVERY)
 
@@ -16,12 +16,12 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-files = RAW_FILES
+files = RAW_FILES_GENERALIZE
 kernel = MEDIAN_FILTER_KERNEL
 threshold = SIMPLE_THRESHOLD
 
 # Create folder in case it doesn't exist yet
-folder_name = MASK_DIR
+folder_name = MASK_DIR_TEST
 folder = join(DATA_DIR, folder_name)
 try:
     os.mkdir(folder)
@@ -32,8 +32,8 @@ except FileExistsError:
 debug_every = DBG_EVERY
 
 # Name of the folder in which the images will reside
-imgs_path = join(DATA_DIR, IMG_DIR)
-masks_path = join(DATA_DIR, MASK_DIR)
+imgs_path = join(DATA_DIR, IMG_DIR_TEST)
+masks_path = join(DATA_DIR, MASK_DIR_TEST)
 # List of filenames of the .npy images
 # .jpg files are for visualizing the process
 images = [image for image in listdir(imgs_path) if '.npy' in image]
@@ -69,11 +69,11 @@ for i, path in enumerate(image_paths):
     np.save(save, thresh)
 
     # Save as .jpg for debugging
-    if i % debug_every == 0:
+    if True:  # i % debug_every == 0:
         dirs = os.path.dirname(save)
         file = os.path.basename(save)
         plt.imsave(f'{dirs}/_{file}.jpg', thresh, cmap='gray')
 
 
 toc = time()
-print(f'annotate.py complete after {(tic-toc)/60: .1f} minutes.')
+print(f'annotate.py complete after {(toc-tic)/60: .1f} minutes.')

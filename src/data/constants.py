@@ -35,6 +35,9 @@ RAW_CUTOFFS = dict(zip(RAW_FILES, cutoffs))
 # 'LI_2020-06-17_emb7_pos3.lsm'
 # ^ changed file extension to .cri
 
+cutoffs_test = [None, None]
+RAW_CUTOFFS_TEST = dict(zip(RAW_FILES_GENERALIZE, cutoffs_test))
+
 # z-dimensions of the raw data files, in order
 idx = [29, 33, 29, 33, 36, 33, 33]
 RAW_FILE_DIMENSIONS = dict(zip(RAW_FILES, idx))

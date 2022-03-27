@@ -7,12 +7,12 @@ import numpy as np
 import tifffile as tiff
 import matplotlib.pyplot as plt
 
-from constants import (MEDIAN_FILTER_KERNEL, RAW_DATA_DIR, RAW_FILE_DIMENSIONS,
-                       RAW_FILES, RAW_FILES_GENERALIZE, RAW_FILE_DIMENSIONS_TEST, RAW_CUTOFFS, IMG_DIR, IMG_DIR_TEST, DBG_EVERY, START_IDX, IMG_EXT)
+from constants import (MEDIAN_FILTER_KERNEL, RAW_DATA_DIR, RAW_FILE_DIMENSIONS, RAW_FILE_DIMENSIONS_TEST,
+                       RAW_FILES, RAW_FILES_GENERALIZE, RAW_CUTOFFS, RAW_CUTOFFS_TEST, IMG_DIR, IMG_DIR_TEST, DBG_EVERY, START_IDX, IMG_EXT)
 
 raw_data_dir = RAW_DATA_DIR
 files = RAW_FILES_GENERALIZE[START_IDX:]
-cutoffs = RAW_CUTOFFS
+cutoffs = RAW_CUTOFFS_TEST
 file_paths = [join(raw_data_dir, file) for file in files]
 Ds = RAW_FILE_DIMENSIONS_TEST
 
@@ -72,9 +72,9 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
                 # image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
                 #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 
-                # np.save(save, image_max)
+                np.save(save, image_max)
 
-            # Save intermittently to .jpg for debugging
+            # Save intermittently to .png for debugging
             if True:  # i % (D * debug_every) == 0:
                 dirs = os.path.dirname(save)
                 file = os.path.basename(save)
@@ -84,4 +84,4 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
             # print(f'Image {idx-1} saved.')
 
 toc = time()
-print(f'make_dataset.py complete after {(toc-tic)/60: .1f}')
+print(f'make_dataset.py complete after {(toc-tic)/60: .1f} minutes.')
