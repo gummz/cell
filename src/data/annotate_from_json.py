@@ -6,30 +6,20 @@ from os import listdir
 from os.path import join
 from time import time
 
-import cv2
-import labelme
-import matplotlib.pyplot as plt
-import numpy as np
-from PIL import Image
-from labelme.utils import img_b64_to_arr
-from labelme import LabelFile
-from src.data.constants import (DATA_DIR, DBG_EVERY, IMG_DIR, IMG_DIR_TEST, FIG_DIR,
-                                MASK_DIR, MASK_DIR_TEST, MASK_DIR_TEST_FULL, MEDIAN_FILTER_KERNEL,
-                                RAW_FILES, RAW_FILES_GENERALIZE,
-                                SIMPLE_THRESHOLD, START_IDX)
+import src.data.constants as c
 
 # Set working directory to script location
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
-files = RAW_FILES_GENERALIZE
-kernel = MEDIAN_FILTER_KERNEL
-threshold = SIMPLE_THRESHOLD
+files = c.RAW_FILES_GENERALIZE
+kernel = c.MEDIAN_FILTER_KERNEL
+threshold = c.SIMPLE_THRESHOLD
 
 # Create folder in case it doesn't exist yet
-folder_name = MASK_DIR_TEST_FULL
-folder = join(DATA_DIR, folder_name)
+folder_name = c.MASK_DIR_TEST
+folder = join(c.DATA_DIR, folder_name)
 try:
     os.mkdir(folder)
 except FileExistsError:
@@ -40,11 +30,11 @@ except FileExistsError:
     pass
 
 # How often to print out with matplotlib
-debug_every = DBG_EVERY
+debug_every = c.DBG_EVERY
 
 # Name of the folder in which the images will reside
-imgs_path = join(DATA_DIR, IMG_DIR_TEST)
-masks_path = join(DATA_DIR, MASK_DIR_TEST)
+imgs_path = join(c.DATA_DIR, c.IMG_DIR_TEST)
+masks_path = join(c.DATA_DIR, c.MASK_DIR_TEST)
 # List of filenames of the .npy images
 # .jpg files are for visualizing the process
 images = [image for image in listdir(imgs_path) if '.json' in image]

@@ -25,12 +25,13 @@ def get_model(time_str):
     return model
 
 
-def get_mask(target):
+def get_mask(output):
     '''Consolidates the masks into one mask.'''
-    if type(target) == dict:  # target is direct output of model
-        mask = target['masks']
-    else:  # target is a tensor of masks
-        mask = target
+    if type(output) == dict:  # `output` is direct output of model (from one image)
+        mask = output['masks']
+    else:
+        mask = output  # target is a tensor of masks (from one image)
+
     mask = torch.squeeze(mask, dim=1)
 
     if mask.shape[0] != 0:
@@ -51,12 +52,22 @@ def get_mask(target):
     return mask
 
 
+def get_masks(outputs):
+    masks = [get_mask(output) for output in outputs]
+    masks = torch.stack(masks, dim=0)
+
+    return masks
+
+
 def get_predictions(model, device, inputs):
 
     model.eval()
 
     with torch.no_grad():
-        pred = model(input)
+        preds = model(inputs)
+
+    masks = [item['masks'] for item in preds]
+    boxes = [item['boxes'] for item in preds]
 
 
 def get_prediction(model, device, input):
