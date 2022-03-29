@@ -55,6 +55,7 @@ IMG_DIR = 'imgs'
 IMG_DIR_TEST = 'imgs_test'
 MASK_DIR = 'masks'
 MASK_DIR_TEST = 'masks_test'
+MASK_DIR_TEST_FULL = 'masks_test_full'
 FIG_DIR = 'figures'
 
 NB_DIR = 'home/gummz/dtu/cell/cell/notebooks'
