@@ -1,6 +1,7 @@
-import torch
+import torch.tensor
+import torch.multinomial
 from tifffile.tifffile import TiffFile
-from src.data.constants import RAW_DATA_DIR, TIMEPOINTS, RAW_FILE_DIMENSIONS, TIMEPOINTS_TEST, RAW_FILE_DIMENSIONS_TEST, RAW_FILES, RAW_FILES_GENERALIZE
+import src.data.constants as c
 from os.path import join
 
 
@@ -8,18 +9,19 @@ def get_raw_array(file_path, index, train=True, every_second=True, sample=0.01):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
+    Output is 4D (timepoints and xyz spatial dimensions)
     '''
     if train:
-        timepoints = TIMEPOINTS[index]
+        timepoints = c.TIMEPOINTS[index]
         # z-dimension
-        D = RAW_FILE_DIMENSIONS[index]
-        file = RAW_FILES[index]
+        D = c.RAW_FILE_DIMENSIONS[index]
+        file = c.RAW_FILES[index]
     else:
-        timepoints = TIMEPOINTS_TEST[index]
-        D = RAW_FILE_DIMENSIONS_TEST[index]
-        file = RAW_FILES_GENERALIZE[index]
+        timepoints = c.TIMEPOINTS_TEST[index]
+        D = c.RAW_FILE_DIMENSIONS_TEST[index]
+        file = c.RAW_FILES_GENERALIZE[index]
 
-    file_path = join(RAW_DATA_DIR, file)
+    file_path = join(c.RAW_DATA_DIR, file)
     num_samples = int(timepoints * sample)
 
     with TiffFile(file_path) as f:
