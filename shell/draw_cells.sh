@@ -24,7 +24,9 @@
 #BSUB -oo out
 #BSUB -eo err
 
-module load python3/3.8.2
+module load python3/3.8.11
+module load cuda/11.1
+
 #python3 -m venv venv_1
 source ../venv_1/bin/activate
 
@@ -37,4 +39,4 @@ source ../venv_1/bin/activate
 ###python3 -m pip install -e ../.
 
 # Run file
-python3 ../src/visualization/draw_cells.py > pyout
+python3 -m cProfile -s tottime ../src/visualization/draw_cells.py > pyout
