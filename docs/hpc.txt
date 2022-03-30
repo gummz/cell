@@ -7,7 +7,7 @@ Download files: (command entered in local terminal)
 /zhome/e2/e/154260 (homedir)
 scp -r s203004@transfer.gbar.dtu.dk:/dtu-compute/tubes/test /home/gummz/dtu/cell_data/
 
-scp -r s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/masks_test /home/gummz/dtu/cell_data/
+scp s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/imgs_test/00002.npy /home/gummz/dtu/cell/cell/data/interim/imgs_test
 
 scp -r /home/gummz/dtu/cell_data/masks_test/mv s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/
 

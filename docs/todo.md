@@ -1,10 +1,8 @@
-
-
-
-
 - Arrange it such that everything is logged properly; Tensorboard/PyTorch Lightning?
 
 - Create a diary with recent runs (some may need to be rerun)
+
+- Extract a small sample of a raw data tiff file for rapid testing on local machine (for predictions)
 
 - Create a test set in which manual annotations of the weaker annotations have been added
 
