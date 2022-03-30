@@ -7,17 +7,16 @@ import numpy as np
 import tifffile as tiff
 import matplotlib.pyplot as plt
 
-from constants import (MEDIAN_FILTER_KERNEL, RAW_DATA_DIR, RAW_FILE_DIMENSIONS, RAW_FILE_DIMENSIONS_TEST,
-                       RAW_FILES, RAW_FILES_GENERALIZE, RAW_CUTOFFS, RAW_CUTOFFS_TEST, IMG_DIR, IMG_DIR_TEST, DBG_EVERY, START_IDX, IMG_EXT)
+import src.data.constants as c
 
-raw_data_dir = RAW_DATA_DIR
-files = RAW_FILES_GENERALIZE[START_IDX:]
-cutoffs = RAW_CUTOFFS_TEST
+raw_data_dir = c.RAW_DATA_DIR
+files = c.RAW_FILES_GENERALIZE[c.START_IDX:]
+cutoffs = c.RAW_CUTOFFS_TEST
 file_paths = [join(raw_data_dir, file) for file in files]
-Ds = RAW_FILE_DIMENSIONS_TEST
+Ds = c.RAW_FILE_DIMENSIONS_TEST
 
 # Create `IMG_DIR` folder, in case it doesn't exist
-folder_name = IMG_DIR_TEST
+folder_name = c.IMG_DIR_TEST
 folder = f'../data/interim/{folder_name}'
 try:
     os.mkdir(folder)
@@ -35,7 +34,7 @@ images = [image for image in listdir(folder) if '.npy' in image]
 img_idx = len(images) - 1 + 1
 idx = img_idx if img_idx > 0 else 0  # numbering for images
 # How often to print out with matplotlib
-debug_every = DBG_EVERY
+debug_every = c.DBG_EVERY
 
 tic = time()
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
@@ -78,7 +77,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
             if True:  # i % (D * debug_every) == 0:
                 dirs = os.path.dirname(save)
                 file = os.path.basename(save)
-                plt.imsave(f'{dirs}/_{file}.{IMG_EXT}', image_max)
+                plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', image_max)
 
             # -1 because index was updated to +1 above
             # print(f'Image {idx-1} saved.')
