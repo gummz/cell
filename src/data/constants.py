@@ -1,4 +1,16 @@
-from aicsimageio import AICSImage
+# from aicsimageio import AICSImage
+import pandas as pd
+import os
+from os.path import join
+
+
+def setcwd():
+    # Set working directory to script location
+    '''Set working directory to script location'''
+    abspath = os.path.abspath(__file__)
+    dname = os.path.dirname(abspath)
+    os.chdir(dname)
+
 
 # CONNECTED COMPONENT ANALYSIS
 CV2_CONNECTED_ALGORITHM = 1
@@ -77,3 +89,6 @@ DBG_EVERY = 70
 IMG_EXT = 'png'
 
 CELL_CHANNEL = 0
+
+EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
+EXCEL_SHEET = pd.read_csv(join(DATA_DIR, EXCEL_FILENAME))
