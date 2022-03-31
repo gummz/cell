@@ -2,7 +2,7 @@
 ### General options
 ### –- specify queue --
 #BSUB -q gpuv100
-### For Gpu: -q gpuv100
+### For Gpu: -q gpuv100 or gpua100
 ### -- set the job Name --
 #BSUB -J annotate_test
 ### -- ask for number of cores (default: 1) --
@@ -37,8 +37,7 @@ source ../venv_1/bin/activate
 ###python3 -m pip --disable-pip-version-check install pickle
 ###python3 -m pip --disable-pip-version-check install matplotlib
 ###python3 -m pip --disable-pip-version-check install opencv-python==3.4.16.57
-###python3 -m pip --disable-pip-version-check install moviepy
-
+###python3 -m pip --disable-pip-version-check install -e ../.
 
 # Run file
-python3 ../src/visualization/annotate_test.py > pyout
+python3 ../src/data/annotate_test.py > pyout

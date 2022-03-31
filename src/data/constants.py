@@ -1,3 +1,5 @@
+from aicsimageio import AICSImage
+
 # CONNECTED COMPONENT ANALYSIS
 CV2_CONNECTED_ALGORITHM = 1
 NUMBER_CONNECTIVITY = 8
@@ -57,6 +59,7 @@ MASK_DIR = 'masks'
 MASK_DIR_TEST = 'masks_test'
 MASK_DIR_TEST_FULL = 'masks_test_full'
 FIG_DIR = 'figures'
+FILE_DIR = 'files'
 
 NB_DIR = 'home/gummz/dtu/cell/cell/notebooks'
 
@@ -72,3 +75,5 @@ SIMPLE_THRESHOLD = 80
 # for make_dataset.py and annotate.py
 DBG_EVERY = 70
 IMG_EXT = 'png'
+
+CELL_CHANNEL = 0

@@ -2,7 +2,6 @@ import os
 from os import listdir
 from os.path import join
 from time import time
-import cv2
 import numpy as np
 import tifffile as tiff
 import matplotlib.pyplot as plt
@@ -10,13 +9,13 @@ import matplotlib.pyplot as plt
 import src.data.constants as c
 
 raw_data_dir = c.RAW_DATA_DIR
-files = c.RAW_FILES_GENERALIZE[c.START_IDX:]
-cutoffs = c.RAW_CUTOFFS_TEST
+files = c.RAW_FILES[c.START_IDX:]
+cutoffs = c.RAW_CUTOFFS
 file_paths = [join(raw_data_dir, file) for file in files]
-Ds = c.RAW_FILE_DIMENSIONS_TEST
+Ds = c.RAW_FILE_DIMENSIONS
 
 # Create `IMG_DIR` folder, in case it doesn't exist
-folder_name = c.IMG_DIR_TEST
+folder_name = c.IMG_DIR
 folder = f'../data/interim/{folder_name}'
 try:
     os.mkdir(folder)
