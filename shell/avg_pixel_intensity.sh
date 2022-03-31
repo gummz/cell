@@ -38,6 +38,6 @@ source ../venv_1/bin/activate
 ###python3 -m pip install -e ../.
 ###python3 -m pip --disable-pip-version-check install aicsimageio
 
-
+# -m cProfile -s tottime
 # Run file
-python3 -m cProfile -s tottime ../src/data/avg_pixel_intensity.py > pyout
+python3 ../src/data/avg_pixel_intensity.py > pyout
