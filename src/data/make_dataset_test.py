@@ -2,22 +2,20 @@ import os
 from os import listdir
 from os.path import join
 from time import time
-import cv2
 import numpy as np
-import tifffile as tiff
 import matplotlib.pyplot as plt
+from aicsimageio import AICSImage
 
-from constants import (MEDIAN_FILTER_KERNEL, RAW_DATA_DIR, RAW_FILE_DIMENSIONS, RAW_FILE_DIMENSIONS_TEST,
-                       RAW_FILES, RAW_FILES_GENERALIZE, RAW_CUTOFFS, RAW_CUTOFFS_TEST, IMG_DIR, IMG_DIR_TEST, DBG_EVERY, START_IDX, IMG_EXT)
+import src.data.constants as c
 
-raw_data_dir = RAW_DATA_DIR
-files = RAW_FILES_GENERALIZE[START_IDX:]
-cutoffs = RAW_CUTOFFS_TEST
+raw_data_dir = c.RAW_DATA_DIR
+files = c.RAW_FILES_GENERALIZE[c.START_IDX:]
+cutoffs = c.RAW_CUTOFFS_TEST
 file_paths = [join(raw_data_dir, file) for file in files]
-Ds = RAW_FILE_DIMENSIONS_TEST
+cell_ch = c.CELL_CHANNEL
 
 # Create `IMG_DIR` folder, in case it doesn't exist
-folder_name = IMG_DIR_TEST
+folder_name = c.IMG_DIR_TEST
 folder = f'../data/interim/{folder_name}'
 try:
     os.mkdir(folder)
@@ -35,53 +33,50 @@ images = [image for image in listdir(folder) if '.npy' in image]
 img_idx = len(images) - 1 + 1
 idx = img_idx if img_idx > 0 else 0  # numbering for images
 # How often to print out with matplotlib
-debug_every = DBG_EVERY
+debug_every = c.DBG_EVERY
 
 tic = time()
+n_timepoints = 10
+n_slices = 5
+i = 0
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
-    file = files[j]
-    cutoff = cutoffs[file]
-    with tiff.TiffFile(file_path) as f:
-        n = len(f.pages)
-        print(f'Number of pages: {n}')
+    data = AICSImage(file_path)
+    T = data.dims['T'][0]
 
-        # Pages are the images of each file
-        pages = f.pages[::2]  # only every other page has beta cells
-        D = Ds[file]  # dimension of current file
-        # pages / D
-        # We want this to pass; otherwise, the z-dimension doesn't add up.
-        # assert type(int(len(pages)) / int(D)) == int
+    # Set cutoff to T+1 if there is no cutoff
+    # i.e., the file won't be cut off because T is the final
+    # timepoint
+    cutoff = cutoffs[file] if cutoffs[file] is not None else T + 1
 
-        for i, page in enumerate(pages):
-            if i % D == 0:
-                # Save the dimension in case we can't use all
-                # frames, in which case we need to stop early
-                # in image_list below
-                old_D = D
-                # If the next MIP goes beyond cutoff, take
-                # only the z-values up to cutoff
-                if cutoff is not None and i + D > cutoff:
-                    D = cutoff
-                name = f'{idx:05d}'
-                idx = idx + 1
-                save = os.path.join(folder, name)
-                image_list = [page.asarray()[0, :, :]
-                              for page in pages[i: i + D]]
+    Z = data.dims['Z']
+    print('Dimensions:')
+    print(data.dims, '\n\n')
+    print(data.metadata, '\n\n')
 
-                image_max = np.max(image_list, axis=0)
-                # image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
-                #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    time_idx = np.random.randint(0, min(cutoff, T), n_timepoints)
 
-                np.save(save, image_max)
+    timepoints = data.get_image_dask_data(
+        'TZYX', T=time_idx, C=cell_ch).compute()
+    for timepoint in timepoints:
+        slice_idx = np.random.randint(0, Z, n_slices)
 
-            # Save intermittently to .png for debugging
-            if True:  # i % (D * debug_every) == 0:
-                dirs = os.path.dirname(save)
-                file = os.path.basename(save)
-                plt.imsave(f'{dirs}/_{file}.{IMG_EXT}', image_max)
+        slices = timepoint[slice_idx]
 
-            # -1 because index was updated to +1 above
-            # print(f'Image {idx-1} saved.')
+        for slice in slices:
+
+            name = f'{idx:05d}'
+            save = os.path.join(folder, name)
+            np.save(save, slice)
+
+            dirs = os.path.dirname(save)
+            file = os.path.basename(save)
+
+            idx = idx + 1
+
+        if j % debug_every == 0:
+            plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', slice)
+
+
 
 toc = time()
 print(f'make_dataset.py complete after {(toc-tic)/60: .1f} minutes.')
