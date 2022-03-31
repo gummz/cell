@@ -9,8 +9,8 @@ import src.data.constants as c
 
 def draw_cells(files, file_paths, consecutive, operation):
     for i, (file, file_path) in enumerate(zip(files, file_paths)):
-        czi = AICSImage(file_path)
-        T = czi.dims['T']
+        data = AICSImage(file_path)
+        T = data.dims['T']
 
         # Create sample indexes
         if consecutive:
@@ -19,7 +19,7 @@ def draw_cells(files, file_paths, consecutive, operation):
         else:
             idx = sorted([int(i) for i in np.random.randint(0, T, 9)])
 
-        timepoints = czi.get_image_dask_data('TZYX', T=idx, C=0)
+        timepoints = data.get_image_dask_data('TZYX', T=idx, C=0)
         timepoints_max = get_MIP(timepoints.compute())
         sample_images = timepoints_max
 
