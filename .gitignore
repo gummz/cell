@@ -95,6 +95,7 @@ venv_1/
 *.pkl
 *.jpg
 *.png
+*.csv
 *H_*
 # Makefile is different by systems
 Makefile
