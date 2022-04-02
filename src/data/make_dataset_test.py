@@ -1,15 +1,29 @@
 import os
 from os import listdir
-from os.path import join
+from os.path import join, splitext
 from time import time
-import numpy as np
+from PIL import Image
 import matplotlib.pyplot as plt
-from aicsimageio import AICSImage
-
+import numpy as np
 import src.data.constants as c
+from aicsimageio import AICSImage
+import cv2
 
 raw_data_dir = c.RAW_DATA_DIR
-files = c.RAW_FILES_GENERALIZE[c.START_IDX:]
+files = c.RAW_FILES_GENERALIZE.keys()
+raw_files = listdir(raw_data_dir)
+temp_files = []
+for file in files:
+    if f'{file}.lsm' in raw_files:
+        tmp = f'{file}.lsm'
+    elif f'{file}.czi' in raw_files:
+        tmp = f'{file}.czi'
+    elif f'{file}.ims' in raw_files:
+        tmp = f'{file}.ims'
+    temp_files.append(tmp)
+files = temp_files
+
+
 cutoffs = c.RAW_CUTOFFS_TEST
 file_paths = [join(raw_data_dir, file) for file in files]
 cell_ch = c.CELL_CHANNEL
@@ -38,34 +52,38 @@ debug_every = c.DBG_EVERY
 tic = time()
 n_timepoints = 10
 n_slices = 5
-i = 0
+idx = 0
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
     data = AICSImage(file_path)
     T = data.dims['T'][0]
-
+    time_idx = c.RAW_FILES_GENERALIZE[splitext(file)[0]]
     # Set cutoff to T+1 if there is no cutoff
     # i.e., the file won't be cut off because T is the final
     # timepoint
-    cutoff = cutoffs[file] if cutoffs[file] is not None else T + 1
+    # cutoff = cutoffs[file] if cutoffs[file] is not None else T + 1
 
     Z = data.dims['Z']
-    print('Dimensions:')
-    print(data.dims, '\n\n')
-    print(data.metadata, '\n\n')
 
-    time_idx = np.random.randint(0, min(cutoff, T), n_timepoints)
-
+    # time_idx = np.random.randint(0, min(cutoff, T), n_timepoints)
+    # Dimension order depends on if time_idx is an int or tuple
+    order = 'ZYX' if type(time_idx) == int else 'TZYX'
     timepoints = data.get_image_dask_data(
-        'TZYX', T=time_idx, C=cell_ch).compute()
+        order, T=time_idx, C=cell_ch).compute()
+
+    # If time_idx is an integer, then we need to create
+    # an empty dimension so that we can "iterate" over it
+    # in `for timepoint in timepoints`.
+    if type(time_idx) == int:
+        timepoints = np.expand_dims(timepoints, 0)
     for timepoint in timepoints:
-        slice_idx = np.random.randint(0, Z, n_slices)
-
-        slices = timepoint[slice_idx]
-
-        for slice in slices:
-
+        for slice in timepoint:
             name = f'{idx:05d}'
             save = os.path.join(folder, name)
+
+            slice = cv2.normalize(
+                slice, None, alpha=0, beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+            slice = cv2.fastNlMeansDenoising(slice, None, 8, 7, 21)
+
             np.save(save, slice)
 
             dirs = os.path.dirname(save)
@@ -73,9 +91,10 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
 
             idx = idx + 1
 
-        if j % debug_every == 0:
-            plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', slice)
-
+            if idx % debug_every == 0:
+                # plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', slice)
+                image = Image.fromarray(slice)
+                image.save(f'{dirs}/_{file}.{c.IMG_EXT}')
 
 
 toc = time()
