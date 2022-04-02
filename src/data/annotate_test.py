@@ -70,18 +70,13 @@ for i, path in enumerate(image_paths):
     # (to avoid manually annotating unnecessarily)
     added = np.array([img, thresh], dtype=object)
     added_max = np.max(added, axis=0)
-    print(type(added_max))
-    print(added_max.shape)
     np.save(save, added_max)
 
     # Save as .png for manual annotation
     dirs = os.path.dirname(save)
     file = os.path.basename(save)
-    print(dirs)
-    print(file)
-    print(added_max)
-    print(np.unique(added_max))
-    plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', added_max, cmap='gray')
+    added_max = added_max.astype(np.uint16)
+    plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', added_max)
 
 
 toc = time()
