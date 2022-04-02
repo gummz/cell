@@ -13,14 +13,15 @@ import cv2
 import src.data.constants as c
 
 '''
-There will be folders inside masks_test called 'filename_json'
-Although I will open the images contained in imgs_test,
-the process (annotation) means I will save the result in masks_test.
+There will be folders inside masks_test called 'filename_json'.
 
-The algorithm will walk through every subfolder called
-'filename_json', fetch the 'label.png' in each subfolder,
-retrieve the image index (it is the subfolder name, 'filename_json'), and merge it with the .npy files present in
-masks_test.
+The algorithm
+
+1. Walk through every subfolder called
+'filename_json'
+2. Fetch the 'label.png' in each subfolder,
+3. Threshold the image.
+
 The manual annotation will be processed: grayscale, threshold.
 
 imgs_test:
@@ -29,11 +30,11 @@ _00000.png
 etc.
 
 masks_test:
-(folder): _00000_json (from labelme script)
-00000.npy (automatic annotations)
+(folder): _00000_json (complete annotation from labelme script)
+_00000.png (automatic annotation)
 
 masks_test_full:
-00000.npy (manual and automatic annotation together)
+00000.npy (thresholded complete annotation)
 
 This algorithm will be applied to the folder `imgs` in the future. So: imgs, masks, masks_full.
 '''
@@ -98,21 +99,22 @@ for folders, subfolders, files in os.walk(join(c.DATA_DIR, mask_dir)):
             if len(auto_img.shape) > 2:
                 print(file)
                 print(auto_img.shape)
-                
-                
+
         if file == 'label.png':
             img_idx = folders.split('_')[-2]
-            # print(img_idx)
+            print(img_idx)
 
             path = join(folders, file)
-            # manual_img = PIL.Image.open(path)
-            # manual_img = np.array(manual_img)
-            load_path = join(c.DATA_DIR, mask_dir)
-            auto_img = np.load(join(load_path, f'{img_idx}.npy'))
+            added_img = PIL.Image.open(path)
+            added_img = np.array(added_img)
+            _, thresh = cv2.threshold(added_img, c.SIMPLE_THRESHOLD, cv2.THRESH_BINARY)
+            np.save(img_idx, thresh)
+            exit()
+            # load_path = join(c.DATA_DIR, mask_dir)
+            # auto_img = np.load(join(load_path, f'{img_idx}.npy'))
             # print(manual_img.shape)
             # print(auto_img.shape)
             # added = np.max(np.array([manual_img, auto_img], dtype=object))
-
             # plt.imsave(f'auto_img_{file}.png', auto_img)
             # print(manual_img.shape, auto_img.shape)
 
