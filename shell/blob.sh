@@ -41,4 +41,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 annotate_test.py > pyout
+python3 blob.py > pyout

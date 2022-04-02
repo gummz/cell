@@ -5,18 +5,16 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image
-from src.data.constants import (CV2_CONNECTED_ALGORITHM, DATA_DIR, IMG_DIR, RAW_FILE_DIMENSIONS, RAW_FILES,
-                                MASK_DIR, MEDIAN_FILTER_KERNEL,
-                                NUMBER_CONNECTIVITY, SIMPLE_THRESHOLD, TIMEPOINTS)
+import src.data.constants as c
 from src.models.utils import transforms as T
 from src.models.utils.utils import collate_fn
 from torch.utils.data import DataLoader
 from torchvision.transforms import functional as F
 
-conn = NUMBER_CONNECTIVITY
-algo = CV2_CONNECTED_ALGORITHM
-kernel = MEDIAN_FILTER_KERNEL
-threshold = SIMPLE_THRESHOLD
+conn = c.NUMBER_CONNECTIVITY
+algo = c.CV2_CONNECTED_ALGORITHM
+kernel = c.MEDIAN_FILTER_KERNEL
+threshold = c.SIMPLE_THRESHOLD
 
 
 def print_unique(image, pre=''):
@@ -27,25 +25,24 @@ def print_unique(image, pre=''):
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
-    def __init__(self, root=DATA_DIR, transforms=None, resize=1024):
+    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train'):
         self.root = root
         self.transforms = transforms
         # load all image files, sorting them to
         # ensure that they are aligned
         imgs = [image for image in listdir(
-            join(root, IMG_DIR)) if '.npy' in image]
+            join(root, mode, c.IMG_DIR)) if '.npy' in image]
         masks = [image for image in listdir(
-            join(root, MASK_DIR)) if '.npy' in image]
+            join(root, mode, c.MASK_DIR)) if '.npy' in image]
 
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.resize = resize
-        self.threshold = threshold
 
     def __getitem__(self, idx):
         # load images and mask
-        img_path = join(self.root, IMG_DIR, self.imgs[idx])
-        mask_path = join(self.root, MASK_DIR, self.masks[idx])
+        img_path = join(self.root, c.IMG_DIR, self.imgs[idx])
+        mask_path = join(self.root, c.MASK_DIR, self.masks[idx])
 
         img = np.int16(np.load(img_path))
         # PREPROCESSING
@@ -85,7 +82,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # remove background label from centroids
 
         # NOTE!: I can use this for the tracking.
-        centroids = np.array(output[3][1:])
+        centroids = torch.as_tensor(np.array(output[3][1:]), dtype=torch.uint8)
 
         # Create variables for Mask R-CNN dataloader ###
         ################################
@@ -121,6 +118,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         target["image_id"] = image_id
         target["area"] = area
         target["iscrowd"] = iscrowd
+        target["centroids"] = centroids
 
         if self.transforms is not None:
             # img, target = self.transforms(img, target)
@@ -141,24 +139,27 @@ class BetaCellDataset(torch.utils.data.Dataset):
         return len(self.imgs)
 
 
-def get_dataloaders(batch_size=4, num_workers=2, resize=1024):
+def get_dataloaders(batch_size=4, num_workers=2, resize=1024, manual_annot=0):
     '''Get dataloaders.
-        resize: resize image in __getitem__ method of dataset class.'''
+        resize: resize image in __getitem__ method of dataset class.
+
+        manual_annot: how many manually annotated images to include. Default: None'''
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
-        DATA_DIR, get_transform(train=True), resize=resize)
+        c.DATA_DIR, get_transform(train=True), resize=resize)
     dataset_val = BetaCellDataset(
-        DATA_DIR, get_transform(train=False), resize=resize)
+        c.DATA_DIR, get_transform(train=False), resize=resize)
 
     # split the dataset in train and test set
     torch.manual_seed(1)
 
-    indices = torch.randperm(len(dataset)).tolist()
+    # indices = torch.randperm(len(dataset)).tolist()
 
-    val_idx = int(0.1 * len(dataset))
-
-    dataset = torch.utils.data.Subset(dataset, indices[:-val_idx])
-    dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_idx:])
+    # val_idx = int(0.1 * len(dataset))
+    indices = range(len(dataset))
+    val_tp = c.TIMEPOINTS[-1]
+    dataset = torch.utils.data.Subset(dataset, indices[:-val_tp])
+    dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_tp:])
 
     # define training and validation data loaders
     data_tr = DataLoader(
