@@ -7,7 +7,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 # from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-from src.data.constants import FIG_DIR, DATA_DIR, IMG_DIR, MEDIAN_FILTER_KERNEL, BLOCK_SIZE, C, RAW_DATA_DIR, RAW_FILES
+import src.data.constants as c
 
 # Set working directory to script location
 abspath = os.path.abspath(__file__)
@@ -17,10 +17,10 @@ os.chdir(dname)
 
 BLOCK_SIZE = 5
 C = 14
-DIR = RAW_DATA_DIR
-files = RAW_FILES
-KERNEL = MEDIAN_FILTER_KERNEL
-imgs_path = join(DATA_DIR, IMG_DIR)
+DIR = c.RAW_DATA_DIR
+files = c.RAW_FILES
+KERNEL = c.MEDIAN_FILTER_KERNEL
+imgs_path = join(c.DATA_DIR, c.IMG_DIR)
 
 
 def movie():
@@ -166,41 +166,39 @@ def test():
                  Gaussian Kernel and Variance, etc.
     '''
     figures_dir = FIG_DIR
-    folder = 'annotate_test'
-
+    folder = 'annotate_gridsearch'
 
     images = sorted([image for image in listdir(imgs_path) if '.npy' in image])
     # Get full image paths from filename list `images`
     image_paths = sorted([join(imgs_path, image) for image in images])
     n_img = len(image_paths)
 
-    # block_sizes = [4*i+1 for i in range(1, 10)]
-    # Cs = [2*i for i in range(10)]
+    block_sizes = [4*i+1 for i in range(1, 10)]
+    Cs = [2*i for i in range(10)]
 
     # Sample image
     idx = 560
     img_name = images[idx].split('.')[0]
 
     try:
-        makedirs(join(FIG_DIR, folder, img_name))
+        makedirs(join(c.FIG_DIR, folder, img_name))
     except FileExistsError:
         pass
 
     path = image_paths[idx]
-    img = np.int16(np.load(path))
+    img = np.load(path)
     img = cv2.normalize(img, img, alpha=0, beta=255,
                         dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     # Define various preprocessing filters
     # Both Gaussian and Mean
-    # filters_gaus = {f'gaussian_{i}_{k}': cv2.GaussianBlur(
-    #     img, (i, i), k) for i in range(9, 19, 2) for k in range(1, 15, 2)}
-    # filters_mean = {f'median_{i}': cv2.medianBlur(
-    #     img_u8, i) for i in range(9, 19, 2)}
-    # filters = {**filters_gaus, **filters_mean}
+    filters_gaus = {f'gaussian_{i}_{k}': cv2.GaussianBlur(
+        img, (i, i), k) for i in range(9, 19, 2) for k in range(1, 15, 2)}
+    filters_mean = {f'median_{i}': cv2.medianBlur(
+        img, i) for i in range(9, 19, 2)}
+    filters = {**filters_gaus, **filters_mean}
     # Add unprocessed image to dictionary
-    # filters['none'] = img
-    filters = {'median_9': cv2.medianBlur(img, KERNEL)}
-
+    filters['none'] = img
+    # filters = {'median_9': cv2.medianBlur(img, KERNEL)}
 
     #
     #
@@ -214,28 +212,31 @@ def test():
     plt.figure(figsize=(10, 10))
     plt.imshow(img)
     plt.axis('off')
-    plt_save = join(figures_dir, folder, img_name, f'Original_plt_{img_name}.jpg')
+    plt_save = join(figures_dir, folder, img_name,
+                    f'Original_plt_{img_name}.jpg')
     plt.savefig(plt_save)
 
     # Draw original with opencv
-    cv_save = join(figures_dir, folder, img_name, f'Original_cv_{img_name}.jpg')
+    cv_save = join(figures_dir, folder, img_name,
+                   f'Original_cv_{img_name}.jpg')
     cv2.imwrite(cv_save, img)
 
-    # for block_size in block_sizes:
-    #     for C in Cs:
-    #         for name, image in filters.items():
-    #             # Skip over mean and none versions
-    #             if 'mean' in name or 'none' in name:
-    #                 continue
-    #             img_copy = image.copy()
+    for block_size in block_sizes:
+        for C in Cs:
+            for name, image in filters.items():
+                # Skip over mean and none versions
+                # if 'mean' in name or 'none' in name:
+                #     continue
+                img_copy = image.copy()
 
-    #             thresh = cv2.adaptiveThreshold(
-    #                 img_copy.astype(
-    #                     np.uint8), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-    #                 cv2.THRESH_BINARY, block_size, C)
+                thresh = cv2.adaptiveThreshold(
+                    img_copy.astype(
+                        np.uint8), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    cv2.THRESH_BINARY, block_size, C)
 
-    #             save = f'{jpg_name}_thresh_{block_size}_{C}_{name}.jpg'
-    #             cv2.imwrite(os.path.join(figures_dir, save), thresh)
+                save = f'{img_name}_thresh_{block_size}_{C}_{name}.jpg'
+                cv2.imwrite(os.path.join(figures_dir, save), thresh)
+                exit()
 
     thresholds = range(0, 240, 5)
     for threshold in thresholds:
