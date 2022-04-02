@@ -1,21 +1,45 @@
+- Make validation use a separate embryo
+
+- Create a test set in which manual annotations of the weaker annotations have been added
+    - Choose suitable files for testing and add them to `RAW_FILES_GENERALIZE`
+        - Debug `LI_2018-11-20_emb6_pos1.lsm` in `draw_cells`
+        - Calculate average pixel intensity
+        - Cross-reference with `/test/` folder in `/dtu-compute/`
+        - (when choosing training set, cross-reference with `/train/`)
+            - When doing different versions of datasets, use default names and use `mv` in the terminal afterwards!
+
+    - Use `make_dataset_test.py` to create `/imgs_test/`
+
+    - Use `annotate_test.py` to create png annotations in `/masks_test/`
+
+    - Download `masks_test` to local computer
+
+    - Manually annotate with Labelme
+
+    - Use `generate_json.py` to output manual annotations into subfolders in `/masks_test/`
+
+    - Use `annotate_from_json.py` to go into subfolders, threshold `label.png`, and save to `/masks_test_full/`
+
+- Run the preprocess grid search again (for Gaussian, Median blurring)
+
 - Arrange it such that everything is logged properly; Tensorboard/PyTorch Lightning?
 
 - Create a diary with recent runs (some may need to be rerun)
 
+- ~~extract green tea from the raw flies~~
+
 - Extract a small sample of a raw data tiff file for rapid testing on local machine (for predictions)
 
-- Create a test set in which manual annotations of the weaker annotations have been added
-
-- - Set up a pipeline which can take in how many manually annotated images to include
+- Set up a pipeline which can take in how many manually annotated images to include
 
 - Create a pipeline which:
-- - Predicts input
-- - - Input is a list of filepaths for a sequence of 3D images; each image is a separate file
-- - - Output is a sequence of segmented 3D images; each image is a separate file
-- - Extracts centroids of cells from the output
-- - - Center of each bounding box
-- - - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
-- - - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
+    - Predicts input
+        - Input is a list of filepaths for a sequence of 3D images; each image is a separate file
+        - Output is a sequence of segmented 3D images; each image is a separate file
+    - Extracts centroids of cells from the output
+        - Center of each bounding box
+        - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
+        - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
 
 - For faster debugging, have a small dataset in local environment
 
