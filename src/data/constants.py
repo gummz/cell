@@ -5,7 +5,6 @@ from os.path import join
 
 
 def setcwd():
-    # Set working directory to script location
     '''Set working directory to script location'''
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
@@ -29,13 +28,33 @@ RAW_FILES = ['LI_2019-11-21_emb6_pos3.lsm',
              'LI_2018-12-07_emb5_pos2.lsm']
 generalize = ['LI_2019-01-17_emb7_pos3.lsm',
               'LI_2019-02-05_emb5_pos4.lsm']
+test_set = {
+    'LI_2015-07-12_emb5_pos1': (16),
+    'LI-2018-11-20_emb6_pos1': (104),  # not found
+    'LI_2018-11-20_emb7_pos4': (10, 71),
+    'LI_2019-01-17_emb7_pos4': (158, 217),
+    'LI_2019-02-05_emb5_pos2': (191),
+    'LI_2019-02-05_emb5_pos3': (210),
+    'LI_2019-02-05_emb5_pos4': (133),
+    'LI_2019-04-11_emb5_pos1': (157),
+    'LI_2019-04-11_emb8_pos2': (68),
+    'LI_2019-04-11_emb8_pos3': (245),
+    'LI_2019-04-11_emb8_pos4': (229),
+    'LI_2019-06-13_emb2_pos1': (204),
+    'LI_2019-06-13_emb2_pos2': (32),
+    'LI_2019-07-03_emb1-pos1': (246),
+    'LI_2019-07-03_emb7_pos2': (98),
+    'LI_2019-07-03_emb7_pos3': (99),
+    'LI_2019-07-03_emb7_pos4': (183),
+}
+generalize = test_set
 
+train_set = {
+    'LI-2016-03-04-emb5-pos3': (70, 88),
+    'LI-2018-09-28-emb3-pos2': (47, 114),
+    'LI-2018-09-28-emb5-pos1': (34, 54),
+}
 
-items = generalize[1]
-if type(items) == str:
-    RAW_FILES_GENERALIZE = [generalize[1]]
-elif type(items) == list:
-    RAW_FILES_GENERALIZE = generalize[1]
 RAW_FILES_GENERALIZE = generalize
 
 # RAW_FILES = RAW_FILES_GENERALIZE  # testing for generalization
@@ -65,11 +84,17 @@ TIMEPOINTS_TEST = [280, 289]
 
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
-IMG_DIR = 'imgs'
-IMG_DIR_TEST = 'imgs_test'
-MASK_DIR = 'masks'
-MASK_DIR_TEST = 'masks_test'
-MASK_DIR_TEST_FULL = 'masks_test_full'
+
+IMG_DIR = 'train/imgs'
+IMG_DIR_TEST = 'test/imgs'
+
+MASK_DIR = 'train/masks'
+MASK_DIR_TEST = 'test/masks'
+MASK_DIR_TEST_FULL = 'test/masks_full'
+
+PRED_DIR = 'train/pred'
+PRED_DIR_TEST = 'test/pred'
+
 FIG_DIR = 'figures'
 FILE_DIR = 'files'
 
@@ -91,4 +116,4 @@ IMG_EXT = 'png'
 CELL_CHANNEL = 0
 
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
-EXCEL_SHEET = pd.read_csv(join(DATA_DIR, EXCEL_FILENAME))
+# EXCEL_SHEET = pd.read_csv(join(DATA_DIR, EXCEL_FILENAME))
