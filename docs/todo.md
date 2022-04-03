@@ -1,3 +1,5 @@
+- Create `make` commands for json, train, test, etc.
+
 - Make validation use a separate embryo
 
 - Create a test set in which manual annotations of the weaker annotations have been added
