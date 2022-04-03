@@ -7,11 +7,11 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
-from skimage.filters import threshold_yen
+from skimage.filters import threshold_yen, frangi
 from skimage.exposure import rescale_intensity
 from skimage.io import imread, imsave
 # from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-from src.data.constants import FIG_DIR, DATA_DIR, IMG_DIR, MEDIAN_FILTER_KERNEL, BLOCK_SIZE, C, SIMPLE_THRESHOLD, RAW_DATA_DIR, RAW_FILES, IMG_EXT, C, BLOCK_SIZE
+import src.data.constants as c
 
 # Set working directory to script location
 abspath = os.path.abspath(__file__)
@@ -19,13 +19,14 @@ dname = os.path.dirname(abspath)
 os.chdir(dname)
 
 
-DIR = RAW_DATA_DIR
-files = RAW_FILES
-KERNEL = MEDIAN_FILTER_KERNEL
-imgs_path = join(DATA_DIR, f'{IMG_DIR}')
+DIR = c.RAW_DATA_DIR
+ext = c.IMG_EXT
+files = c.RAW_FILES
+KERNEL = c.MEDIAN_FILTER_KERNEL
+imgs_path = join(c.DATA_DIR, f'{c.IMG_DIR}')
 
 
-figures_dir = FIG_DIR
+figures_dir = c.FIG_DIR
 folder = 'modify_single'
 modification = ''
 
@@ -52,34 +53,42 @@ img = cv2.normalize(img, img, alpha=0, beta=255,
 
 # Operation
 # Median Blur
-operation = 'medianblur'
-for i in range(1, 21, 2):
-    img_blur = cv2.medianBlur(img, i)
-    img_blur = np.array(img_blur)
-    img_blur = np.where(img_blur > 5, img_blur, 0)
-    cv2.imwrite(f'{save}/{operation}_{img_name}_{i}.{IMG_EXT}', img_blur)
+# operation = 'medianblur'
+# for i in range(1, 21, 2):
+#     img_blur = cv2.medianBlur(img, i)
+#     img_blur = np.array(img_blur)
+#     img_blur = np.where(img_blur > 5, img_blur, 0)
+#     cv2.imwrite(f'{save}/{operation}_{img_name}_{i}.{c.IMG_EXT}', img_blur)
 
-cv2.imwrite(join(save, f'img_cv.{IMG_EXT}'), img)
-plt.imsave(join(save, f'img_plt.{IMG_EXT}'), img)
+cv2.imwrite(join(save, f'img_cv.{ext}'), img)
+plt.imsave(join(save, f'img_plt.{ext}'), img)
 
 # Operation
 # Denoise
-operation = 'denoise'
-for i in range(1, 21, 2):
-    for j in range(1, 10, 2):
-        for k in range(1, 30, 4):
-            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
-            cv2.imwrite(
-                f'{save}/{operation}_cv2_{img_name}_{i}_{j}_{k}.png', img_denoise)
-            plt.imsave(
-                f'{save}/_TEST_{operation}_plt_{img_name}_{i}_{j}_{k}.png', img_denoise)
-            sys.exit()
+# operation = 'denoise'
+# for i in range(1, 21, 2):
+#     for j in range(1, 10, 2):
+#         for k in range(1, 30, 4):
+#             img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
+#             cv2.imwrite(
+#                 f'{save}/{operation}_cv2_{img_name}_{i}_{j}_{k}.{png}', img_denoise)
+#             plt.imsave(
+#                 f'{save}/_TEST_{operation}_plt_{img_name}_{i}_{j}_{k}.{ext}', img_denoise)
+
+operation = 'frangi'
+for alpha in np.linspace(0.1, 1, 10):
+    for beta in np.linspace(0.1, 1, 10):
+        for gamma in np.linspace(1, 30, 5):
+            img_frangi = frangi(img, alpha=alpha, beta=beta,
+                                gamma=gamma, black_ridges=False)
+            name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}_{black_ridges}'
+            plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
 # Operation
 # Simple Threshold
-operation = 'simple_threshold'
-_, thresh = cv2.threshold(img_blur, SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
-cv2.imwrite(f'{save}/{operation}_{img_name}.png', thresh)
+# operation = 'simple_threshold'
+# _, thresh = cv2.threshold(img_blur, SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
+# cv2.imwrite(f'{save}/{operation}_{img_name}.png', thresh)
 
 # # Operation
 # # Rescale intensity
