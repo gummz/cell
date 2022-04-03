@@ -1,5 +1,4 @@
-from os import makedirs
-from os.path import mkdir
+from os import mkdir, makedirs
 
 
 def make_dir(path):

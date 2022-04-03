@@ -85,12 +85,13 @@ TIMEPOINTS_TEST = [280, 289]
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
 
-IMG_DIR = 'train/imgs'
-IMG_DIR_TEST = 'test/imgs'
+IMG_DIR = 'imgs'
+IMG_DIR_TEST = 'imgs'
 
-MASK_DIR = 'train/masks'
-MASK_DIR_TEST = 'test/masks'
-MASK_DIR_TEST_FULL = 'test/masks_full'
+MASK_DIR = 'masks'
+MASK_DIR_FULL = 'masks_full'
+MASK_DIR_TEST = 'masks'
+MASK_DIR_TEST_FULL = 'masks_full'
 
 PRED_DIR = 'train/pred'
 PRED_DIR_TEST = 'test/pred'
