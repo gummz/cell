@@ -5,7 +5,7 @@ from os.path import join
 from time import time
 from os import listdir
 import matplotlib.pyplot as plt
-
+from src.data.utils.make_dir import make_dir
 import src.data.constants as c
 
 # Set working directory to script location
@@ -17,21 +17,19 @@ files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
 data_dir = c.DATA_DIR
+mode = 'test'
 
 # Create folder in case it doesn't exist yet
-folder_name = c.MASK_DIR_TEST
-folder = join(data_dir, folder_name)
-try:
-    os.mkdir(folder)
-except FileExistsError:
-    print(f'Folder already exists: {folder}')
+folder_name = c.MASK_DIR
+folder = join(data_dir, mode, folder_name)
+make_dir(folder)
 
 # How often to print out with matplotlib
 debug_every = c.DBG_EVERY
 
 # Name of the folder in which the images will reside
-imgs_path = join(c.DATA_DIR, c.IMG_DIR_TEST)
-masks_path = join(c.DATA_DIR, c.MASK_DIR_TEST)
+imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
+masks_path = join(c.DATA_DIR, mode, c.MASK_DIR)
 # List of filenames of the .npy images
 # .jpg files are for visualizing the process
 images = [image for image in listdir(imgs_path) if '.npy' in image]
@@ -70,7 +68,7 @@ for i, path in enumerate(image_paths):
     # (to avoid manually annotating unnecessarily)
     added = np.array([img, thresh], dtype=object)
     added_max = np.max(added, axis=0)
-    np.save(save, added_max)
+    # np.save(save, added_max)
 
     # Save as .png for manual annotation
     dirs = os.path.dirname(save)

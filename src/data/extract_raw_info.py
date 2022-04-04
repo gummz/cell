@@ -1,7 +1,7 @@
 import pandas as pd
 from os.path import join, splitext
 import src.data.constants as c
-c.setcwd()
+c.setcwd(__file__)
 
 # Split path into lists, don't take last item
 # so that we  move up one directory, and lastly

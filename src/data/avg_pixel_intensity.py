@@ -46,7 +46,7 @@ for (file, filepath) in zip(files, filepaths):
 
     print('Inner for loop start')
     for t in range(T):
-        timepoint = data.get_image_dask_data('ZYX', T=t, C=beta_ch).compute()
+        timepoint = data.get_image_dask_data('ZXY', T=t, C=beta_ch).compute()
         average[t] = np.round(mean(timepoint), 3)
         print(f'Timepoint {t} done')
 

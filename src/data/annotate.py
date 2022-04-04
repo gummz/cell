@@ -5,33 +5,29 @@ from os.path import join
 from time import time
 from os import listdir
 import matplotlib.pyplot as plt
-
+from src.data.utils.make_dir import make_dir
 import src.data.constants as c
 
 # Set working directory to script location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
+c.setcwd(__file__)
 
 files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
 data_dir = c.DATA_DIR
+mode = 'train'
 
 # Create folder in case it doesn't exist yet
-folder_name = c.MASK_DIR_TEST
-folder = join(data_dir, folder_name)
-try:
-    os.mkdir(folder)
-except FileExistsError:
-    print(f'Folder already exists: {folder}')
+folder_name = c.MASK_DIR
+folder = join(data_dir, mode, folder_name)
+make_dir(folder)
 
 # How often to print out with matplotlib
 debug_every = c.DBG_EVERY
 
 # Name of the folder in which the images will reside
-imgs_path = join(c.DATA_DIR, c.IMG_DIR_TEST)
-masks_path = join(c.DATA_DIR, c.MASK_DIR_TEST)
+imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
+masks_path = join(c.DATA_DIR, mode, c.MASK_DIR)
 # List of filenames of the .npy images
 # .jpg files are for visualizing the process
 images = [image for image in listdir(imgs_path) if '.npy' in image]
@@ -45,7 +41,6 @@ image_paths = sorted([join(imgs_path, image) for image in images])
 # -1 for zero-indexing, +1 because we want to start at the next free index
 img_idx = len(masks) - 1 + 1
 idx = img_idx if img_idx > 0 else 0  # numbering for images
-
 
 thresholds = []
 idx = 0
@@ -64,13 +59,13 @@ for i, path in enumerate(image_paths):
     filtered = cv2.medianBlur(img, kernel)
     _, thresh = cv2.threshold(filtered,
                               threshold, 255, cv2.THRESH_BINARY)
-    np.save(save, thresh)
+    # np.save(save, thresh)
 
     # Save as .jpg for debugging
-    if True:  # i % debug_every == 0:
-        dirs = os.path.dirname(save)
-        file = os.path.basename(save)
-        plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', thresh, cmap='gray')
+    # if i % debug_every == 1:
+    dirs = os.path.dirname(save)
+    file = os.path.basename(save)
+    plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', thresh, cmap='gray')
 
 
 toc = time()

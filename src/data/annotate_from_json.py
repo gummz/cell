@@ -41,7 +41,7 @@ So: imgs, masks, masks_full.
 '''
 
 # Set working directory to script location
-c.setcwd()
+c.setcwd(__file__)
 
 files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL

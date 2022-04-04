@@ -43,7 +43,7 @@ def main():
     #     out_dir = args.out
     # if not osp.exists(out_dir):
     #     os.mkdir(out_dir)
-    c.setcwd()
+    c.setcwd(__file__)
     mode = 'test'
     mask_dir = join(c.DATA_DIR, mode, c.MASK_DIR)
     files = listdir(mask_dir)
