@@ -224,10 +224,7 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
         print([y.shape for y in y_hat])
         print([y.shape for y in y_val], '\n\n')
 
-        image_grid = make_grid(
-            [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
-        image_grid = image_grid.squeeze().unsqueeze(1)
-        image_grid = (image_grid * 255).type(torch.uint8)
+        image_grid = create_grid(x_val, y_val, y_hat)
         writer.add_image(f'epoch_{epoch}', image_grid,
                          epoch, dataformats='NCHW')
 
@@ -245,6 +242,13 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
     #                         label_img=images.unsqueeze(1))
 
     return tot_train_losses, tot_val_losses
+
+def create_grid(x_val, y_val, y_hat):
+    image_grid = make_grid(
+            [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
+    image_grid = image_grid.squeeze().unsqueeze(1)
+    image_grid = (image_grid * 255).type(torch.uint8)
+    return image_grid
 
 
 def to_device(tensor_list, device):
@@ -357,7 +361,8 @@ hparam_dict = {
     'losses': ';'.join(loss_list),
     'img_size': size if size else 1024,
     'batch_size': batch_size,
-    'pretrained': pretrained
+    'pretrained': pretrained,
+    'manual_annot': 0
 }
 # TODO: add "how many weakly annotated"
 # TODO: add /pred/ folder in addition to /runs/
