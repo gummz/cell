@@ -1,10 +1,14 @@
+aicsimageio==4.6.4
+aicspylibczi==3.0.5
 asciitree==0.3.3
 astroid==2.9.3
 autopep8==1.6.0
+bioformats_jar==6.7.0.post2
 certifi==2021.10.8
 charset-normalizer==2.0.12
 cloudpickle==2.0.0
 cycler==0.11.0
+czifile==2019.7.2
 dask==2022.2.1
 dnspython==2.2.0
 docopt==0.6.2
@@ -27,8 +31,9 @@ networkx==2.7.1
 numcodecs==0.9.1
 numpy==1.22.2
 ome-types==0.2.10
-opencv-python==4.5.5.62
+opencv-python==3.4.16.59
 packaging==21.3
+pandas
 partd==1.2.0
 Pillow==9.0.1
 Pint==0.18
