@@ -5,6 +5,7 @@ from os import makedirs, listdir
 from aicsimageio import AICSImage
 import os
 import src.data.constants as c
+from src.data.utils.make_dir import make_dir
 
 
 def draw_cells(files, file_paths, consecutive, operation):
@@ -45,7 +46,9 @@ def get_MIP(timepoints: np.array):
 
 if __name__ == '__main__':
     # Set working directory to file location
-    c.setcwd()
+    print('draw_cells.py start')
+    c.setcwd(__file__)
+    print(os.getcwd())
 
     files = listdir(c.RAW_DATA_DIR)
 
@@ -54,8 +57,8 @@ if __name__ == '__main__':
     files_drawn = [splitext(file)[0] for file in files_drawn]
 
     # Filter out files already used in train/test
-    files = [file for file in files if (file not in c.RAW_FILES) & (
-        file not in c.RAW_FILES_GENERALIZE)]
+    # files = [file for file in files if (file not in c.RAW_FILES) & (
+    #     file not in c.RAW_FILES_GENERALIZE)]
 
     # Filter out files already drawn
     file_paths = [join(c.RAW_DATA_DIR, file) for file in files]
@@ -66,10 +69,7 @@ if __name__ == '__main__':
     # whether to draw the pages in a consecutive order or random
     consecutive = False
     # Create `FIG_DIR` directory
-    try:
-        makedirs(join(c.FIG_DIR, operation))
-    except FileExistsError:
-        pass
+    make_dir(join(c.FIG_DIR, operation))
 
     draw_cells(files, file_paths, consecutive, operation)
 
