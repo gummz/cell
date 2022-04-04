@@ -4,9 +4,9 @@ import os
 from os.path import join
 
 
-def setcwd():
+def setcwd(file_path):
     '''Set working directory to script location'''
-    abspath = os.path.abspath(__file__)
+    abspath = os.path.abspath(file_path)
     dname = os.path.dirname(abspath)
     os.chdir(dname)
 
@@ -30,7 +30,7 @@ generalize = ['LI_2019-01-17_emb7_pos3.lsm',
               'LI_2019-02-05_emb5_pos4.lsm']
 test_set = {
     'LI_2015-07-12_emb5_pos1': (16),
-    'LI-2018-11-20_emb6_pos1': (104),  # not found
+    'LI-2018-11-20_emb6_pos1': (104),
     'LI_2018-11-20_emb7_pos4': (10, 71),
     'LI_2019-01-17_emb7_pos4': (158, 217),
     'LI_2019-02-05_emb5_pos2': (191),
@@ -40,9 +40,9 @@ test_set = {
     'LI_2019-04-11_emb8_pos2': (68),
     'LI_2019-04-11_emb8_pos3': (245),
     'LI_2019-04-11_emb8_pos4': (229),
-    'LI_2019-06-13_emb2_pos1': (204),
-    'LI_2019-06-13_emb2_pos2': (32),
-    'LI_2019-07-03_emb1-pos1': (246),
+    # 'LI_2019-06-13_emb2_pos1': (204),
+    # 'LI_2019-06-13_emb2_pos2': (32),
+    'LI_2019-07-03_emb1_pos1': (246),
     'LI_2019-07-03_emb7_pos2': (98),
     'LI_2019-07-03_emb7_pos3': (99),
     'LI_2019-07-03_emb7_pos4': (183),
