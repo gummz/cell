@@ -25,6 +25,9 @@ class CenterLink():
     def get_prev(self):
         return self.prev
 
+    def get_center(self):
+        return self.center
+
     def get_intensity(self):
         return self.intensity
 
