@@ -4,13 +4,6 @@ import os
 from os.path import join
 
 
-def setcwd(file_path):
-    '''Set working directory to script location'''
-    abspath = os.path.abspath(file_path)
-    dname = os.path.dirname(abspath)
-    os.chdir(dname)
-
-
 # CONNECTED COMPONENT ANALYSIS
 CV2_CONNECTED_ALGORITHM = 1
 NUMBER_CONNECTIVITY = 8
@@ -28,6 +21,19 @@ RAW_FILES = ['LI_2019-11-21_emb6_pos3.lsm',
              'LI_2018-12-07_emb5_pos2.lsm']
 generalize = ['LI_2019-01-17_emb7_pos3.lsm',
               'LI_2019-02-05_emb5_pos4.lsm']
+
+test_set = {  # None = ok to use any timepoint
+    'LI_2015-07-12_emb5_pos1': None,
+    'LI_2016-03-04_emb5_pos2': (0, 117),
+    'LI_2018-11-20_emb7_pos3': None,
+    'LI_2018-11-20_emb6_pos2': None,
+    'LI_2019-01-17_emb7_pos3': None,
+    'LI_2019-02-05_emb5_pos4': (0, 123),
+    'LI_2019-09-19_emb1_pos3': None,
+    'LI_2019-11-08_emb3_pos2': None,
+    'LI_2019-11-08_emb5_pos4': None,
+}
+
 test_set = {
     'LI_2015-07-12_emb5_pos1': (16),
     'LI-2018-11-20_emb6_pos1': (104),
@@ -47,6 +53,7 @@ test_set = {
     'LI_2019-07-03_emb7_pos3': (99),
     'LI_2019-07-03_emb7_pos4': (183),
 }
+
 generalize = test_set
 
 train_set = {
