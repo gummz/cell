@@ -13,7 +13,7 @@ import torchvision
 from aicsimageio import AICSImage
 from matplotlib.image import BboxImage
 from PIL import Image
-from src.data.utils.make_dir import make_dir
+import src.data.utils.utils as utils
 from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
                                         get_transform)
 from src.models.utils.model import get_instance_segmentation_model
@@ -22,10 +22,19 @@ from torch.utils.data import DataLoader, Subset
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 
-def get_model(time_str):
+def get_model(folder, time_str: str, device: torch.device):
     # Load model
-    load = join(folder, f'model_{time_str}.pkl')
-    model = pickle.load(open(load, 'rb'))
+    load_path = join(folder, f'model_{time_str}.pkl')
+    if device.type == 'cuda':
+        model = pickle.load(open(load_path, 'rb'))
+    else:
+        # model = pickle.load(open(load, 'rb'))
+        model = utils.CPU_unpickler(open(load_path, 'rb')).load()
+        '''Attempting to deserialize object on a CUDA device
+        but torch.cuda.is_available() is False.
+        If you are running on a CPU-only machine, please use
+        torch.load with map_location=torch.device('cpu') to map your storages to the CPU.'''
+
     return model
 
 
@@ -87,9 +96,15 @@ def get_predictions(model, device, inputs):
         pass
 
     inputs = [input.to(device) for input in inputs]
-
     with torch.no_grad():
-        preds = model(inputs)
+        if device.type == 'cuda':
+            preds = model(inputs)
+        else:
+            preds = []
+            for input in inputs:
+                pred = model([input])[0]
+                preds.append(pred)
+            # preds = [model([input]) for input in inputs]
 
     return preds
 
@@ -134,8 +149,40 @@ def get_prediction(model, device, input):
     return pred[0]
 
 
+def predict_ssh(raw_data_file, time_idx):
+    for t in time_idx:
+        timepoint = raw_data_file.get_image_dask_data(
+            'ZXY', T=t, C=c.CELL_CHANNEL).compute()
+        timepoint = torch.tensor(timepoint)
+        pred = get_predictions(model, device, timepoint)
+        centroids = CL.get_chains(timepoint, pred)
+        np.savetxt(join(c.DATA_DIR, '{t:05d}.csv'), centroids)
+
+
+def predict_local(timepoints, device, model):
+    # List to record centroids for all timepoints
+    # so each element represents centroids from a
+    # certain timepoint
+    centroids_list = []
+    for t, timepoint in enumerate(timepoints):
+        #  timepoint = raw_data_file.get_image_dask_data(
+        # 'ZYX', T=t, C=c.CELL_CHANNEL).compute()
+        timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
+                                  dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
+        timepoint = torch.tensor(timepoint)
+        timepoint = torch.unsqueeze(timepoint, 1)
+        pred = get_predictions(model, device, timepoint)
+        centroids = CL.get_chains(timepoint, pred)
+
+        np.savetxt(join(c.DATA_DIR, f't_{t:02d}.csv'), centroids)
+
+        centroids_list.append(centroids)
+
+    return centroids_list
+
+
 if __name__ == '__main__':
-    c.setcwd(__file__)
+    utils.setcwd(__file__)
     mode = 'test'
     # Running on CUDA?
     device = torch.device(
@@ -152,31 +199,28 @@ if __name__ == '__main__':
     dataset = BetaCellDataset(
         transforms=get_transform(train=False), resize=size, mode=mode)
 
-    model = get_model(time_str)
+    model = get_model(folder, time_str, device)
     model.to(device)
 
-    make_dir(c.PRED_DIR)
     save = join(c.DATA_DIR, mode, c.PRED_DIR)
+    utils.make_dir(save)
 
     # 1. Choose raw data file
-    name = c.RAW_FILES_GENERALIZE.keys()[1]
+    name = list(c.RAW_FILES_GENERALIZE.keys())[1]
     path = join(c.RAW_DATA_DIR, name)
-    raw_data_file = AICSImage(path)
+    # raw_data_file = AICSImage(path)
+    timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
+
     # # Choose time range
     time_start = 0
-    time_end = raw_data_file.dims['T'][0]
+    time_end = 1
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
-    make_dir(join(c.DATA_DIR, mode, c.PRED_DIR, name))
+    utils.make_dir(join(c.DATA_DIR, mode, c.PRED_DIR, name))
     # 2. Loop over each timepoint at a time
     time_range = range(time_start, time_end)
-    for t in time_range:
-        timepoint = raw_data_file.get_image_dask_data(
-            'ZYX', T=time_range, C=c.CELL_CHANNEL)
-        pred = get_predictions(model, device, timepoint.compute())
-        centroids = CL.get_chains(timepoint, pred)
-
-        np.save(join(path, f'{t:05d}'), centroids)
+    pred = predict_local(timepoints, device, model)
+    # np.save(join(path, f'{t:05d}'), centroids)
 
     # 3. Get centroids inside the loop
     # - can't store the entire prediction
@@ -188,31 +232,31 @@ if __name__ == '__main__':
     #     np.save(save, pred)
 
     # Get image and target
-    input, target = dataset[img_idx]
-    # Get mask from target
-    target_mask = get_mask(target)
+    # input, target = dataset[img_idx]
+    # # Get mask from target
+    # target_mask = get_mask(target)
 
-    img, mask = get_prediction(model, device, input)
+    # img, mask = get_prediction(model, device, input)
 
-    # Get segmentations and bounding boxes
-    pred_mask = get_mask(mask)
-    # Change to RGB image
-    pred_mask = pred_mask.repeat(3, 1, 1)
-    boxes = torch.tensor(target['boxes'])
-    bboxed_image = draw_bounding_boxes(pred_mask, boxes)
-    bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
-    print(bboxed_image.shape)
-    debug_img = np.array(input)[0, :, :]
+    # # Get segmentations and bounding boxes
+    # pred_mask = get_mask(mask)
+    # # Change to RGB image
+    # pred_mask = pred_mask.repeat(3, 1, 1)
+    # boxes = torch.tensor(target['boxes'])
+    # bboxed_image = draw_bounding_boxes(pred_mask, boxes)
+    # bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
+    # print(bboxed_image.shape)
+    # debug_img = np.array(input)[0, :, :]
 
-    # Print mask from model output
+    # # Print mask from model output
 
-    plt.imsave(f'{folder}/pred_debug_mask.jpg',
-               bboxed_image.cpu().detach().numpy())
-    # Print image that was fed into the model
-    plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
-    # Print target mask from dataset
-    plt.imsave(f'{folder}/pred_debug_target_mask.jpg', target_mask)
+    # plt.imsave(f'{folder}/pred_debug_mask.jpg',
+    #            bboxed_image.cpu().detach().numpy())
+    # # Print image that was fed into the model
+    # plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
+    # # Print target mask from dataset
+    # plt.imsave(f'{folder}/pred_debug_target_mask.jpg', target_mask)
 
-    print(target['boxes'])
+    # print(target['boxes'])
 
-    print('predict_model.py complete')
+    # print('predict_model.py complete')
