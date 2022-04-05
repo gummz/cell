@@ -6,13 +6,14 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from src.data.utils.make_dir import make_dir
 import numpy as np
+import src.data.utils.utils as utils
 import src.data.constants as c
 from aicsimageio import AICSImage
 import cv2
 
 print('make_dataset_test.py start')
 
-c.setcwd(__file__)
+utils.setcwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
 files = c.RAW_FILES_GENERALIZE.keys()
@@ -54,7 +55,7 @@ idx = img_idx if img_idx > 0 else 0  # numbering for images
 debug_every = c.DBG_EVERY
 
 tic = time()
-n_timepoints = 4
+n_timepoints = 5
 n_slices = 5
 idx = 0
 # To store which timepoints and slices
@@ -62,19 +63,25 @@ idx = 0
 file_indexes = []
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
     data = AICSImage(file_path)
-    T = data.dims['T'][0]
-    Z = data.dims['Z'][0]
 
-    # time_idx = c.RAW_FILES_GENERALIZE[splitext(file)[0]]
+    if '.czi' not in file_path:
+        T = data.dims['T'][0]
+        Z = data.dims['Z'][0]
+    else:
+        dims = utils.get_czi_dims(data.metadata)
+        T = dims['T']
+        Z = dims['Z']
+
+    time_ok = c.RAW_FILES_GENERALIZE[splitext(file)[0]]
     # Set cutoff to T+1 if there is no cutoff
     # i.e., the file won't be cut off because T is the final
     # timepoint
     # cutoff = cutoffs[file] if cutoffs[file] is not None else T + 1
-
+    time_ok = T if time_ok is None else time_ok[1]
     # time_idx = np.random.randint(0, min(cutoff, T), n_timepoints)
     # Dimension order depends on if time_idx is an int or tuple
     # order = 'ZXY' if type(time_idx) == int else 'TZXY'
-    time_idx = np.random.randint(0, T, n_timepoints)
+    time_idx = np.random.randint(0, time_ok, n_timepoints)
     timepoints = data.get_image_dask_data(
         'TZXY', T=time_idx, C=cell_ch).compute()
 
