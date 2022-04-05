@@ -68,24 +68,41 @@ def get_bbox_center(bbox, z):
     Outut:
         center of bbox in 3D coordinates (X, Y, Z)
     '''
-    pass
+    x1, y1, x2, y2 = bbox
+    w = x2 - x1
+    h = y2 - y1
+    center = int(x1 + w/2), int(y1 + h/2), z
+    return center
 
 
-def find_closest_center(i: int, center: CenterLink, centers: list, searchrange: int = 1):
+def calculate_distance(center1, center2):
+    return np.linalg.norm(center2-center1)
+
+
+def find_closest_center(z: int, center: CenterLink,
+                        centers: list, searchrange: int = 3):
     '''
     Finds the next closest center in the slice after slice i.
     The found center must be within `searchrange` distance of `center`.
 
     Inputs:
-        i: the current slice.
+        z: the current slice.
         center: the current center.
-        centers: centers of next slice (i+1).
-        searchrange: the range of which to search for a candidate center.
+        centers: centers of next slice (z+1).
+        searchrange: the range of which to search for a 
+        candidate center, in (x,y) coordinates.
 
     Output:
         a center within `searchrange` distance, or None if none is found.
     '''
-    pass
+    candidates = []
+    for candidate in centers:
+        distance = calculate_distance(center, candidate)
+        if distance <= searchrange:
+            candidates.append(candidate)
+
+    return np.min(candidates)
+        
 
 
 def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
@@ -103,7 +120,7 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
             Each element in this list represents a slice from
             the timepoint.
         searchrange: the tolerance when searching for a center belonging
-            to current cell. Default: 1 pixel
+            to current cell. Default: 3 pixels
 
     Output:
         centroids: A list for each slice. Each element in the list
@@ -163,7 +180,8 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
         for j, center in enumerate(centers):  # each center in slice
             # search in the direction of z-dimension
             # a total of `searchrange` pixels in all directions
-            closest_center = find_closest_center(j, center, centers[i + 1])
+            closest_center = find_closest_center(
+                j, center, centers[i + 1], searchrange)
             if closest_center is not None:
                 closest_center.set_prev(center)
             center.set_next(closest_center)
