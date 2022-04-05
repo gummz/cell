@@ -10,6 +10,7 @@ import src.data.utils.utils as utils
 import src.data.constants as c
 from aicsimageio import AICSImage
 import cv2
+import pandas as pd
 
 print('make_dataset_test.py start')
 
@@ -60,7 +61,7 @@ n_slices = 5
 idx = 0
 # To store which timepoints and slices
 # were randomly chosen for each file:
-file_indexes = []
+file_indices = []
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
     data = AICSImage(file_path)
 
@@ -90,9 +91,12 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
     # in `for timepoint in timepoints`.
     # if type(time_idx) == int:
     #     timepoints = np.expand_dims(timepoints, 0)
+    indices = []
     for t, timepoint in enumerate(timepoints):
         print('Timepoint', t)
         slice_idx = np.random.randint(0, Z, n_slices)
+        indices.append({time_idx: slice_idx})
+
         timepoint_sliced = timepoint[slice_idx]
         for z_slice in timepoint_sliced:
             name = f'{idx:05d}'
@@ -109,12 +113,16 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
             file = os.path.basename(save)
 
             if idx % debug_every == 1:
-                # plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', slice)
                 image = Image.fromarray(z_slice)
                 image.save(f'{dirs}/_{file}.{c.IMG_EXT}')
 
             idx = idx + 1
 
+    file_indices[file] = indices
+
+# Record keeping over which indices were randomly selected
+index_record = pd.DataFrame(file_indices)
+index_record.to_csv(join(c.DATA_DIR, mode, c.IMG_DIR, 'index_record.csv'))
 
 toc = time()
 print(f'make_dataset.py complete after {(toc-tic)/60: .1f} minutes.')
