@@ -1,26 +1,46 @@
 import os
 from os import listdir
-from os.path import join
+from os.path import join, splitext
 from time import time
-import numpy as np
-import tifffile as tiff
+from PIL import Image
 import matplotlib.pyplot as plt
-
+from src.data.utils.make_dir import make_dir
+import numpy as np
+import src.data.utils.utils as utils
 import src.data.constants as c
+from aicsimageio import AICSImage
+import cv2
+import pandas as pd
+
+print('make_dataset.py start')
+
+utils.setcwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
-files = c.RAW_FILES[c.START_IDX:]
+files = c.RAW_FILES.keys()
+raw_files = listdir(raw_data_dir)
+temp_files = []
+for file in files:
+    if f'{file}.lsm' in raw_files:
+        tmp = f'{file}.lsm'
+    elif f'{file}.czi' in raw_files:
+        tmp = f'{file}.czi'
+    elif f'{file}.ims' in raw_files:
+        tmp = f'{file}.ims'
+    temp_files.append(tmp)
+files = temp_files
+
+
 cutoffs = c.RAW_CUTOFFS
 file_paths = [join(raw_data_dir, file) for file in files]
-Ds = c.RAW_FILE_DIMENSIONS
+cell_ch = c.CELL_CHANNEL
+mode = 'test'
 
 # Create `IMG_DIR` folder, in case it doesn't exist
 folder_name = c.IMG_DIR
-folder = f'../data/interim/{folder_name}'
-try:
-    os.mkdir(folder)
-except FileExistsError:
-    pass
+# f'../data/interim/{folder_name}'
+folder = join(c.DATA_DIR, mode, folder_name)
+make_dir(folder)
 
 # Get files in imgs folder - need to know what's in there so
 # we don't start the index at 0
@@ -36,50 +56,68 @@ idx = img_idx if img_idx > 0 else 0  # numbering for images
 debug_every = c.DBG_EVERY
 
 tic = time()
+n_timepoints = 5
+n_slices = 5
+idx = 0
+# To store which timepoints and slices
+# were randomly chosen for each file:
+file_indices = []
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
-    file = files[j]
-    cutoff = cutoffs[file]
-    with tiff.TiffFile(file_path) as f:
-        n = len(f.pages)
-        print(f'Number of pages: {n}')
+    data = AICSImage(file_path)
 
-        # Pages are the images of each file
-        pages = f.pages[::2]  # only every other page has beta cells
-        D = Ds[file]  # dimension of current file
-        # pages / D
-        # We want this to pass; otherwise, the z-dimension doesn't add up.
-        # assert type(int(len(pages)) / int(D)) == int
+    if '.czi' not in file_path:
+        T = data.dims['T'][0]
+        Z = data.dims['Z'][0]
+    else:
+        dims = utils.get_czi_dims(data.metadata)
+        T = dims['T']
+        Z = dims['Z']
 
-        for i, page in enumerate(pages):
-            if i % D == 0:
-                # Save the dimension in case we can't use all
-                # frames, in which case we need to stop early
-                # in image_list below
-                old_D = D
-                # If the next MIP goes beyond cutoff, take
-                # only the z-values up to cutoff
-                if cutoff is not None and i + D > cutoff:
-                    D = cutoff
-                name = f'{idx:05d}'
-                idx = idx + 1
-                save = os.path.join(folder, name)
-                image_list = [page.asarray()[0, :, :]
-                              for page in pages[i: i + D]]
+    time_ok = c.RAW_FILES_GENERALIZE[splitext(file)[0]]
+    # Set cutoff to T+1 if there is no cutoff
+    # i.e., the file won't be cut off because T is the final
+    # timepoint
+    # cutoff = cutoffs[file] if cutoffs[file] is not None else T + 1
+    time_ok = T if time_ok is None else time_ok[1]
+    # time_idx = np.random.randint(0, min(cutoff, T), n_timepoints)
+    # Dimension order depends on if time_idx is an int or tuple
+    # order = 'ZXY' if type(time_idx) == int else 'TZXY'
+    time_idx = np.random.randint(0, time_ok, n_timepoints)
+    timepoints = data.get_image_dask_data(
+        'TZXY', T=time_idx, C=cell_ch).compute()
 
-                image_max = np.max(image_list, axis=0)
-                # image_max = cv2.normalize(image_max, None, alpha=0, beta=255,
-                #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    # If time_idx is an integer, then we need to create
+    # an empty dimension so that we can "iterate" over it
+    # in `for timepoint in timepoints`.
+    # if type(time_idx) == int:
+    #     timepoints = np.expand_dims(timepoints, 0)
+    indices = []
+    for t, timepoint in enumerate(timepoints):
+        print('Timepoint', t)
+        name = f'{idx:05d}'
+        save = os.path.join(folder, name)
 
-                np.save(save, image_max)
+        timepoint_mip = np.max(timepoint, axis=0)
 
-            # Save intermittently to .png for debugging
-            if True:  # i % (D * debug_every) == 0:
-                dirs = os.path.dirname(save)
-                file = os.path.basename(save)
-                plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', image_max)
+        # # z_slice = cv2.normalize(
+        #     z_slice, None, alpha=0, beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+        # z_slice = cv2.fastNlMeansDenoising(z_slice, None, 8, 7, 21)
 
-            # -1 because index was updated to +1 above
-            # print(f'Image {idx-1} saved.')
+        np.save(save, timepoint_mip)
+        print('Saved to', save)
+
+        dirs = os.path.dirname(save)
+        file = os.path.basename(save)
+
+        if idx % debug_every == 1:
+            image = Image.fromarray(timepoint_mip)
+            image.save(f'{dirs}/_{file}.{c.IMG_EXT}')
+
+        idx = idx + 1
+
+# Record keeping over which indices were randomly selected
+index_record = pd.DataFrame(file_indices)
+index_record.to_csv(join(c.DATA_DIR, mode, c.IMG_DIR, 'index_record.csv'))
 
 toc = time()
 print(f'make_dataset.py complete after {(toc-tic)/60: .1f} minutes.')
