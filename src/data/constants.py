@@ -32,6 +32,7 @@ test_set = {  # None = ok to use any timepoint
     'LI_2019-09-19_emb1_pos3': None,
     'LI_2019-11-08_emb3_pos2': None,
     'LI_2019-11-08_emb5_pos4': None,
+    'LI_2020-06-04_emb1_pos1': None,
 }
 
 test_set = {
