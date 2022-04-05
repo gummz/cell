@@ -1,17 +1,21 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from os.path import join, splitext
-from os import makedirs, listdir
+from os import listdir
 from aicsimageio import AICSImage
 import os
 import src.data.constants as c
-from src.data.utils.make_dir import make_dir
+import src.data.utils.utils as utils
 
 
 def draw_cells(files, file_paths, consecutive, operation):
     for i, (file, file_path) in enumerate(zip(files, file_paths)):
         data = AICSImage(file_path)
-        T = data.dims['T'][0]
+        if '.czi' not in file_path:
+            T = data.dims['T'][0]
+        else:
+            dims = utils.get_czi_dims(data.metadata)
+            T = dims['T']
 
         # Create sample indexes
         if consecutive:  # sample timepoints in a row
@@ -47,29 +51,31 @@ def get_MIP(timepoints: np.array):
 if __name__ == '__main__':
     # Set working directory to file location
     print('draw_cells.py start')
-    c.setcwd(__file__)
+    utils.setcwd(__file__)
     print(os.getcwd())
 
     files = listdir(c.RAW_DATA_DIR)
 
     operation = 'draw_cells'
+    utils.make_dir(join(c.FIG_DIR, operation))
+
     files_drawn = listdir(f'{c.FIG_DIR}/{operation}')
     files_drawn = [splitext(file)[0] for file in files_drawn]
-
+    
     # Filter out files already used in train/test
     # files = [file for file in files if (file not in c.RAW_FILES) & (
     #     file not in c.RAW_FILES_GENERALIZE)]
 
     # Filter out files already drawn
-    file_paths = [join(c.RAW_DATA_DIR, file) for file in files]
     for file in files:
         if file in files_drawn:
             files.remove(file)
+    
+    file_paths = [join(c.RAW_DATA_DIR, file) for file in files]
 
     # whether to draw the pages in a consecutive order or random
     consecutive = False
     # Create `FIG_DIR` directory
-    make_dir(join(c.FIG_DIR, operation))
 
     draw_cells(files, file_paths, consecutive, operation)
 
