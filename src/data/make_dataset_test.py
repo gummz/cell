@@ -4,7 +4,6 @@ from os.path import join, splitext
 from time import time
 from PIL import Image
 import matplotlib.pyplot as plt
-from src.data.utils.make_dir import make_dir
 import numpy as np
 import src.data.utils.utils as utils
 import src.data.constants as c
@@ -72,7 +71,9 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         T = dims['T']
         Z = dims['Z']
 
+    # What timepoints it's ok to use, according to excel sheet
     time_ok = c.RAW_FILES_GENERALIZE[splitext(file)[0]]
+
     # Set cutoff to T+1 if there is no cutoff
     # i.e., the file won't be cut off because T is the final
     # timepoint
@@ -97,10 +98,6 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         for z_slice in timepoint_sliced:
             name = f'{idx:05d}'
             save = os.path.join(folder, name)
-
-            # # z_slice = cv2.normalize(
-            #     z_slice, None, alpha=0, beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-            # z_slice = cv2.fastNlMeansDenoising(z_slice, None, 8, 7, 21)
 
             np.save(save, z_slice)
             print('Saved to', save)
