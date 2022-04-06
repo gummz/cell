@@ -9,7 +9,7 @@ import src.data.constants as c
 from aicsimageio import AICSImage
 import pandas as pd
 
-mode = 'test'
+mode = 'train'
 
 utils.setcwd(__file__)
 
@@ -65,20 +65,13 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
 
     time_idx = np.random.randint(0, time_ok, n_timepoints).tolist()
     timepoints = data.get_image_dask_data(
-        'TZXY', T=time_idx, C=cell_ch).compute()
+        'TZXY', T=range(time_ok), C=cell_ch).compute()
 
     indices = []
     for t, timepoint in enumerate(timepoints):
         print('Timepoint', t)
-        slice_idx = np.random.randint(0, Z, n_slices)
-        # Gets slices with most cells on them
-        slice_idx = utils.active_slices(timepoint)
-        # Make record of the indices of T and Z
-        record = utils.record_dict(t, slice_idx)
-        indices.append(record)
 
-        timepoint_sliced = timepoint[slice_idx]
-        for z_slice in timepoint_sliced:
+        for z_slice in timepoint:
             name = f'{idx:05d}'
             save = os.path.join(folder, name)
 
@@ -93,7 +86,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
 
             idx = idx + 1
 
-    file_indices[file] = ';'.join([f'{key}:{",".join(idx)}' for key, idx in indices.items()])
+    file_indices[file] = indices
 
 # Record keeping over which indices were randomly selected
 save = join(c.DATA_DIR, mode, c.IMG_DIR)
@@ -104,4 +97,4 @@ index_record = pd.DataFrame(file_indices, columns=list(file_indices.keys()))
 index_record.to_csv(join(save, 'index_record.csv'), sep='\t')
 
 toc = time()
-print(f'make_dataset.py complete after {(toc-tic)/60: .1f} minutes.')
+print(f'make_dataset_train.py complete after {(toc-tic)/60: .1f} minutes.')
