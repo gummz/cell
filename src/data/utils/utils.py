@@ -1,7 +1,8 @@
+import cv2
 import inspect
 import os
-from os import makedirs, mkdir
-
+from os import makedirs, mkdir, listdir
+import numpy as np
 import src.data.constants as c
 from aicsimageio import AICSImage
 import pickle
@@ -15,6 +16,37 @@ class CPU_unpickler(pickle.Unpickler):
             return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
         else:
             return super().find_class(module, name)
+
+
+def active_slices(timepoint: np.array):
+    max_val = np.max(timepoint)
+    min_val = np.min(timepoint)
+    diff = np.abs(max_val - min_val)
+    thresh = diff * c.ACTIVE_SLICES_RATIO
+
+    timepoint = np.where(timepoint > thresh, 1, 0)
+    sums = np.sum(timepoint, axis=(1, 2))
+    active_idx = np.argpartition(sums, -3)[-3:]
+
+    return active_idx
+
+
+def add_ext(files):
+    raw_files = listdir(c.RAW_DATA_DIR)
+    temp_files = []
+    for file in files:
+        if f'{file}.lsm' in raw_files:
+            tmp = f'{file}.lsm'
+        elif f'{file}.czi' in raw_files:
+            tmp = f'{file}.czi'
+        elif f'{file}.ims' in raw_files:
+            tmp = f'{file}.ims'
+        temp_files.append(tmp)
+
+    if len(temp_files) == 1:
+        return temp_files[0]
+
+    return temp_files
 
 
 def get_czi_dims(metadata):
@@ -105,6 +137,12 @@ def make_dir(path):
             mkdir(path)
         except FileExistsError:
             pass
+
+
+def record_dict(t, slice_idx):
+    slice_idx = [str(idx) for idx in slice_idx]
+    record = {t: ','.join(slice_idx)}
+    return record
 
 
 def setcwd(file_path):
