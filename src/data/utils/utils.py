@@ -18,11 +18,12 @@ class CPU_unpickler(pickle.Unpickler):
             return super().find_class(module, name)
 
 
-def active_slices(timepoint: np.array):
+def active_slices(timepoint: np.array, ratio=None):
     max_val = np.max(timepoint)
     min_val = np.min(timepoint)
     diff = np.abs(max_val - min_val)
-    thresh = diff * c.ACTIVE_SLICES_RATIO
+    ratio = ratio if ratio else c.ACTIVE_SLICES_RATIO
+    thresh = diff * ratio
 
     timepoint = np.where(timepoint > thresh, 1, 0)
     sums = np.sum(timepoint, axis=(1, 2))
