@@ -9,15 +9,13 @@ from src.data.utils.make_dir import make_dir
 import src.data.constants as c
 
 # Set working directory to script location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
+c.setcwd(__file__)
 
 files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
 data_dir = c.DATA_DIR
-mode = 'test'
+mode = 'train'
 
 # Create folder in case it doesn't exist yet
 folder_name = c.MASK_DIR
@@ -44,13 +42,13 @@ image_paths = sorted([join(imgs_path, image) for image in images])
 img_idx = len(masks) - 1 + 1
 idx = img_idx if img_idx > 0 else 0  # numbering for images
 
-
 thresholds = []
 idx = 0
 tic = time()
 for i, path in enumerate(image_paths):
 
     img = np.int16(np.load(path))
+    # Convert to PIL image; requirement for the model
     img = cv2.normalize(img, img, alpha=0, beta=255,
                         dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     name = f'{idx:05d}'
@@ -61,20 +59,13 @@ for i, path in enumerate(image_paths):
     filtered = cv2.medianBlur(img, kernel)
     _, thresh = cv2.threshold(filtered,
                               threshold, 255, cv2.THRESH_BINARY)
+    # np.save(save, thresh)
 
-    # Add image and thresholded image together
-    # Because we're going to manually annotate over the
-    # original image with automatic thresholds marked
-    # (to avoid manually annotating unnecessarily)
-    added = np.array([img, thresh], dtype=object)
-    added_max = np.max(added, axis=0)
-    # np.save(save, added_max)
-
-    # Save as .png for manual annotation
+    # Save as .jpg for debugging
+    # if i % debug_every == 1:
     dirs = os.path.dirname(save)
     file = os.path.basename(save)
-    added_max = added_max.astype(np.uint16)
-    plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', added_max)
+    plt.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', thresh, cmap='gray')
 
 
 toc = time()

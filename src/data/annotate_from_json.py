@@ -9,7 +9,7 @@ import PIL.Image
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from src.data.utils.make_dir import make_dir
+import src.data.utils.utils as utils
 import src.data.constants as c
 
 '''
@@ -41,7 +41,7 @@ So: imgs, masks, masks_full.
 '''
 
 # Set working directory to script location
-c.setcwd(__file__)
+utils.setcwd(__file__)
 
 files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL
@@ -55,9 +55,9 @@ mask_dir_full = c.MASK_DIR_FULL
 # Create folder in case it doesn't exist yet
 folder_name = c.MASK_DIR
 folder = join(c.DATA_DIR, mode, folder_name)
-make_dir(folder)
-make_dir(join(c.DATA_DIR, mode, mask_dir_full))
-make_dir(c.FIG_DIR)
+utils.make_dir(folder)
+utils.make_dir(join(c.DATA_DIR, mode, mask_dir_full))
+utils.make_dir(c.FIG_DIR)
 
 # How often to print out with matplotlib
 debug_every = c.DBG_EVERY
@@ -109,6 +109,7 @@ for folders, subfolders, files in os.walk(join(c.DATA_DIR, mode, mask_dir)):
 
             if idx % debug_every == 0:
                 plt.imsave(join(save, f'_{img_idx}.png'), thresh)  # debug
+                
             idx += 1
 
 
