@@ -149,14 +149,35 @@ def get_prediction(model, device, input):
     return pred[0]
 
 
-def predict_ssh(raw_data_file, time_idx):
+def predict_ssh(raw_data_file, time_idx, device, model):
+    centroids_tot = []
     for t in time_idx:
         timepoint = raw_data_file.get_image_dask_data(
             'ZXY', T=t, C=c.CELL_CHANNEL).compute()
-        timepoint = torch.tensor(timepoint)
+        slice_idx = utils.active_slices(timepoint)
+        timepoint_sliced = timepoint[slice_idx]
+        
+        # debug
+        save_dir = join(c.DATA_DIR, 'test', c.PRED_DIR)
+        for idx, slice in zip(slice_idx, timepoint_sliced):
+            plt.imsave(join(save_dir, f'active_{idx}.png'))
+        for i, slice in enumerate(timepoint):
+            plt.imsave(join(save_dir, f'orig_{i}.png'))
+
+        timepoint = prepare_mrcnn_data(timepoint, device)
         pred = get_predictions(model, device, timepoint)
         centroids = CL.get_chains(timepoint, pred)
-        np.savetxt(join(c.DATA_DIR, '{t:05d}.csv'), centroids)
+        centroids_tot.append(centroids)
+
+    return centroids_tot
+
+
+def prepare_mrcnn_data(timepoint, device):
+    timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
+                              dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
+    timepoint = torch.tensor(timepoint).to(device)
+    timepoint = torch.unsqueeze(timepoint, 1)
+    return timepoint
 
 
 def predict_local(timepoints, device, model):
@@ -167,10 +188,7 @@ def predict_local(timepoints, device, model):
     for t, timepoint in enumerate(timepoints):
         #  timepoint = raw_data_file.get_image_dask_data(
         # 'ZYX', T=t, C=c.CELL_CHANNEL).compute()
-        timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
-                                  dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
-        timepoint = torch.tensor(timepoint)
-        timepoint = torch.unsqueeze(timepoint, 1)
+        timepoint = prepare_mrcnn_data(timepoint, device)
         pred = get_predictions(model, device, timepoint)
         centroids = CL.get_chains(timepoint, pred)
 
@@ -187,6 +205,7 @@ if __name__ == '__main__':
     # Running on CUDA?
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    # device = torch.device('cpu')
     print(f'Running on {device}.')
 
     # Get dataloaders
@@ -202,61 +221,30 @@ if __name__ == '__main__':
     model = get_model(folder, time_str, device)
     model.to(device)
 
-    save = join(c.DATA_DIR, mode, c.PRED_DIR)
-    utils.make_dir(save)
-
     # 1. Choose raw data file
     name = list(c.RAW_FILES_GENERALIZE.keys())[1]
+    name = utils.add_ext([name])
+    # # Make directory for this raw data file
+    # # i.e. mode/pred/name
+    save = join(c.DATA_DIR, mode, c.PRED_DIR)
+    utils.make_dir(join(save, name))
+
+    # either ssh with full data:
     path = join(c.RAW_DATA_DIR, name)
-    # raw_data_file = AICSImage(path)
-    timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
+    raw_data_file = AICSImage(path)
+    # ... or local with small debug file:
+    # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
 
     # # Choose time range
     time_start = 0
     time_end = 1
-    # # Make directory for this raw data file
-    # # i.e. mode/pred/name
-    utils.make_dir(join(c.DATA_DIR, mode, c.PRED_DIR, name))
+
     # 2. Loop over each timepoint at a time
     time_range = range(time_start, time_end)
-    pred = predict_local(timepoints, device, model)
+    centroids = predict_ssh(raw_data_file, [10, 100],
+                            device, model)
+    centroids_save = [(cent.get_center(), cent.get_intensity())
+                      for centers in centroids for cent in centers]
+    np.savetxt(
+        join(save, name, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
     # np.save(join(path, f'{t:05d}'), centroids)
-
-    # 3. Get centroids inside the loop
-    # - can't store the entire prediction
-    #
-
-    # for i, (image, target) in enumerate(dataset):
-    #     pred = get_prediction(model, device, image)
-    #     # extract_centroids.py uses this file
-    #     np.save(save, pred)
-
-    # Get image and target
-    # input, target = dataset[img_idx]
-    # # Get mask from target
-    # target_mask = get_mask(target)
-
-    # img, mask = get_prediction(model, device, input)
-
-    # # Get segmentations and bounding boxes
-    # pred_mask = get_mask(mask)
-    # # Change to RGB image
-    # pred_mask = pred_mask.repeat(3, 1, 1)
-    # boxes = torch.tensor(target['boxes'])
-    # bboxed_image = draw_bounding_boxes(pred_mask, boxes)
-    # bboxed_image = torch.permute(bboxed_image, (1, 2, 0))
-    # print(bboxed_image.shape)
-    # debug_img = np.array(input)[0, :, :]
-
-    # # Print mask from model output
-
-    # plt.imsave(f'{folder}/pred_debug_mask.jpg',
-    #            bboxed_image.cpu().detach().numpy())
-    # # Print image that was fed into the model
-    # plt.imsave(f'{folder}/pred_debug_img.jpg', img[0].cpu())
-    # # Print target mask from dataset
-    # plt.imsave(f'{folder}/pred_debug_target_mask.jpg', target_mask)
-
-    # print(target['boxes'])
-
-    # print('predict_model.py complete')

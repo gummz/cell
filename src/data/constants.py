@@ -2,7 +2,11 @@
 import pandas as pd
 import os
 from os.path import join
+import src.data.utils.utils as utils
 
+
+# ACTIVE SLICES RATIO
+ACTIVE_SLICES_RATIO = 0.1
 
 # CONNECTED COMPONENT ANALYSIS
 CV2_CONNECTED_ALGORITHM = 1
@@ -12,13 +16,16 @@ NUMBER_CONNECTIVITY = 8
 RAW_DATA_DIR = '/dtu-compute/tubes/raw_data'
 # Very important to maintain the order of files in `RAW_FILES`
 # because the dataset creation depends on this order
-RAW_FILES = ['LI_2019-11-21_emb6_pos3.lsm',
-             'LI_2020-05-06_emb7_pos3.lsm',
-             'LI_2019-07-03_emb7_pos3.lsm',
-             'LI_2018-12-07_emb6_pos3.lsm',
-             'LI_2018-12-18_emb4_pos4.lsm',
-             'LI_2020-05-06_emb7_pos4.lsm',
-             'LI_2018-12-07_emb5_pos2.lsm']
+RAW_FILES_TRAIN = {
+    'LI_2019-11-21_emb6_pos3.lsm': None,
+    'LI_2020-05-06_emb7_pos3.lsm': None,
+    'LI_2019-07-03_emb7_pos3.lsm': (0, 250),
+    'LI_2018-12-07_emb6_pos3.lsm': None,
+    'LI_2018-12-18_emb4_pos4.lsm': None,
+    'LI_2020-05-06_emb7_pos4.lsm': None,
+    'LI_2018-12-07_emb5_pos2.lsm': None
+}
+
 generalize = ['LI_2019-01-17_emb7_pos3.lsm',
               'LI_2019-02-05_emb5_pos4.lsm']
 
@@ -34,26 +41,29 @@ test_set = {  # None = ok to use any timepoint
     'LI_2019-11-08_emb5_pos4': None,
     'LI_2020-06-04_emb1_pos1': None,
 }
+# testset_ext = utils.add_ext(list(test_set.keys()))
+# test_set = {ext: value for ext, value
+#             in zip(testset_ext, list(test_set.values()))}
 
-test_set = {
-    'LI_2015-07-12_emb5_pos1': (16),
-    'LI-2018-11-20_emb6_pos1': (104),
-    'LI_2018-11-20_emb7_pos4': (10, 71),
-    'LI_2019-01-17_emb7_pos4': (158, 217),
-    'LI_2019-02-05_emb5_pos2': (191),
-    'LI_2019-02-05_emb5_pos3': (210),
-    'LI_2019-02-05_emb5_pos4': (133),
-    'LI_2019-04-11_emb5_pos1': (157),
-    'LI_2019-04-11_emb8_pos2': (68),
-    'LI_2019-04-11_emb8_pos3': (245),
-    'LI_2019-04-11_emb8_pos4': (229),
-    # 'LI_2019-06-13_emb2_pos1': (204),
-    # 'LI_2019-06-13_emb2_pos2': (32),
-    'LI_2019-07-03_emb1_pos1': (246),
-    'LI_2019-07-03_emb7_pos2': (98),
-    'LI_2019-07-03_emb7_pos3': (99),
-    'LI_2019-07-03_emb7_pos4': (183),
-}
+# test_set = {
+#     'LI_2015-07-12_emb5_pos1': (16),
+#     'LI-2018-11-20_emb6_pos1': (104),
+#     'LI_2018-11-20_emb7_pos4': (10, 71),
+#     'LI_2019-01-17_emb7_pos4': (158, 217),
+#     'LI_2019-02-05_emb5_pos2': (191),
+#     'LI_2019-02-05_emb5_pos3': (210),
+#     'LI_2019-02-05_emb5_pos4': (133),
+#     'LI_2019-04-11_emb5_pos1': (157),
+#     'LI_2019-04-11_emb8_pos2': (68),
+#     'LI_2019-04-11_emb8_pos3': (245),
+#     'LI_2019-04-11_emb8_pos4': (229),
+#     # 'LI_2019-06-13_emb2_pos1': (204),
+#     # 'LI_2019-06-13_emb2_pos2': (32),
+#     'LI_2019-07-03_emb1_pos1': (246),
+#     'LI_2019-07-03_emb7_pos2': (98),
+#     'LI_2019-07-03_emb7_pos3': (99),
+#     'LI_2019-07-03_emb7_pos4': (183),
+# }
 
 generalize = test_set
 
@@ -64,6 +74,11 @@ train_set = {
 }
 
 RAW_FILES_GENERALIZE = generalize
+
+RAW_FILES = {
+    'train': RAW_FILES_TRAIN,
+    'test': RAW_FILES_GENERALIZE
+}
 
 # RAW_FILES = RAW_FILES_GENERALIZE  # testing for generalization
 #  'LI_2020-06-17_emb3_pos5.czi']
@@ -101,8 +116,8 @@ MASK_DIR_FULL = 'masks_full'
 MASK_DIR_TEST = 'masks'
 MASK_DIR_TEST_FULL = 'masks_full'
 
-PRED_DIR = 'train/pred'
-PRED_DIR_TEST = 'test/pred'
+PRED_DIR = 'pred'
+PRED_DIR_TEST = 'pred'
 
 FIG_DIR = 'figures'
 FILE_DIR = 'files'

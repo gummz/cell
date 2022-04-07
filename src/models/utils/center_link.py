@@ -1,14 +1,19 @@
 import numpy as np
+import torch
 
 
 class CenterLink():
-    '333333333333333333333333333333333333333333333333333333333333333333'
 
     def __init__(self, center: tuple, intensity: float):
         self.next = None
         self.prev = None
         self.center = center
         self.intensity = intensity
+
+    def __sub__(self, other):
+        x, y, _ = self.get_center()
+        x_other, y_other, _ = other.get_center()
+        return (x - x_other, y - y_other)
 
     def set_next(self, center):
         self.next = center
@@ -39,23 +44,32 @@ class CenterChain():
         while True:
             next = center.get_next()
             if next in links:
-                raise ValueError('Circular list of links detected')
+                raise RuntimeError('Circular list of links detected')
             if next:
                 links.append(next)
                 center = next
             else:
                 break
-        centers = np.array([link.center for link in links])
-        intensities = np.array([link.intensity for link in links])
+        centers = [link.get_center()
+                   for link in links]
+        intensities = [link.get_intensity()
+                       for link in links]
 
         self.center = np.mean(centers)
         self.intensity = np.mean(intensities)
+        self.links = links
+
+    def __repr__(self):
+        return self.get_center(), self.get_intensity()
 
     def get_center(self):
         return self.center
 
     def get_intensity(self):
         return self.intensity
+
+    def get_links(self):
+        return self.links
 
 
 def get_bbox_center(bbox, z):
@@ -68,15 +82,16 @@ def get_bbox_center(bbox, z):
     Outut:
         center of bbox in 3D coordinates (X, Y, Z)
     '''
-    x1, y1, x2, y2 = bbox
+    x1, y1, x2, y2 = [int(coord) for coord in bbox]
     w = x2 - x1
     h = y2 - y1
-    center = int(x1 + w/2), int(y1 + h/2), z
+    center = int(x1 + w / 2), int(y1 + h / 2), z
+
     return center
 
 
-def calculate_distance(center1, center2):
-    return np.linalg.norm(center2-center1)
+def calculate_distance(centerlink_1, centerlink_2):
+    return np.linalg.norm(centerlink_1 - centerlink_2)
 
 
 def find_closest_center(z: int, center: CenterLink,
@@ -89,7 +104,7 @@ def find_closest_center(z: int, center: CenterLink,
         z: the current slice.
         center: the current center.
         centers: centers of next slice (z+1).
-        searchrange: the range of which to search for a 
+        searchrange: the range of which to search for a
         candidate center, in (x,y) coordinates.
 
     Output:
@@ -99,10 +114,16 @@ def find_closest_center(z: int, center: CenterLink,
     for candidate in centers:
         distance = calculate_distance(center, candidate)
         if distance <= searchrange:
-            candidates.append(candidate)
+            candidates.append((candidate, distance))
 
-    return np.min(candidates)
-        
+    if len(candidates) == 0:
+        return None
+
+    distances = [cand[1] for cand in candidates]
+    argmin_closest = np.argmin(distances)
+    best = candidates[argmin_closest][0]
+
+    return best
 
 
 def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
@@ -123,13 +144,11 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
             to current cell. Default: 3 pixels
 
     Output:
-        centroids: A list for each slice. Each element in the list
-            contains the centroids for that slice.
+        chains: A list for each slice.
+            Each element in the list contains the centroids for that slice.
             The centroids are of type CenterLink.
             As before, the average is taken over all occurrences of the
             cell across all slices.
-
-     963 33 2 3
     '''
     # need pixel intensity also
     # fetched from original image
@@ -146,30 +165,21 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
     masks_tot = [pred['masks'] for pred in preds]
     centers_tot = []
 
-    # Get average pixel intensities
-    # for z_slice, masks in zip(timepoint, masks_tot):
-    #     intensities = []
-    #     for mask in masks:
-    #         mask_nonzero = np.argwhere(mask)
-    #         # Coordinates in original slice
-    #         region = z_slice[mask_nonzero]
-    #         intensity = np.mean(region)
-    #         intensities.append(intensity)
-    #     intensities_tot.append(intensities)
-    # pred is 3d
-
-    centroids = None
-    image_iter = zip(timepoint, masks_tot, bboxes_tot)
+    image_iter = zip(timepoint.squeeze(1), masks_tot, bboxes_tot)
     for z, (z_slice, masks, bboxes) in enumerate(image_iter):  # each slice
         centers = []
+
         for mask, bbox in zip(masks, bboxes):  # each box in slice
             center = get_bbox_center(bbox, z)
+
             # Coordinates in original slice
-            mask_nonzero = np.argwhere(mask)
+            mask_nonzero = np.argwhere(mask.detach().cpu())
+
             # Get cell coordinates in original image (z_slice)
-            region = z_slice[mask_nonzero]
+            region = z_slice[mask_nonzero].detach().cpu()
+
             # Calculate average pixel intensity
-            intensity = np.mean(region)
+            intensity = np.mean(region.numpy())
 
             center_link = CenterLink(center, intensity)
             centers.append(center_link)
@@ -178,10 +188,12 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
 
     for i, centers in enumerate(centers_tot):  # each slice
         for j, center in enumerate(centers):  # each center in slice
+            if i == len(centers_tot) - 1:
+                continue
             # search in the direction of z-dimension
             # a total of `searchrange` pixels in all directions
             closest_center = find_closest_center(
-                j, center, centers[i + 1], searchrange)
+                j, center, centers_tot[i + 1], searchrange)
             if closest_center is not None:
                 closest_center.set_prev(center)
             center.set_next(closest_center)
@@ -189,9 +201,11 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
     # Get only first link of each chain because that's all we need
     # (link is first occurring part of each cell)
     # link = cell occurrence in slice, chain = whole cell
-    centroids = [center for center in centers_tot if center.get_prev() is None]
+    links = [
+        center for centers in centers_tot for center in centers if center.get_prev() is None]
     # Get chains (= whole cells)
     # which contains average pixel intensity and average center
     # for the whole chain (i.e. over all links in the chain)
-    chains = [CenterChain(center) for center in centroids]
+    chains = [CenterChain(link) for link in links]
+
     return chains
