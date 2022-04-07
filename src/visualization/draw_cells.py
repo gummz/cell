@@ -10,6 +10,8 @@ import src.data.utils.utils as utils
 
 def draw_cells(files, file_paths, consecutive, operation):
     for i, (file, file_path) in enumerate(zip(files, file_paths)):
+        print('Now:', file)
+        
         data = AICSImage(file_path)
         if '.czi' not in file_path:
             T = data.dims['T'][0]
