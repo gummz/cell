@@ -149,7 +149,7 @@ def predict_ssh(raw_data_file, time_idx, device, model):
             # debug
             save_dir = join('..', c.EXPERIMENT_DIR, 'active_slices')
             for idx, slice in zip(slice_idx, timepoint_sliced):
-                plt.imsave(join(save_dir, f'active_{idx:02d}_{ratio}.png'), slice)
+                plt.imsave(join(save_dir, f'active_{idx:02d}_{ratio*255}.png'), slice)
         for i, slice in enumerate(timepoint):
             plt.imsave(join(save_dir, f'orig_{i:02d}.png'), slice)
         print('done')

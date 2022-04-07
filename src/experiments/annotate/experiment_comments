@@ -1,0 +1,6 @@
+Compare Frangi, median, mean, Gaussian filters
+
+Choose median, Gaussian for annotate experiment
+
+So /filter/ is for checking out the filters.
+/annotate/ is for checking out combining the two filters I chose, with various annotation methods and thresholds.
