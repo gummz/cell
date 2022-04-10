@@ -37,51 +37,6 @@ from BetaCellDataset import BetaCellDataset, get_dataloaders, print_unique
 # import torch.optim as optim
 # import torchvision
 
-# Environment variable for memory management
-alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
-try:
-    print(alloc_conf, os.environ[alloc_conf])
-except KeyError:
-    print(alloc_conf, 'not found')
-
-conn = NUMBER_CONNECTIVITY
-algo = CV2_CONNECTED_ALGORITHM
-kernel = MEDIAN_FILTER_KERNEL
-threshold = SIMPLE_THRESHOLD
-
-device = torch.device(
-    'cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f'Running on {device}.')
-
-# Set working directory to file location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-
-
-# our dataset has two classes only - background and person
-num_classes = 2
-
-
-# Get data
-# Size of image
-size = 512
-batch_size = 8  # 1024, 8; 128, 16
-pretrained = True
-data_tr, data_val = get_dataloaders(
-    batch_size=batch_size, num_workers=2, resize=size)
-# TODO: switch to batch_size=2, size=1024
-
-# get the model using our helper function
-model = get_instance_segmentation_model(pretrained=pretrained)
-# move model to the right device
-model.to(device)
-
-# Unique identifier for newly saved objects
-now = datetime.datetime.now()
-time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
-save = f'interim/run_{time_str}'
-
 
 def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
     '''Train'''
@@ -155,7 +110,7 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
 
                 if j % 100 == 0:
                     writer.add_scalar('training loss',
-                                      float(losses) / 200,
+                                      float(scaler.scale(losses)) / 100,
                                       epoch * len(data_tr) + j)
 
                 # End of training loop for mini-batch
@@ -178,58 +133,62 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
             print(time_print)
 
         # Validation
-        with torch.no_grad(), autocast():
-            # x_val, y_val = to_device([x_val, y_val], device)
-            x_val = [x.to(device) for x in x_val]
-            y_val = [{k: v.to(device) for k, v in t.items()} for t in y_val]
+        for x_val, y_val in data_val:
+            with torch.no_grad(), autocast():
 
-            val_losses = get_loss(model, loss_list, x_val, y_val)
+                # x_val, y_val = to_device([x_val, y_val], device)
+                x_val = [x.to(device) for x in x_val]
+                y_val = [{k: v.to(device) for k, v in t.items()}
+                         for t in y_val]
 
-            scheduler.step(val_losses)
-            # TODO: make sure scheduler works
-            # by printing out the learning rate each epoch
+                val_losses = get_loss(model, loss_list, x_val, y_val)
 
-            # Get current learning rate
-            if i % log_every == 0:
-                # print(f'Current learning rate: {scheduler}')
-                print(f'Validation loss: {val_losses.item():.3f}')
+                scheduler.step(val_losses)
+                # TODO: make sure scheduler works
+                # by printing out the learning rate each epoch
 
-            writer.add_scalar('validation loss', float(val_losses), epoch)
-            tot_val_losses.append(val_losses.item())
+                # Get current learning rate
+                if i % log_every == 0:
+                    # print(f'Current learning rate: {scheduler}')
+                    print(f'Validation loss: {val_losses.item():.3f}')
 
-            # Save progress every `save_every` epochs
-            if i % save_every == 0:
-                dump_model(model, time_str)
+                writer.add_scalar('validation loss', float(val_losses), epoch)
+                tot_val_losses.append(val_losses.item())
 
-            if i == save_every:
-                debug_opencv_mask()
+                # Save progress every `save_every` epochs
+                if i % save_every == 0:
+                    dump_model(model, time_str)
 
-            model.eval()
-            y_hat = model(x_val)
+                if i == save_every:
+                    debug_opencv_mask()
 
-            # Convert ys to masks
-            # yhat_boxes = [y['boxes']] .....
-            # Convert y_hat to CUDA
-            # y_hat = to_device([y_hat], device)
-            y_hat = [{k: v.to(device) for k, v in t.items()} for t in y_hat]
-            # Strip everything except masks
-            y_hat, y_val = y_to_mask([y_hat, y_val])
-            # Consolidate masks in batch
-            y_hat = [get_mask(y) for y in y_hat]
-            y_val = [get_mask(y) for y in y_val]
+                model.eval()
+                y_hat = model(x_val)
 
-        # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
-        x_val = [x.squeeze() for x in x_val]
-        print([x.shape for x in x_val])
-        print([y.shape for y in y_hat])
-        print([y.shape for y in y_val], '\n\n')
+                # Convert ys to masks
+                # yhat_boxes = [y['boxes']] .....
+                # Convert y_hat to CUDA
+                # y_hat = to_device([y_hat], device)
+                y_hat = [{k: v.to(device) for k, v in t.items()}
+                         for t in y_hat]
+                # Strip everything except masks
+                y_hat, y_val = y_to_mask([y_hat, y_val])
+                # Consolidate masks in batch
+                y_hat = [get_mask(y) for y in y_hat]
+                y_val = [get_mask(y) for y in y_val]
 
-        image_grid = create_grid(x_val, y_val, y_hat)
-        writer.add_image(f'epoch_{epoch}', image_grid,
-                         epoch, dataformats='NCHW')
+            # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
+            x_val = [x.squeeze() for x in x_val]
+            print([x.shape for x in x_val])
+            print([y.shape for y in y_hat])
+            print([y.shape for y in y_val], '\n\n')
 
-        writer.add_hparams(
-            hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
+            image_grid = create_grid(x_val, y_val, y_hat)
+            writer.add_image(f'epoch_{epoch}', image_grid,
+                             epoch, dataformats='NCHW')
+
+            writer.add_hparams(
+                hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
     # select random images and their target indices
     # images, labels = select_n_random()
 
@@ -241,11 +200,12 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
 
-    return tot_train_losses, tot_val_losses
+    return val_losses.item()
+
 
 def create_grid(x_val, y_val, y_hat):
     image_grid = make_grid(
-            [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
+        [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
     image_grid = image_grid.squeeze().unsqueeze(1)
     image_grid = (image_grid * 255).type(torch.uint8)
     return image_grid
@@ -306,7 +266,7 @@ def debug_opencv_mask():
 def dump_model(model, time_str):
     # Make folder unique to this run in order to save model and loss
     try:
-        mkdir(save)
+        utils.make_dir(save)
     except FileExistsError:
         pass
 
@@ -320,8 +280,6 @@ def predict(model, data):
     return np.array(Y_pred)
 
 # helper function
-
-
 def select_n_random(n=100):
     '''
     Selects n random datapoints and their corresponding labels from a dataset
@@ -338,8 +296,49 @@ def select_n_random(n=100):
 
 def bce_loss(y_real, y_pred):
     '''bce_loss'''
-    return torch.mean(y_pred - y_real * y_pred
-                      + torch.log(1 + torch.exp(-y_pred)))
+    return torch.mean(y_pred - y_real * y_pred +
+                      torch.log(1 + torch.exp(-y_pred)))
+
+
+# Environment variable for memory management
+alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
+try:
+    print(alloc_conf, os.environ[alloc_conf])
+except KeyError:
+    print(alloc_conf, 'not found')
+
+conn = NUMBER_CONNECTIVITY
+algo = CV2_CONNECTED_ALGORITHM
+kernel = MEDIAN_FILTER_KERNEL
+threshold = SIMPLE_THRESHOLD
+
+device = torch.device(
+    'cuda') if torch.cuda.is_available() else torch.device('cpu')
+print(f'Running on {device}.')
+
+utils.setcwd()
+
+
+# our dataset has two classes only - background and person
+num_classes = 2
+
+
+# Get data
+# Size of image
+size = 512
+batch_size = 8  # 1024, 8; 128, 16
+pretrained = True
+data_tr, data_val = get_dataloaders(
+    batch_size=batch_size, num_workers=2, resize=size, manual_ratio=0)
+
+# get the model using our helper function
+model = get_instance_segmentation_model(pretrained=pretrained)
+model.to(device)
+
+# Unique identifier for newly saved objects
+now = datetime.datetime.now()
+time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
+save = f'interim/run_{time_str}'
 
 
 params = [p for p in model.parameters() if p.requires_grad]
@@ -374,9 +373,6 @@ description = f'''{time_str}\n
                     Weight decay: {wd}\n
                     Optimizer: {opt}\n
                     Losses: {loss_list}
-                    
-                    Denoised training set
-
                     '''
 
 with SummaryWriter(f'runs/{time_str}') as w:
@@ -389,28 +385,28 @@ losses = np.array(losses).T
 
 # Special note that is saved as the name of a file with
 # a name which is the value of the string `special_mark`
-special_mark = 'all_losses'
-if special_mark:
-    np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
+# special_mark = 'all_losses'
+# if special_mark:
+#     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
 
-np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
-pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
+# np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
+# pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
 
-plt.subplot(121)
-plt.plot(losses[0])
-title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-plt.title(title_train)
-plt.xlabel('Epoch')
-plt.ylabel('Total loss')
+# plt.subplot(121)
+# plt.plot(losses[0])
+# title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
+# plt.title(title_train)
+# plt.xlabel('Epoch')
+# plt.ylabel('Total loss')
 
-plt.subplot(122)
-plt.plot(losses[1])
-title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-plt.title(title_val)
-plt.xlabel('Epoch')
-plt.ylabel('Total loss')
+# plt.subplot(122)
+# plt.plot(losses[1])
+# title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
+# plt.title(title_val)
+# plt.xlabel('Epoch')
+# plt.ylabel('Total loss')
 
-plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
+# plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
 
 # TODO: optuna
 # compare with and without autocast for training of final model
