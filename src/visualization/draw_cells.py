@@ -10,8 +10,11 @@ import src.data.utils.utils as utils
 
 def draw_cells(files, file_paths, consecutive, operation):
     for i, (file, file_path) in enumerate(zip(files, file_paths)):
-        print('Now:', file)
+        if 'LI_2020-12-10_emb3_pos2' in file:
+            continue
         
+        print('Now:', file)
+
         data = AICSImage(file_path)
         if '.czi' not in file_path:
             T = data.dims['T'][0]
@@ -22,18 +25,17 @@ def draw_cells(files, file_paths, consecutive, operation):
         # Create sample indexes
         if consecutive:  # sample timepoints in a row
             randint = np.random.randint(low=0, high=T - 9)
-            idx = np.arange(randint, randint + 9)
+            time_idx = np.arange(randint, randint + 9)
         else:
-            idx = sorted([int(i) for i in np.random.randint(0, T, 9)])
+            time_idx = sorted([int(i) for i in np.random.randint(0, T, 9)])
 
-        timepoints = data.get_image_dask_data('TZYX', T=idx, C=0)
-        timepoints_max = get_MIP(timepoints.compute())
-        sample_images = timepoints_max
+        for j, t in enumerate(time_idx):
+            timepoint = data.get_image_dask_data('ZYX', T=t, C=0)
+            timepoint_max = get_MIP(timepoint.compute())
 
-        for j, (t, image) in enumerate(zip(idx, sample_images)):
-            # Create plot of sample images
+            # Draw subplot of sample MIP
             plt.subplot(3, 3, j + 1)
-            plt.imshow(image)
+            plt.imshow(timepoint_max)
             plt.axis('off')
             plt.title(f'Timepoint {t}', fontsize=6)
 
@@ -46,7 +48,7 @@ def draw_cells(files, file_paths, consecutive, operation):
 def get_MIP(timepoints: np.array):
     '''Returns Maximum Intensity Projection of
     `timepoints` array'''
-    timepoints_max = np.max(timepoints, axis=1)
+    timepoints_max = np.max(timepoints, axis=0)
     return timepoints_max
 
 
@@ -63,7 +65,7 @@ if __name__ == '__main__':
 
     files_drawn = listdir(f'{c.FIG_DIR}/{operation}')
     files_drawn = [splitext(file)[0] for file in files_drawn]
-    
+
     # Filter out files already used in train/test
     # files = [file for file in files if (file not in c.RAW_FILES) & (
     #     file not in c.RAW_FILES_GENERALIZE)]
@@ -72,12 +74,11 @@ if __name__ == '__main__':
     for file in files:
         if file in files_drawn:
             files.remove(file)
-    
+
     file_paths = [join(c.RAW_DATA_DIR, file) for file in files]
 
     # whether to draw the pages in a consecutive order or random
     consecutive = False
-    # Create `FIG_DIR` directory
 
     draw_cells(files, file_paths, consecutive, operation)
 
