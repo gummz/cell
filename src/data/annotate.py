@@ -8,14 +8,12 @@ import matplotlib.pyplot as plt
 import src.data.utils.utils as utils
 import src.data.constants as c
 
-# Set working directory to script location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
+mode = 'test'
+
+utils.setcwd(__file__)
 
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
-mode = 'test'
 files = c.RAW_FILES[mode]
 
 
@@ -67,7 +65,16 @@ for i, path in enumerate(image_paths):
     # (to avoid manually annotating unnecessarily)
     added = np.array([img, thresh], dtype=object)
     added_max = np.max(added, axis=0)
-    np.save(save, added_max)
+
+    # We don't really have a use for a saved .npy file of the
+    # overlayed image only, i.e., the automatic annotations
+    # overlayed on the original image. (The purpose of that
+    # was that I would know what to annotate)
+    # It's therefore best to save the thresholded image only
+    # to .npy here.
+    # This way, we can use the masks immediately, without
+    # any manual annotations.
+    np.save(save, thresh)
 
     # Save as .png for manual annotation
     dirs = os.path.dirname(save)
