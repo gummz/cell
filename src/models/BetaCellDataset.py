@@ -1,5 +1,6 @@
 from os import listdir
 from os.path import join
+import random
 
 import cv2
 import numpy as np
@@ -8,6 +9,7 @@ from PIL import Image
 import src.data.constants as c
 from src.models.utils import transforms as T
 from src.models.utils.utils import collate_fn
+import src.data.utils.utils as utils
 from torch.utils.data import DataLoader
 from torchvision.transforms import functional as F
 
@@ -25,24 +27,63 @@ def print_unique(image, pre=''):
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
-    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train'):
+    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=0, manual_ratio=0):
+        '''
+        Inputs:
+
+        manual_ratio:
+            The percentage of the masks which are
+            to come from the set of fully (manually) annotated
+            images.
+        '''
         self.root = root
         self.transforms = transforms
+
+        # For added robustness, create folders if they don't
+        # already exist
+        for folder in [c.IMG_DIR, c.MASK_DIR, c.MASK_DIR_FULL]:
+            utils.make_dir(join(root, mode, folder))
+        
         # load all image files, sorting them to
         # ensure that they are aligned
         imgs = [image for image in listdir(
             join(root, mode, c.IMG_DIR)) if '.npy' in image]
-        masks = [image for image in listdir(
-            join(root, mode, c.MASK_DIR)) if '.npy' in image]
+        masks = [mask for mask in listdir(
+            join(root, mode, c.MASK_DIR)) if '.npy' in mask]
+        masks_full = [mask for mask in listdir(
+            join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask]
 
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
+        self.masks_full = list(sorted(masks_full))
+
+        # masks:       ----------------------------
+        # masks_full:  ----------
+        # so we can't return a higher ratio than we have
+        # available
+        # "choice" variable below
+
+        len_masks = len(self.masks)
+        len_masks_full = len(self.masks_full)
+        full_ratio = len_masks_full / len_masks
+
+        if manual_ratio < full_ratio:
+            k = int(manual_ratio) * len_masks
+            self.masks_full = list(sorted(random.choices(self.masks_full, k)))
+        elif manual_ratio > full_ratio:
+            print(f'WARNING: Requested more full annotations than available. \
+            Returning all available annotations ({len(self.masks_full)}).')
+
         self.resize = resize
 
     def __getitem__(self, idx):
         # load images and mask
         img_path = join(self.root, c.IMG_DIR, self.imgs[idx])
-        mask_path = join(self.root, c.MASK_DIR, self.masks[idx])
+        if self.masks[idx] in self.masks_full:
+            mask_dir = c.MASK_DIR_FULL
+        else:
+            mask_dir = c.MASK_DIR
+        mask_path = join(self.root, mask_dir, self.masks[idx])
 
         img = np.int16(np.load(img_path))
         # PREPROCESSING
@@ -139,27 +180,29 @@ class BetaCellDataset(torch.utils.data.Dataset):
         return len(self.imgs)
 
 
-def get_dataloaders(batch_size=4, num_workers=2, resize=1024, manual_annot=0):
+def get_dataloaders(batch_size=4, num_workers=2, resize=1024, n_img_ratio=1, manual_ratio=0):
     '''Get dataloaders.
         resize: resize image in __getitem__ method of dataset class.
 
-        manual_annot: how many manually annotated images to include. Default: None'''
+        manual_ratio: how many manually (i.e., fully) annotated
+        images to include. Default: None (0)
+    '''
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
-        c.DATA_DIR, get_transform(train=True), resize=resize)
+        c.DATA_DIR, get_transform(train=True), resize=resize, mode='train', n_img_ratio=n_img_ratio, manual_ratio=manual_ratio)
     dataset_val = BetaCellDataset(
-        c.DATA_DIR, get_transform(train=False), resize=resize)
+        c.DATA_DIR, get_transform(train=False), resize=resize, mode='val', n_img_ratio=0.5, manual_ratio=1)
 
     # split the dataset in train and test set
-    torch.manual_seed(1)
+    # torch.manual_seed(1)
 
     # indices = torch.randperm(len(dataset)).tolist()
 
     # val_idx = int(0.1 * len(dataset))
-    indices = range(len(dataset))
-    val_tp = c.TIMEPOINTS[-1]
-    dataset = torch.utils.data.Subset(dataset, indices[:-val_tp])
-    dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_tp:])
+    # indices = range(len(dataset))
+    # val_tp = c.TIMEPOINTS[-1]
+    # dataset = torch.utils.data.Subset(dataset, indices[:-val_tp])
+    # dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_tp:])
 
     # define training and validation data loaders
     data_tr = DataLoader(
