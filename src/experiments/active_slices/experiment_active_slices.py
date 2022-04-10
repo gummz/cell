@@ -139,6 +139,7 @@ def get_prediction(model, device, input):
 
 def predict_ssh(raw_data_file, time_idx, device, model):
     centroids_tot = []
+
     for t in time_idx:
         timepoint = raw_data_file.get_image_dask_data(
             'ZXY', T=t, C=c.CELL_CHANNEL).compute()
@@ -149,15 +150,15 @@ def predict_ssh(raw_data_file, time_idx, device, model):
             # debug
             save_dir = join('..', c.EXPERIMENT_DIR, 'active_slices')
             for idx, slice in zip(slice_idx, timepoint_sliced):
-                plt.imsave(join(save_dir, f'active_{idx:02d}_{ratio*255}.png'), slice)
+                utils.imsave(join(save_dir, f't-{t}_active_{idx:02d}_{ratio*255}.jpg'), slice, 512)
         for i, slice in enumerate(timepoint):
-            plt.imsave(join(save_dir, f'orig_{i:02d}.png'), slice)
+            utils.imsave(join(save_dir, f't-{t}_orig_{i:02d}.jpg'), slice, 512)
         print('done')
-        exit()
-        timepoint = prepare_mrcnn_data(timepoint, device)
-        pred = get_predictions(model, device, timepoint)
-        centroids = CL.get_chains(timepoint, pred)
-        centroids_tot.append(centroids)
+    exit()
+    timepoint = prepare_mrcnn_data(timepoint, device)
+    pred = get_predictions(model, device, timepoint)
+    centroids = CL.get_chains(timepoint, pred)
+    centroids_tot.append(centroids)
 
     return centroids_tot
 
