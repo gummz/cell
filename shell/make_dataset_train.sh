@@ -9,9 +9,9 @@
 ### -- specify that the cores must be on the same host -- 
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need 1GB of memory per core/slot -- 
-#BSUB -R "rusage[mem=1GB]"
+#BSUB -R "rusage[mem=5GB]"
 ### -- specify that we want the job to get killed if it exceeds 3 GB per core/slot -- 
-#BSUB -M 3GB
+#BSUB -M 6GB
 ### -- set walltime limit: hh:mm -- 
 #BSUB -W 24:00 
 
@@ -24,7 +24,7 @@
 #BSUB -oo out
 #BSUB -eo err
 
-module load python3/3.8.2
+module load python3/3.8.11
 ###python3 -m venv ../venv_1
 source ../venv_1/bin/activate
 
@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 -m cProfile -s tottime ../src/data/make_dataset.py > pyout
+python3 -m memory_profiler ../src/data/make_dataset_train.py > pyout
