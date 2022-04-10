@@ -7,6 +7,7 @@ import src.data.constants as c
 from aicsimageio import AICSImage
 import pickle
 import torch
+import matplotlib.pyplot as plt
 import io
 
 
@@ -42,6 +43,8 @@ def add_ext(files):
             tmp = f'{file}.czi'
         elif f'{file}.ims' in raw_files:
             tmp = f'{file}.ims'
+        else:
+            raise RuntimeError(f'File not found with extension: {file}')
         temp_files.append(tmp)
 
     if len(temp_files) == 1:
@@ -127,6 +130,15 @@ def get_raw_array(file_path, index):
     #     return images
 
 
+def imsave(path, img, resize=False):
+    if resize:
+        if type(img) != np.ndarray:
+            img = np.array(img)
+        img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
+
+    plt.imsave(path, img)
+
+
 def make_dir(path):
     if '/' in path:
         try:
@@ -141,8 +153,9 @@ def make_dir(path):
 
 
 def record_dict(t, slice_idx):
-    slice_idx = [str(idx) for idx in slice_idx]
-    record = {t: ','.join(slice_idx)}
+    # print('slice idx', slice_idx)
+    # slice_idx = [str(idx) for idx in slice_idx]
+    record = {t: slice_idx}
     return record
 
 
