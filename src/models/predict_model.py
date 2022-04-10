@@ -160,9 +160,9 @@ def predict_ssh(raw_data_file, time_idx, device, model):
         # debug
         save_dir = join(c.DATA_DIR, 'test', c.PRED_DIR)
         for idx, slice in zip(slice_idx, timepoint_sliced):
-            plt.imsave(join(save_dir, f'active_{idx}.png'))
+            plt.imsave(join(save_dir, f'active_{idx}.png'), slice)
         for i, slice in enumerate(timepoint):
-            plt.imsave(join(save_dir, f'orig_{i}.png'))
+            plt.imsave(join(save_dir, f'orig_{i}.png'), slice)
 
         timepoint = prepare_mrcnn_data(timepoint, device)
         pred = get_predictions(model, device, timepoint)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     model.to(device)
 
     # 1. Choose raw data file
-    name = list(c.RAW_FILES_GENERALIZE.keys())[1]
+    name = list(c.RAW_FILES[mode].keys())[1]
     name = utils.add_ext([name])
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
@@ -239,7 +239,6 @@ if __name__ == '__main__':
     time_start = 0
     time_end = 1
 
-    # 2. Loop over each timepoint at a time
     time_range = range(time_start, time_end)
     centroids = predict_ssh(raw_data_file, [10, 100],
                             device, model)
@@ -247,4 +246,6 @@ if __name__ == '__main__':
                       for centers in centroids for cent in centers]
     np.savetxt(
         join(save, name, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
+
+    print('predict_model.py complete')
     # np.save(join(path, f'{t:05d}'), centroids)
