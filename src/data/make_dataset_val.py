@@ -10,15 +10,14 @@ import src.data.constants as c
 from aicsimageio import AICSImage
 import pandas as pd
 
-mode = 'test'
+mode = 'val'
 
 utils.setcwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
-files = c.RAW_FILES[mode].keys()
 
-temp_files = utils.add_ext(files)
-files = temp_files
+files = c.RAW_FILES[mode].keys()
+files = utils.add_ext(files)
 
 file_paths = [join(raw_data_dir, file) for file in files]
 cell_ch = c.CELL_CHANNEL
@@ -43,11 +42,12 @@ debug_every = c.DBG_EVERY
 
 tic = time()
 n_timepoints = 5
-n_slices = 5
+n_slices = 10
 idx = 0
 # To store which timepoints and slices
 # were randomly chosen for each file
 file_indices = {}
+print(files)
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
     data = AICSImage(file_path)
 
@@ -64,8 +64,8 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
     time_ok = T if time_ok is None else time_ok[1]
 
     time_idx = sorted(random.sample(range(time_ok), n_timepoints))
-    indices = []
 
+    indices = []
     for t in time_idx:
         timepoint = data.get_image_dask_data(
             'ZXY', T=t, C=cell_ch).compute()
@@ -73,6 +73,8 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         print('Timepoint', t)
         slice_idx = np.random.randint(0, Z, n_slices)
 
+        # Gets slices with most cells on them
+        # slice_idx = utils.active_slices(timepoint)
         # Make record of the indices of T and Z
         record = utils.record_dict(t, slice_idx)
         indices.append(record)
@@ -88,7 +90,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
             if idx % debug_every == 0:
                 dirs = os.path.dirname(save)
                 file = os.path.basename(save)
-                utils.imsave(f'{dirs}/_{file}.jpg', z_slice)
+                utils.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', z_slice, 512)
 
             idx = idx + 1
 
