@@ -88,6 +88,17 @@ def main():
     '''
 
     # STEP 1
+    generate_label()
+
+    # STEP 2
+    tic = time()
+    annotate_from_label()
+
+    toc = time()
+    print(f'annotate_from_json.py complete after {(toc-tic)/60: .1f} minutes.')
+
+
+def generate_label():
     utils.setcwd(__file__)
     mode = 'test'
     mask_dir = join(c.DATA_DIR, mode, c.MASK_DIR)
@@ -98,12 +109,13 @@ def main():
         out_dir = json_file.replace('.', '_')
         out_dir = join(mask_dir, out_dir)
         utils.make_dir(out_dir)
-        data = json.load(open(join(mask_dir, json_file)))
+        json_path = join(mask_dir, json_file)
+        data = json.load(open(json_path))
         imageData = data.get("imageData")
 
         if not imageData:
             imagePath = os.path.join(
-                os.path.dirname(json_file), data["imagePath"])
+                os.path.dirname(json_path), data["imagePath"])
             with open(imagePath, "rb") as f:
                 imageData = f.read()
                 imageData = base64.b64encode(imageData).decode("utf-8")
@@ -139,14 +151,14 @@ def main():
 
         logger.info("Saved to: {}".format(out_dir))
 
-    # STEP 2
-    # Set working directory to script location
-    utils.setcwd(__file__)
 
-    files = c.RAW_FILES_GENERALIZE
+def annotate_from_label():
+    utils.setcwd(__file__)
+    mode = 'test'
+
+    files = c.RAW_FILES[mode]
     kernel = c.MEDIAN_FILTER_KERNEL
     threshold = c.SIMPLE_THRESHOLD
-    mode = 'test'
 
     img_dir = c.IMG_DIR
     mask_dir = c.MASK_DIR
@@ -156,6 +168,7 @@ def main():
     folder_name = c.MASK_DIR
     folder = join(c.DATA_DIR, mode, folder_name)
     utils.make_dir(folder)
+    utils.make_dir(join(c.DATA_DIR, mode, img_dir))
     utils.make_dir(join(c.DATA_DIR, mode, mask_dir_full))
     utils.make_dir(c.FIG_DIR)
 
@@ -193,7 +206,6 @@ def main():
             #     if len(auto_img.shape) > 2:
             #         print(file)
             #         print(auto_img.shape)
-
             if file == 'label.png':
                 img_idx = folders.split('_')[-2]
                 path = join(folders, file)
@@ -207,12 +219,10 @@ def main():
                 np.save(join(save, img_idx), thresh)
 
                 if idx % debug_every == 0:
-                    utils.imsave(join(save, f'_{img_idx}.jpg'), thresh, 512)  # debug
+                    utils.imsave(
+                        join(save, f'_{img_idx}.jpg'), thresh, 512)  # debug
 
                 idx += 1
-
-    toc = time()
-    print(f'annotate_from_json.py complete after {(toc-tic)/60: .1f} minutes.')
 
 
 if __name__ == "__main__":
