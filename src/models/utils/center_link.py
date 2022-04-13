@@ -55,8 +55,8 @@ class CenterChain():
         intensities = [link.get_intensity()
                        for link in links]
 
-        self.center = np.mean(centers)
-        self.intensity = np.mean(intensities)
+        self.center = np.mean(centers, axis=0)
+        self.intensity = np.mean(intensities, axis=0)
         self.links = links
 
     def __repr__(self):
@@ -97,15 +97,15 @@ def calculate_distance(centerlink_1, centerlink_2):
 def find_closest_center(z: int, center: CenterLink,
                         centers: list, searchrange: int = 3):
     '''
-    Finds the next closest center in the slice after slice i.
+    Finds the next closest center in the slice after slice z.
     The found center must be within `searchrange` distance of `center`.
 
     Inputs:
         z: the current slice.
-        center: the current center.
-        centers: centers of next slice (z+1).
+        center: the current CenterLink.
+        centers: CenterLink of next slice (z+1).
         searchrange: the range of which to search for a
-        candidate center, in (x,y) coordinates.
+            candidate center, in (x,y) coordinates.
 
     Output:
         a center within `searchrange` distance, or None if none is found.
@@ -114,19 +114,47 @@ def find_closest_center(z: int, center: CenterLink,
     for candidate in centers:
         distance = calculate_distance(center, candidate)
         if distance <= searchrange:
+            # There are no competitors for this candidate
             candidates.append((candidate, distance))
 
     if len(candidates) == 0:
         return None
 
     distances = [cand[1] for cand in candidates]
-    argmin_closest = np.argmin(distances)
-    best = candidates[argmin_closest][0]
+    argsort = np.argsort(distances)
+
+    for i in argsort:
+        best = candidates[i][0]
+        # No competitor; we can return this candidate
+        if not best.get_prev():
+            break
+
+        # There is a competitor for this candidate.
+        # Need to find out which, center or candidate
+        # previous link,has the shorter distance to
+        # the cendidate
+        cand_prev = best.get_prev()
+        cand_prev_dist = calculate_distance(cand_prev, best)
+        center_dist = calculate_distance(center, best)
+        if cand_prev_dist < center_dist:
+            # Our center won against the competitor
+            # Need to assign a new next-slice-center to
+            # competitor
+            new_centers = centers.copy()
+            new_centers.remove(best)
+            closest_second = find_closest_center(
+                z, cand_prev, new_centers, searchrange)
+            cand_prev.set_next(closest_second)
+        else:
+            # Our center lost to the competitor
+            # nothing to be done except move to next
+            # candidate
+            pass
 
     return best
 
 
-def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
+def get_chains(timepoint: np.array, preds: list, searchrange: int = 3):
     '''
     Returns the chains of the input timepoint.
     Each chain represents a cell. Each chain is composed of connected links,
@@ -194,8 +222,10 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
             # a total of `searchrange` pixels in all directions
             closest_center = find_closest_center(
                 j, center, centers_tot[i + 1], searchrange)
+            # maybe it was assigned before
             if closest_center is not None:
                 closest_center.set_prev(center)
+
             center.set_next(closest_center)
 
     # Get only first link of each chain because that's all we need
@@ -206,6 +236,7 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 1):
     # Get chains (= whole cells)
     # which contains average pixel intensity and average center
     # for the whole chain (i.e. over all links in the chain)
-    chains = [CenterChain(link) for link in links]
+    chains = [CenterChain(link)
+              for link in links if link.get_center() != np.nan]
 
     return chains
