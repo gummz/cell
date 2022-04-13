@@ -10,6 +10,7 @@ import src.data.constants as c
 import src.models.utils.center_link as CL
 import torch
 import torchvision
+from os import listdir
 from aicsimageio import AICSImage
 from matplotlib.image import BboxImage
 from PIL import Image
@@ -149,30 +150,56 @@ def get_prediction(model, device, input):
     return pred[0]
 
 
-def predict_ssh(raw_data_file, time_idx, device, model):
-    centroids_tot = []
+def predict_ssh(raw_data_file, time_idx, device, model, save):
+    chains_tot = []
     for t in time_idx:
-        timepoint = raw_data_file.get_image_dask_data(
+        timepoint_raw = raw_data_file.get_image_dask_data(
             'ZXY', T=t, C=c.CELL_CHANNEL).compute()
-        slice_idx = utils.active_slices(timepoint)
-        timepoint_sliced = timepoint[slice_idx]
-        
-        # debug
-        save_dir = join(c.DATA_DIR, 'test', c.PRED_DIR)
-        for idx, slice in zip(slice_idx, timepoint_sliced):
-            plt.imsave(join(save_dir, f'active_{idx}.png'), slice)
-        for i, slice in enumerate(timepoint):
-            plt.imsave(join(save_dir, f'orig_{i}.png'), slice)
 
-        timepoint = prepare_mrcnn_data(timepoint, device)
+        timepoint = prepare_mrcnn_data(timepoint_raw, device)
         pred = get_predictions(model, device, timepoint)
-        centroids = CL.get_chains(timepoint, pred)
-        centroids_tot.append(centroids)
 
-    return centroids_tot
+        # Draw bounding boxes on slice for debugging
+        Z = raw_data_file.dims['Z'][0]
+        debug_timepoint(save, t, timepoint_raw, pred, Z)
+
+        chains = CL.get_chains(timepoint, pred, c.SEARCHRANGE)
+        chains_tot.append(chains)
+
+    return chains_tot
+
+
+def debug_timepoint(save, t, timepoint_raw, pred, Z):
+    # Randomly sample 10 slices to debug (per timepoint)
+    debug_idx = np.random.randint(0, Z, 2)
+    for i, z_slice in enumerate(timepoint_raw[debug_idx]):
+        z_slice = np.int16(z_slice)
+        z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
+        boxes = pred[i]['boxes']
+        masks = [mask > 0.5 for mask in pred[i]['masks']]
+        if len(masks) == 0:
+            utils.imsave(join(save,
+                              f't-{t}_{i}.jpg'), z_slice, 512)
+            continue
+        masks = torch.stack(masks)
+        masks = masks.squeeze(1)
+        z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1)
+        z_slice = torch.tensor(z_slice)
+        masked_img = draw_segmentation_masks(z_slice, masks)
+        bboxed_img = draw_bounding_boxes(masked_img, boxes)
+        utils.imsave(join(save,
+                          f't-{t}_{i}.jpg'), masked_img, 512)
 
 
 def prepare_mrcnn_data(timepoint, device):
+    timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
+                              dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    z_slices = []
+    for z_slice in timepoint:
+        z_slice = cv2.fastNlMeansDenoising(
+            z_slice, z_slice, 11, 7, 21)
+        z_slices.append(z_slice)
+    timepoint = np.array(z_slices)
     timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
                               dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
     timepoint = torch.tensor(timepoint).to(device)
@@ -201,7 +228,7 @@ def predict_local(timepoints, device, model):
 
 if __name__ == '__main__':
     utils.setcwd(__file__)
-    mode = 'test'
+    mode = 'pred'
     # Running on CUDA?
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -215,23 +242,22 @@ if __name__ == '__main__':
     folder = f'interim/run_{time_str}'
     # data_tr, data_val = get_dataloaders(resize=size)
 
-    dataset = BetaCellDataset(
-        transforms=get_transform(train=False), resize=size, mode=mode)
-
     model = get_model(folder, time_str, device)
     model.to(device)
 
     # 1. Choose raw data file
-    name = list(c.RAW_FILES[mode].keys())[1]
-    name = utils.add_ext([name])
+    names = listdir(c.RAW_DATA_DIR)
+    names = [name for name in names if '.czi' not in name]
+    name = 'LI_2019-02-05_emb5_pos3.lsm'
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
-    save = join(c.DATA_DIR, mode, c.PRED_DIR)
-    utils.make_dir(join(save, name))
+    utils.make_dir(join(c.DATA_DIR, mode, name))
+    save = join(c.DATA_DIR, mode, name)
 
     # either ssh with full data:
     path = join(c.RAW_DATA_DIR, name)
     raw_data_file = AICSImage(path)
+    T = raw_data_file.dims['T'][0]
     # ... or local with small debug file:
     # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
 
@@ -240,12 +266,15 @@ if __name__ == '__main__':
     time_end = 1
 
     time_range = range(time_start, time_end)
-    centroids = predict_ssh(raw_data_file, [10, 100],
-                            device, model)
-    centroids_save = [(cent.get_center(), cent.get_intensity())
-                      for centers in centroids for cent in centers]
+    centroids = predict_ssh(raw_data_file, range(T),
+                            device, model, save)
+    centroids_save = [[(cent.get_center(), cent.get_intensity())
+                      for cent in centers] for centers in centroids]
+    centroids_save = [(center, intensity)
+                      for center, intensity in centroids_save]
+    print(centroids_save)
     np.savetxt(
-        join(save, name, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
+        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
 
     print('predict_model.py complete')
     # np.save(join(path, f'{t:05d}'), centroids)
