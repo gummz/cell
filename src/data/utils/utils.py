@@ -53,6 +53,13 @@ def add_ext(files):
     return temp_files
 
 
+def del_multiple(list_object, indices):
+    indices = sorted(indices, reverse=True)
+    for idx in indices:
+        if idx < len(list_object):
+            list_object.pop(idx)
+
+
 def get_czi_dims(metadata):
     search_T = './Metadata/Information/Image/SizeT'
     search_Z = './Metadata/Information/Image/SizeZ'
@@ -131,9 +138,13 @@ def get_raw_array(file_path, index):
 
 
 def imsave(path, img, resize=False):
+    dirs = os.path.dirname(path)
+    make_dir(dirs)
     if resize:
         if type(img) != np.ndarray:
             img = np.array(img)
+        if len(img.shape) > 2:
+            img = img[0]
         img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
     plt.imsave(path, img)
@@ -141,15 +152,15 @@ def imsave(path, img, resize=False):
 
 def make_dir(path):
     if '/' in path:
-        try:
-            makedirs(path)
-        except FileExistsError:
-            pass
+        makedirs(path, exist_ok=True)
     else:
-        try:
-            mkdir(path)
-        except FileExistsError:
-            pass
+        mkdir(path, exist_ok=True)
+
+
+def normalize(img, alpha, beta, out):
+    if type(img) != np.ndarray:
+        img = np.array(img)
+    return cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
 
 
 def record_dict(t, slice_idx):
