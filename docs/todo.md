@@ -12,15 +12,6 @@
         - Frangi, median, mean, Gaussian: choose two
         - Adaptive, simple thresholding
 
-- Create a pipeline which:
-    - Predicts input
-        - Input is a list of filepaths for a sequence of 3D images; each image is a separate file
-        - Output is a sequence of segmented 3D images; each image is a separate file
-    - Extracts centroids of cells from the output
-        - Center of each bounding box
-        - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
-        - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
-
 - Arrange it such that everything is logged properly; Tensorboard/PyTorch Lightning?
 
 - Create `make` commands for json, train, test, etc.
@@ -38,6 +29,16 @@
 - - -
 
 *Done*
+
+- Create a pipeline which:
+
+    - Predicts input
+        - Input is a list of filepaths for a sequence of 3D images; each image is a separate file
+        - Output is a sequence of segmented 3D images; each image is a separate file
+    - Extracts centroids of cells from the output
+        - Center of each bounding box
+        - For the first bounding box: search within the total width, height of the current cell. If none, then cell ends in the current z-coordinate.
+        - The final centroid will be the average of all centroids which were deemed to be from this cell. I.e., all centroids of the z-coordinates.
 
 - Set up a pipeline which can take in how many manually annotated images to include
 
