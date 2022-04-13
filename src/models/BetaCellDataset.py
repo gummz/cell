@@ -27,7 +27,7 @@ def print_unique(image, pre=''):
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
-    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=0, manual_ratio=0):
+    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=1, manual_ratio=0):
         '''
         Inputs:
 
@@ -43,7 +43,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # already exist
         for folder in [c.IMG_DIR, c.MASK_DIR, c.MASK_DIR_FULL]:
             utils.make_dir(join(root, mode, folder))
-        
+
         # load all image files, sorting them to
         # ensure that they are aligned
         imgs = [image for image in listdir(
@@ -53,15 +53,26 @@ class BetaCellDataset(torch.utils.data.Dataset):
         masks_full = [mask for mask in listdir(
             join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask]
 
+        if n_img_ratio < 1:
+            len_imgs = len(imgs)
+            n_img_include = int(n_img_ratio * len_imgs)
+            index = np.random.randint(0, len_imgs, n_img_include)
+            for img_list in [imgs, masks, masks_full]:
+                utils.del_multiple(img_list, index)
+
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.masks_full = list(sorted(masks_full))
 
         # masks:       ----------------------------
         # masks_full:  ----------
+        # manual_ratio: proportionally how many full annotations
+        # we WANT to include
+        # full_ratio: proportionally how many full annotations
+        # are AVAILABLE
         # so we can't return a higher ratio than we have
         # available
-        # "choice" variable below
+        # "k" variable below
 
         len_masks = len(self.masks)
         len_masks_full = len(self.masks_full)
@@ -163,7 +174,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
         if self.transforms is not None:
             # img, target = self.transforms(img, target)
-            img = cv2.normalize(img, img, alpha=0, beta=1,
+            img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
             img = F.pil_to_tensor(Image.fromarray(img))
 
