@@ -23,22 +23,6 @@ from torch.utils.data import DataLoader, Subset
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 
-def get_model(folder, time_str: str, device: torch.device):
-    # Load model
-    load_path = join(folder, f'model_{time_str}.pkl')
-    if device.type == 'cuda':
-        model = pickle.load(open(load_path, 'rb'))
-    else:
-        # model = pickle.load(open(load, 'rb'))
-        model = utils.CPU_unpickler(open(load_path, 'rb')).load()
-        '''Attempting to deserialize object on a CUDA device
-        but torch.cuda.is_available() is False.
-        If you are running on a CPU-only machine, please use
-        torch.load with map_location=torch.device('cpu') to map your storages to the CPU.'''
-
-    return model
-
-
 def get_mask(output):
     '''Consolidates the masks into one mask.'''
     if type(output) == dict:  # `output` is direct output of model (from one image)
@@ -242,7 +226,7 @@ if __name__ == '__main__':
     folder = f'interim/run_{time_str}'
     # data_tr, data_val = get_dataloaders(resize=size)
 
-    model = get_model(folder, time_str, device)
+    model = utils.get_model(folder, time_str, device)
     model.to(device)
 
     # 1. Choose raw data file
