@@ -11,7 +11,7 @@ from aicsimageio import AICSImage
 import pandas as pd
 
 mode = 'val'
-
+random.seed(41)
 utils.setcwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
@@ -47,7 +47,8 @@ idx = 0
 # To store which timepoints and slices
 # were randomly chosen for each file
 file_indices = {}
-print(files)
+slice_record = []
+
 for j, (file, file_path) in enumerate(zip(files, file_paths)):
     data = AICSImage(file_path)
 
@@ -70,8 +71,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         timepoint = data.get_image_dask_data(
             'ZXY', T=t, C=cell_ch).compute()
 
-        print('Timepoint', t)
-        slice_idx = np.random.randint(0, Z, n_slices)
+        slice_idx = sorted(random.sample(range(Z), n_slices))
 
         # Gets slices with most cells on them
         # slice_idx = utils.active_slices(timepoint)
@@ -80,18 +80,18 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         indices.append(record)
 
         timepoint_sliced = timepoint[slice_idx]
-        for z_slice in timepoint_sliced:
+        for i, z_slice in enumerate(timepoint_sliced):
             name = f'{idx:05d}'
             save = os.path.join(folder, name)
 
             np.save(save, z_slice)
-            print('---> Saved to', save)
 
             if idx % debug_every == 0:
                 dirs = os.path.dirname(save)
-                file = os.path.basename(save)
-                utils.imsave(f'{dirs}/_{file}.{c.IMG_EXT}', z_slice, 512)
+                filename = os.path.basename(save)
+                utils.imsave(f'{dirs}/_{filename}.{c.IMG_EXT}', z_slice, 512)
 
+            slice_record.append((name, file, t, slice_idx[i]))
             idx = idx + 1
 
     # ';'.join([f'{key}:{",".join(value)}' for idx in indices for key, value in idx.items()])
@@ -103,7 +103,11 @@ save = join(c.DATA_DIR, mode, c.IMG_DIR)
 # np.savetxt(join(save, 'index_record_np.csv'), file_indices)
 
 index_record = pd.DataFrame(file_indices, columns=list(file_indices.keys()))
-index_record.to_csv(join(save, 'index_record.csv'), sep='\t')
+index_record.to_csv(join(save, 'index_record.csv'), sep=';')
+
+slices_record = pd.DataFrame(slice_record, columns=[
+                             'name', 'file', 'timepoint', 'slice'])
+slices_record.to_csv(join(save, 'slice_record.csv'), sep='\t', index=False)
 
 toc = time()
-print(f'make_dataset_test.py complete after {(toc-tic)/60: .1f} minutes.')
+print(f'make_dataset_val.py complete after {(toc-tic)/60: .1f} minutes.')
