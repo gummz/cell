@@ -35,7 +35,7 @@ RAW_FILES_TRAIN = {
 
 RAW_FILES_VAL = {
     'LI_2020-05-06_emb4_pos2': None,
-    'LI_2019-08-30_emb2_pos1': 250,
+    'LI_2019-08-30_emb2_pos1': (0, 250),
     'LI_2019-02-05_emb5_pos3': None
 }
 
@@ -83,6 +83,9 @@ RAW_FILE_DIMENSIONS_TEST = dict(zip(RAW_FILES_TEST, idx_test))
 TIMEPOINTS = [328, 288, 295, 276, 290, 288, 276]
 TIMEPOINTS_TEST = [280, 289]
 
+# absolute project path
+PROJECT_DIR = '/zhome/e2/e/154260/cell/'
+
 # To be used within the src/[subfolder] directories
 DATA_DIR = '../../data/interim/'
 EXPERIMENT_DIR = '../experiments/'
@@ -97,6 +100,8 @@ MASK_DIR_TEST_FULL = 'masks_full'
 
 PRED_DIR = 'pred'
 PRED_DIR_TEST = 'pred'
+
+EXTRACT_DIR = 'extract'
 
 FIG_DIR = 'figures'
 FILE_DIR = 'files'
