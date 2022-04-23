@@ -19,11 +19,6 @@ kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
 
 
-def print_unique(image, pre=''):
-    # print(pre, np.unique(image))
-    pass
-
-
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
@@ -85,16 +80,19 @@ class BetaCellDataset(torch.utils.data.Dataset):
             print(f'WARNING: Requested more full annotations than available. \
             Returning all available annotations ({len(self.masks_full)}).')
 
+        self.mode = mode
         self.resize = resize
 
     def __getitem__(self, idx):
         # load images and mask
-        img_path = join(self.root, c.IMG_DIR, self.imgs[idx])
+        img_path = join(self.root, self.mode,
+                        c.IMG_DIR, self.imgs[idx])
         if self.masks[idx] in self.masks_full:
             mask_dir = c.MASK_DIR_FULL
         else:
             mask_dir = c.MASK_DIR
-        mask_path = join(self.root, mask_dir, self.masks[idx])
+        mask_path = join(self.root, self.mode,
+                         mask_dir, self.masks[idx])
 
         img = np.int16(np.load(img_path))
         # PREPROCESSING
@@ -202,7 +200,7 @@ def get_dataloaders(batch_size=4, num_workers=2, resize=1024, n_img_ratio=1, man
     dataset = BetaCellDataset(
         c.DATA_DIR, get_transform(train=True), resize=resize, mode='train', n_img_ratio=n_img_ratio, manual_ratio=manual_ratio)
     dataset_val = BetaCellDataset(
-        c.DATA_DIR, get_transform(train=False), resize=resize, mode='val', n_img_ratio=0.5, manual_ratio=1)
+        c.DATA_DIR, get_transform(train=False), resize=resize, mode='val', n_img_ratio=1, manual_ratio=1)
 
     # split the dataset in train and test set
     # torch.manual_seed(1)
