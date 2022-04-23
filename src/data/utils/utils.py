@@ -2,6 +2,7 @@ import cv2
 import inspect
 import os
 from os import makedirs, mkdir, listdir
+from os.path import join
 import numpy as np
 import src.data.constants as c
 from aicsimageio import AICSImage
@@ -80,7 +81,29 @@ def get_czi_dims(metadata):
     return dims
 
 
-def get_raw_array(file_path, index):
+def set_device():
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    return device
+
+
+def get_model(folder, time_str: str, device: torch.device):
+    # Load model
+    load_path = join(folder, f'model_{time_str}.pkl')
+    if device.type == 'cuda':
+        model = pickle.load(open(load_path, 'rb'))
+    else:
+        # model = pickle.load(open(load, 'rb'))
+        model = CPU_unpickler(open(load_path, 'rb')).load()
+        '''Attempting to deserialize object on a CUDA device
+        but torch.cuda.is_available() is False.
+        If you are running on a CPU-only machine, please use
+        torch.load with map_location=torch.device('cpu') to map your storages to the CPU.'''
+
+    return model
+
+
+def get_raw_array(file_path, which, idx):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
@@ -88,22 +111,40 @@ def get_raw_array(file_path, index):
     '''
     raw_data = AICSImage(file_path)
 
-    if '.czi' not in file_path:
-        if type(index) == tuple:
-            data = raw_data.get_image_dask_data(
-                'TZXY', T=index, C=c.CELL_CHANNEL)
-        elif type(index) == int:
-            data = raw_data.get_image_dask_data(
-                'ZXY', T=index, C=c.CELL_CHANNEL)
-    else:
-        dims = get_czi_dims(raw_data.metadata)
+    if which == 'timepoint':
+        if '.czi' not in file_path:
+            if type(idx) == tuple:
+                data = raw_data.get_image_dask_data(
+                    'TZXY', T=idx, C=c.CELL_CHANNEL)
+            elif type(idx) == int:
+                data = raw_data.get_image_dask_data(
+                    'ZXY', T=idx, C=c.CELL_CHANNEL)
+        else:
+            dims = get_czi_dims(raw_data.metadata)
 
-        if type(index) == tuple:
-            data = raw_data.get_image_dask_data(
-                'TZXY', T=index, C=c.CELL_CHANNEL)
-        elif type(index) == int:
-            data = raw_data.get_image_dask_data(
-                'ZXY', T=index, C=c.CELL_CHANNEL)
+            if type(idx) == tuple:
+                data = raw_data.get_image_dask_data(
+                    'TZXY', T=idx, C=c.CELL_CHANNEL)
+            elif type(idx) == int:
+                data = raw_data.get_image_dask_data(
+                    'ZXY', T=idx, C=c.CELL_CHANNEL)
+    elif which == 'slice':
+        if '.czi' not in file_path:
+            if type(idx) == tuple:
+                data = raw_data.get_image_dask_data(
+                    'TZXY', Z=idx, C=c.CELL_CHANNEL)
+            elif type(idx) == int:
+                data = raw_data.get_image_dask_data(
+                    'TXY', Z=idx, C=c.CELL_CHANNEL)
+        else:
+            dims = get_czi_dims(raw_data.metadata)
+
+            if type(idx) == tuple:
+                data = raw_data.get_image_dask_data(
+                    'TZXY', Z=idx, C=c.CELL_CHANNEL)
+            elif type(idx) == int:
+                data = raw_data.get_image_dask_data(
+                    'TXY', Z=idx, C=c.CELL_CHANNEL)
 
     return data
 
