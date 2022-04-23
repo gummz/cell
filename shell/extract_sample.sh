@@ -24,7 +24,7 @@
 #BSUB -oo out
 #BSUB -eo err
 
-module load python3/3.8.2
+module load python3/3.8.11
 ###python3 -m venv ../venv_1
 source ../venv_1/bin/activate
 
