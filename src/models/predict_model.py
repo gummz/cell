@@ -124,12 +124,13 @@ def get_prediction(model, device, input):
     # img = torch.tensor(img, dtype=torch.uint8)
     # img = img.repeat(3, 1, 1)
 
-    mask = cv2.normalize(mask.cpu().numpy(), None, alpha=0,
-                         beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-
-    mask = torch.tensor(mask, dtype=torch.uint8).squeeze(1)
+    # mask = cv2.normalize(mask.cpu().numpy(), None, alpha=0,
+    #                      beta=255, dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    # mask = torch.tensor(mask, dtype=torch.uint8).squeeze(1)
     # mask = np.where(mask > 0, True, False)
     # mask = torch.tensor(mask, dtype=torch.bool)
+
+    bboxes = pred[0]['boxes']
 
     return pred[0]
 
@@ -153,29 +154,61 @@ def predict_ssh(raw_data_file, time_idx, device, model, save):
     return chains_tot
 
 
+def prepare_draw(image: np.ndarray, pred: torch.Tensor):
+    '''
+    Prepares data for being drawn via the draw_bounding_boxes
+    and draw_segmentation_masks functions from PyTorch.
+    '''
+    image = image.repeat(3, 1, 1)
+    boxes = pred['boxes']
+
+    masks = [mask > 0.5 for mask in pred['masks']]
+
+    if len(masks) != 0:
+        masks = torch.stack(masks)
+        masks = masks.squeeze(1)
+    else:
+        masks = torch.empty(0)
+
+    image = utils.normalize(image, 0, 255, cv2.CV_8UC1)
+    image = torch.tensor(image)
+
+    return image, boxes, masks
+
+
 def debug_timepoint(save, t, timepoint_raw, pred, Z):
     # Randomly sample 10 slices to debug (per timepoint)
     debug_idx = np.random.randint(0, Z, 2)
     for i, z_slice in enumerate(timepoint_raw[debug_idx]):
         z_slice = np.int16(z_slice)
         z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
+
         boxes = pred[i]['boxes']
         masks = [mask > 0.5 for mask in pred[i]['masks']]
+
         if len(masks) == 0:
             utils.imsave(join(save,
                               f't-{t}_{i}.jpg'), z_slice, 512)
             continue
+
         masks = torch.stack(masks)
         masks = masks.squeeze(1)
+
         z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1)
         z_slice = torch.tensor(z_slice)
+
         masked_img = draw_segmentation_masks(z_slice, masks)
         bboxed_img = draw_bounding_boxes(masked_img, boxes)
+
         utils.imsave(join(save,
                           f't-{t}_{i}.jpg'), masked_img, 512)
 
 
 def prepare_mrcnn_data(timepoint, device):
+    ''''
+    Prepares data for input to model if BetaCellDataset
+    class is not being used.
+    '''
     timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
                               dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     z_slices = []
