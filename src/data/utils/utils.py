@@ -178,7 +178,7 @@ def get_raw_array(file_path, which, idx):
     #     return images
 
 
-def imsave(path, img, resize=False):
+def imsave(path, img, resize=512):
     dirs = os.path.dirname(path)
     make_dir(dirs)
     if resize:
@@ -187,6 +187,9 @@ def imsave(path, img, resize=False):
         if len(img.shape) > 2:
             img = img[0]
         img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
+
+    if path[-4:] not in ['.png', '.jpg']:
+        path += '.jpg'
 
     plt.imsave(path, img)
 
