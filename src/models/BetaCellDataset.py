@@ -33,6 +33,8 @@ class BetaCellDataset(torch.utils.data.Dataset):
         '''
         self.root = root
         self.transforms = transforms
+        self.mode = mode
+        self.resize = resize
 
         # For added robustness, create folders if they don't
         # already exist
@@ -49,15 +51,27 @@ class BetaCellDataset(torch.utils.data.Dataset):
             join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask]
 
         if n_img_ratio < 1:
-            len_imgs = len(imgs)
-            n_img_include = int(n_img_ratio * len_imgs)
-            index = np.random.randint(0, len_imgs, n_img_include)
-            for img_list in [imgs, masks, masks_full]:
-                utils.del_multiple(img_list, index)
+            # don't need min( len(imgs), len(masks_full) )
+            # yet because we don't yet know how many full
+            # annotations the user has asked for (i.e.
+            # manual_ratio); that is below this clause
+            k = int(n_img_ratio * len(imgs))
+            imgs = imgs[:k]
+            masks = masks[:k]
+            masks_full = masks_full[:k]
 
-        self.imgs = list(sorted(imgs))
-        self.masks = list(sorted(masks))
-        self.masks_full = list(sorted(masks_full))
+            # The commented code below is for if it's desired
+            # to delete indices at random. But since the
+            # manual annotations were done in order, starting
+            # at index 00000, there is a greater incentive
+            # to simply use slicing, starting from 0,
+            # regarding n_img_ratio.
+            # len_imgs = len(imgs)
+            # n_img_include = int(n_img_ratio * len_imgs)
+            # index = np.random.randint(0,
+            #                           min(len_imgs, len(masks_full)), n_img_include)
+            # for img_list in [imgs, masks, masks_full]:
+            #     utils.del_multiple(img_list, index)
 
         # masks:       ----------------------------
         # masks_full:  ----------
@@ -69,19 +83,20 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # available
         # "k" variable below
 
-        len_masks = len(self.masks)
-        len_masks_full = len(self.masks_full)
-        full_ratio = len_masks_full / len_masks
+        len_masks = len(masks)
+        len_masks_full = len(masks_full)
+        available = len_masks_full / len_masks
 
-        if manual_ratio < full_ratio:
+        if manual_ratio <= available:
             k = int(manual_ratio) * len_masks
-            self.masks_full = list(sorted(random.choices(self.masks_full, k)))
-        elif manual_ratio > full_ratio:
+            masks_full = list(sorted(random.choices(masks_full, k)))
+        elif manual_ratio > available:
             print(f'WARNING: Requested more full annotations than available. \
-            Returning all available annotations ({len(self.masks_full)}).')
+            Returning all available annotations ({len(masks_full)}).')
 
-        self.mode = mode
-        self.resize = resize
+        self.imgs = list(sorted(imgs))
+        self.masks = list(sorted(masks))
+        self.masks_full = list(sorted(masks_full))
 
     def __getitem__(self, idx):
         # load images and mask
@@ -98,8 +113,8 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # PREPROCESSING
         img = cv2.normalize(img, None, alpha=0, beta=255,
                             dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-        img = cv2.fastNlMeansDenoising(
-            img, None, 11, 7, 21)
+        # img = cv2.fastNlMeansDenoising(
+        #     img, None, 11, 7, 21)
         # END PREPROCESSING
 
         mask = np.load(mask_path)
