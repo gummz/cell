@@ -38,7 +38,7 @@ from BetaCellDataset import BetaCellDataset, get_dataloaders, print_unique
 # import torchvision
 
 
-def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
+def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
 
@@ -156,7 +156,7 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
                 tot_val_losses.append(val_losses.item())
 
                 # Save progress every `save_every` epochs
-                if i % save_every == 0:
+                if i % save_every == 0 and save:
                     dump_model(model, time_str)
 
                 if i == save_every:
@@ -200,7 +200,7 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer):
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
 
-    return val_losses.item()
+    return losses.item(), val_losses.item()
 
 
 def create_grid(x_val, y_val, y_hat):
@@ -280,6 +280,8 @@ def predict(model, data):
     return np.array(Y_pred)
 
 # helper function
+
+
 def select_n_random(n=100):
     '''
     Selects n random datapoints and their corresponding labels from a dataset
@@ -300,114 +302,112 @@ def bce_loss(y_real, y_pred):
                       torch.log(1 + torch.exp(-y_pred)))
 
 
-# Environment variable for memory management
-alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
-try:
-    print(alloc_conf, os.environ[alloc_conf])
-except KeyError:
-    print(alloc_conf, 'not found')
+if __name__ == '__main__':
 
-conn = NUMBER_CONNECTIVITY
-algo = CV2_CONNECTED_ALGORITHM
-kernel = MEDIAN_FILTER_KERNEL
-threshold = SIMPLE_THRESHOLD
+    # Environment variable for memory management
+    alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
+    try:
+        print(alloc_conf, os.environ[alloc_conf])
+    except KeyError:
+        print(alloc_conf, 'not found')
 
-device = torch.device(
-    'cuda') if torch.cuda.is_available() else torch.device('cpu')
-print(f'Running on {device}.')
+    conn = NUMBER_CONNECTIVITY
+    algo = CV2_CONNECTED_ALGORITHM
+    kernel = MEDIAN_FILTER_KERNEL
+    threshold = SIMPLE_THRESHOLD
 
-utils.setcwd()
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    print(f'Running on {device}.')
 
+    utils.setcwd()
 
-# our dataset has two classes only - background and person
-num_classes = 2
+    # our dataset has two classes only - background and person
+    num_classes = 2
 
+    # Get data
+    # Size of image
+    size = 512
+    batch_size = 8  # 1024, 8; 128, 16
+    pretrained = True
+    data_tr, data_val = get_dataloaders(
+        batch_size=batch_size, num_workers=2, resize=size, manual_ratio=0)
 
-# Get data
-# Size of image
-size = 512
-batch_size = 8  # 1024, 8; 128, 16
-pretrained = True
-data_tr, data_val = get_dataloaders(
-    batch_size=batch_size, num_workers=2, resize=size, manual_ratio=0)
+    # get the model using our helper function
+    model = get_instance_segmentation_model(pretrained=pretrained)
+    model.to(device)
 
-# get the model using our helper function
-model = get_instance_segmentation_model(pretrained=pretrained)
-model.to(device)
+    # Unique identifier for newly saved objects
+    now = datetime.datetime.now()
+    time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
+    save = f'interim/run_{time_str}'
 
-# Unique identifier for newly saved objects
-now = datetime.datetime.now()
-time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
-save = f'interim/run_{time_str}'
+    params = [p for p in model.parameters() if p.requires_grad]
 
+    num_epochs = 10  # 500
+    lr = 0.00001  # 0.00001
+    wd = 0.001  # 0.001
+    opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
 
-params = [p for p in model.parameters() if p.requires_grad]
+    loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
+                 'loss_classifier', 'loss_objectness']
+    # loss_list = ['loss_mask', 'loss_rpn_box_reg']
 
-num_epochs = 10  # 500
-lr = 0.00001  # 0.00001
-wd = 0.001  # 0.001
-opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
+    hparam_dict = {
+        'learning_rate': lr,
+        'weight_decay': wd,
+        'num_epochs': num_epochs,
+        'optimizer': f'{opt}',
+        'losses': ';'.join(loss_list),
+        'img_size': size if size else 1024,
+        'batch_size': batch_size,
+        'pretrained': pretrained,
+        'manual_annot': 0
+    }
+    # TODO: add "how many weakly annotated"
+    # TODO: add /pred/ folder in addition to /runs/
+    # so make a writer in predict_model which saves images
+    # add_video í SummaryWriter
 
-loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
-             'loss_classifier', 'loss_objectness']
-# loss_list = ['loss_mask', 'loss_rpn_box_reg']
+    description = f'''{time_str}\n
+                        Learning rate: {lr}\n
+                        Weight decay: {wd}\n
+                        Optimizer: {opt}\n
+                        Losses: {loss_list}
+                        '''
 
-hparam_dict = {
-    'learning_rate': lr,
-    'weight_decay': wd,
-    'num_epochs': num_epochs,
-    'optimizer': f'{opt}',
-    'losses': ';'.join(loss_list),
-    'img_size': size if size else 1024,
-    'batch_size': batch_size,
-    'pretrained': pretrained,
-    'manual_annot': 0
-}
-# TODO: add "how many weakly annotated"
-# TODO: add /pred/ folder in addition to /runs/
-# so make a writer in predict_model which saves images
-# add_video í SummaryWriter
+    with SummaryWriter(f'runs/{time_str}') as w:
+        losses = train(model, opt, num_epochs,
+                       data_tr, data_val, time_str, hparam_dict, w)
+        w.add_text('description', description)
 
-description = f'''{time_str}\n
-                    Learning rate: {lr}\n
-                    Weight decay: {wd}\n
-                    Optimizer: {opt}\n
-                    Losses: {loss_list}
-                    '''
+    losses = np.array(losses).T
 
-with SummaryWriter(f'runs/{time_str}') as w:
-    losses = train(model, opt, num_epochs,
-                   data_tr, data_val, time_str, hparam_dict, w)
-    w.add_text('description', description)
+    # Special note that is saved as the name of a file with
+    # a name which is the value of the string `special_mark`
+    # special_mark = 'all_losses'
+    # if special_mark:
+    #     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
 
-losses = np.array(losses).T
+    # np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
+    # pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
 
+    # plt.subplot(121)
+    # plt.plot(losses[0])
+    # title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
+    # plt.title(title_train)
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Total loss')
 
-# Special note that is saved as the name of a file with
-# a name which is the value of the string `special_mark`
-# special_mark = 'all_losses'
-# if special_mark:
-#     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
+    # plt.subplot(122)
+    # plt.plot(losses[1])
+    # title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
+    # plt.title(title_val)
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Total loss')
 
-# np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
-# pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
+    # plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
 
-# plt.subplot(121)
-# plt.plot(losses[0])
-# title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-# plt.title(title_train)
-# plt.xlabel('Epoch')
-# plt.ylabel('Total loss')
-
-# plt.subplot(122)
-# plt.plot(losses[1])
-# title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-# plt.title(title_val)
-# plt.xlabel('Epoch')
-# plt.ylabel('Total loss')
-
-# plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
-
-# TODO: optuna
-# compare with and without autocast for training of final model
-# optuna: what losses to include?
+    # TODO: optuna
+    # compare with and without autocast for training of final model
+    # optuna: what losses to include?
