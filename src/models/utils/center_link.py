@@ -131,8 +131,8 @@ def find_closest_center(z: int, center: CenterLink,
 
         # There is a competitor for this candidate.
         # Need to find out which, center or candidate
-        # previous link,has the shorter distance to
-        # the cendidate
+        # previous link, has the shorter distance to
+        # the candidate
         cand_prev = best.get_prev()
         cand_prev_dist = calculate_distance(cand_prev, best)
         center_dist = calculate_distance(center, best)
