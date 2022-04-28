@@ -52,8 +52,8 @@ def eval_model(model, dataloader, mode='val'):
         scores_bbox[i] = np.mean(score_bbox)
         cm_bbox_tot += cm_bbox
 
-    avg_score_mask = np.mean(scores_mask)
-    avg_score_bbox = np.mean(scores_bbox)
+    avg_score_mask = np.round(np.mean(scores_mask), 2)
+    avg_score_bbox = np.round(np.mean(scores_bbox), 2)
 
     return (cm_mask_tot, avg_score_mask,
             cm_bbox_tot, avg_score_bbox)
@@ -124,6 +124,7 @@ def performance_bbox(pred, target):
             # target_copy[i] = 0
             scores[i] = iou_scores[max_arg]
 
+    # didn't yield a true positive or false negative
     fp = len(pred_bboxes) - (tp + fn)
     confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
 
@@ -156,6 +157,7 @@ def performance_mask(pred, target):
     pred_masks = pred['masks']
     target_masks = target['masks']
 
+    # edge cases
     if len(pred_masks) == 0 and len(target_masks) == 0:
         confusion_matrix = np.array([[0, 0], [0, np.nan]])
         return confusion_matrix, np.array([1])
@@ -171,8 +173,8 @@ def performance_mask(pred, target):
     pred_masks_nonzero = [mask > thresh for mask in pred_masks]
     target_masks_nonzero = [mask != 0 for mask in target_masks]
     scores = np.zeros(len(target_masks))
-    tp = 0  # true positive
-    fn = 0  # false negative
+    tp = 0  # true positives
+    fn = 0  # false negatives
 
     # if (len(pred_masks_nonzero) == 0 and len(target_masks_nonzero) != 0) or False:
     #     return scores
@@ -199,6 +201,8 @@ def performance_mask(pred, target):
 
             scores[i] = calc_iou_mask(suitable_prd, target_mask)
 
+    # false positives are all the predictions which
+    # didn't yield a true positive or false negative
     fp = len(pred_masks) - (tp + fn)
     confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
 
@@ -237,7 +241,7 @@ if __name__ == '__main__':
     model = utils.get_model(folder, time_str, utils.set_device())
     dataset = BetaCellDataset(
         transforms=get_transform(train=False), mode='val',
-        n_img_ratio=1, manual_ratio=1)
+        n_img_ratio=1, manual_select=1)
     dataloader = DataLoader(dataset, batch_size=1,
                             shuffle=True, num_workers=2, collate_fn=collate_fn)
 
