@@ -1,4 +1,5 @@
 from os import listdir
+import os
 from os.path import join
 import random
 
@@ -18,15 +19,17 @@ algo = c.CV2_CONNECTED_ALGORITHM
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD
 
+random.seed(42)
+
 
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
-    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=1, manual_ratio=0):
+    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=1, manual_select=0):
         '''
         Inputs:
 
-        manual_ratio:
+        manual_select:
             The percentage of the masks which are
             to come from the set of fully (manually) annotated
             images.
@@ -43,18 +46,18 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
         # load all image files, sorting them to
         # ensure that they are aligned
-        imgs = [image for image in listdir(
-            join(root, mode, c.IMG_DIR)) if '.npy' in image]
-        masks = [mask for mask in listdir(
-            join(root, mode, c.MASK_DIR)) if '.npy' in mask]
-        masks_full = [mask for mask in listdir(
-            join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask]
+        imgs = sorted([image for image in listdir(
+            join(root, mode, c.IMG_DIR)) if '.npy' in image])
+        masks = sorted([mask for mask in listdir(
+            join(root, mode, c.MASK_DIR)) if '.npy' in mask])
+        masks_full = sorted([mask for mask in listdir(
+            join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask])
 
         if n_img_ratio < 1:
             # don't need min( len(imgs), len(masks_full) )
             # yet because we don't yet know how many full
             # annotations the user has asked for (i.e.
-            # manual_ratio); that is below this clause
+            # manual_select); that is below this clause
             k = int(n_img_ratio * len(imgs))
             imgs = imgs[:k]
             masks = masks[:k]
@@ -75,7 +78,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
         # masks:       ----------------------------
         # masks_full:  ----------
-        # manual_ratio: proportionally how many full annotations
+        # manual_select: proportionally how many full annotations
         # we WANT to include
         # full_ratio: proportionally how many full annotations
         # are AVAILABLE
@@ -87,12 +90,33 @@ class BetaCellDataset(torch.utils.data.Dataset):
         len_masks_full = len(masks_full)
         available = len_masks_full / len_masks
 
-        if manual_ratio <= available:
-            k = int(manual_ratio) * len_masks
-            masks_full = list(sorted(random.choices(masks_full, k)))
-        elif manual_ratio > available:
-            print(f'WARNING: Requested more full annotations than available. \
-            Returning all available annotations ({len(masks_full)}).')
+        # is manual_select a ratio or a hard number?
+        # user can request either a fraction of the images
+        # or the actual number of the images
+        if manual_select <= 1:
+            # NB: if manual_select == available, we can leave
+            # `masks_full` as-is
+            if manual_select < available:
+                # request is less than available
+                # return requested amount of images
+                k = int(manual_select * len_masks)
+                # caution: indices become wrong for
+                # `masks_full` with random.sample,
+                # since some indices are removed here,
+                # so `masks` must be used instead
+                masks_full = list(
+                    sorted(random.sample(population=masks_full, k=k)))
+            elif manual_select > available:
+                print(
+                    f'WARNING: Requested more full annotations than available for {mode}. Returning all available annotations ({len_masks_full}).')
+        else:
+            if manual_select <= len_masks_full:
+                k = manual_select
+                masks_full = list(
+                    sorted(random.sample(population=masks_full, k=k)))
+            else:
+                print(
+                    f'WARNING: Requested more full annotations than available for {mode}. Returning all available annotations ({len_masks_full}).')
 
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
@@ -102,7 +126,14 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # load images and mask
         img_path = join(self.root, self.mode,
                         c.IMG_DIR, self.imgs[idx])
+        # if self.mode == 'train':
+        #     print('chosen index', self.masks[idx], idx)
+        #     print('masks_full', self.masks_full)
+        #     print('len masks', len(self.masks))
+
         if self.masks[idx] in self.masks_full:
+            # if self.mode == 'train':
+            #     print(f'Selected full annotation for index {idx} and mode {self.mode}.')
             mask_dir = c.MASK_DIR_FULL
         else:
             mask_dir = c.MASK_DIR
@@ -138,7 +169,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # TODO: preprocess inside __getitem__
         # don't need to create a new dataset every time!
         # easier to experiment this way.
-        # TODO: annotate inside __GETITEM__!!!! yeah!
 
         # `labels_out` denotes
         labels_out = np.array(output[1])
@@ -204,7 +234,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         return len(self.imgs)
 
 
-def get_dataloaders(batch_size=4, num_workers=2, resize=1024, n_img_ratio=1, manual_ratio=0):
+def get_dataloaders(root=c.DATA_DIR, batch_size=4, num_workers=1, resize=1024, n_img_ratio=1, manual_select=0):
     '''Get dataloaders.
         resize: resize image in __getitem__ method of dataset class.
 
@@ -213,9 +243,9 @@ def get_dataloaders(batch_size=4, num_workers=2, resize=1024, n_img_ratio=1, man
     '''
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
-        c.DATA_DIR, get_transform(train=True), resize=resize, mode='train', n_img_ratio=n_img_ratio, manual_ratio=manual_ratio)
+        root, get_transform(train=True), resize=resize, mode='train', n_img_ratio=n_img_ratio, manual_select=manual_select)
     dataset_val = BetaCellDataset(
-        c.DATA_DIR, get_transform(train=False), resize=resize, mode='val', n_img_ratio=1, manual_ratio=1)
+        root, get_transform(train=False), resize=resize, mode='val', n_img_ratio=1, manual_select=1)
 
     # split the dataset in train and test set
     # torch.manual_seed(1)
