@@ -3,10 +3,12 @@ import datetime
 import os
 import pickle
 import sys
+import math
 from os import mkdir
 # from torchsummary import summary
 from os.path import join
 from time import time
+from memory_profiler import profile
 
 import cv2
 import matplotlib.pyplot as plt
@@ -32,15 +34,18 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
-from BetaCellDataset import BetaCellDataset, get_dataloaders, print_unique
+from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders
 
 # import torch.optim as optim
 # import torchvision
 
 
-def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False):
+def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
+
+    size = hparam_dict['size']
+    batch_size = hparam_dict['batch_size']
 
     # TODO: send HPC support email
     # regarding why it runs out of memory but shows only
@@ -101,6 +106,10 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
 
                 # forward pass
                 Y_pred = model(x_batch, y_batch)
+                
+                # print(x_batch.shape, len(y_batch))
+                # print(np.unique(x_batch.cpu()), '\n' * 5)
+                # print(np.unique(y_batch.cpu()), '\n' * 7)
 
                 # Select only losses of interest
                 losses = [value for loss, value in Y_pred.items()
@@ -126,16 +135,20 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
 
         toc = time()
         tot_train_losses.append(train_loss)
-
-        time_print = f'''Training loss: {train_loss: .3f};
-                        Time: {(toc-tic)/60: .1f} minutes'''
+        
         if i % log_every == 0:
+            # loss is nan; cancel training
+            if torch.isnan(torch.tensor(train_loss)) or math.isnan(train_loss):
+                print('training loss is nan\n')
+                return 100, 100
+            time_print = f'''Training loss: {train_loss: .3f};
+                        Time: {(toc-tic)/60: .1f} minutes'''
             print(time_print)
 
         # Validation
         for x_val, y_val in data_val:
             with torch.no_grad(), autocast():
-
+                model.train()
                 # x_val, y_val = to_device([x_val, y_val], device)
                 x_val = [x.to(device) for x in x_val]
                 y_val = [{k: v.to(device) for k, v in t.items()}
@@ -143,14 +156,8 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
 
                 val_losses = get_loss(model, loss_list, x_val, y_val)
 
-                scheduler.step(val_losses)
                 # TODO: make sure scheduler works
                 # by printing out the learning rate each epoch
-
-                # Get current learning rate
-                if i % log_every == 0:
-                    # print(f'Current learning rate: {scheduler}')
-                    print(f'Validation loss: {val_losses.item():.3f}')
 
                 writer.add_scalar('validation loss', float(val_losses), epoch)
                 tot_val_losses.append(val_losses.item())
@@ -159,8 +166,8 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
                 if i % save_every == 0 and save:
                     dump_model(model, time_str)
 
-                if i == save_every:
-                    debug_opencv_mask()
+                # if i == save_every:
+                #     debug_opencv_mask()
 
                 model.eval()
                 y_hat = model(x_val)
@@ -179,16 +186,24 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
 
             # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
             x_val = [x.squeeze() for x in x_val]
-            print([x.shape for x in x_val])
-            print([y.shape for y in y_hat])
-            print([y.shape for y in y_val], '\n\n')
+            # print([x.shape for x in x_val])
+            # print([y.shape for y in y_hat])
+            # print([y.shape for y in y_val], '\n\n')
 
-            image_grid = create_grid(x_val, y_val, y_hat)
+            image_grid = create_grid(x_val, y_val, y_hat,
+                                     batch_size)
             writer.add_image(f'epoch_{epoch}', image_grid,
                              epoch, dataformats='NCHW')
 
             writer.add_hparams(
                 hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
+
+        scheduler.step(val_losses)
+
+        if i % log_every == 0:
+            # print(f'Current learning rate: {scheduler}')
+            print(f'Validation loss: {val_losses.item():.3f}')
+
     # select random images and their target indices
     # images, labels = select_n_random()
 
@@ -203,7 +218,7 @@ def train(model, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, 
     return losses.item(), val_losses.item()
 
 
-def create_grid(x_val, y_val, y_hat):
+def create_grid(x_val, y_val, y_hat, batch_size):
     image_grid = make_grid(
         [*x_val, *y_hat, *y_val], nrow=batch_size, pad_value=220, padding=30)
     image_grid = image_grid.squeeze().unsqueeze(1)
@@ -241,11 +256,12 @@ def y_to_mask(ys):
 def get_loss(model, loss_list, x_val, y_val):
     output = model(x_val, y_val)  # losses
     # float(sum(loss for loss in output.values()))
-    val_losses = [value for loss, value
-                  in output.items() if loss in loss_list]
+    losses = [value
+              for loss, value in output.items()
+              if loss in loss_list]
 
-    val_losses = sum(val_losses)
-    return val_losses
+    losses = sum(losses)
+    return losses
 
 
 def debug_opencv_mask():
@@ -331,7 +347,7 @@ if __name__ == '__main__':
     batch_size = 8  # 1024, 8; 128, 16
     pretrained = True
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=2, resize=size, manual_ratio=0)
+        batch_size=batch_size, num_workers=2, resize=size, manual_select=0)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
@@ -377,7 +393,7 @@ if __name__ == '__main__':
                         '''
 
     with SummaryWriter(f'runs/{time_str}') as w:
-        losses = train(model, opt, num_epochs,
+        losses = train(model, device, opt, num_epochs,
                        data_tr, data_val, time_str, hparam_dict, w)
         w.add_text('description', description)
 
