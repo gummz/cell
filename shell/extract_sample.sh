@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/data/extract_sample.py > pyout
+python3 ../src/data/extract_sample.py > pyout_sample
