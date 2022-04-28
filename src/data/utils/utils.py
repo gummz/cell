@@ -195,10 +195,14 @@ def imsave(path, img, resize=512):
 
 
 def make_dir(path):
-    if '/' in path:
+    dirs = os.path.dirname(path)
+    if len(dirs) > 1:  # more than one directory
         makedirs(path, exist_ok=True)
     else:
-        mkdir(path, exist_ok=True)
+        try:
+            mkdir(path)
+        except FileExistsError:
+            pass
 
 
 def normalize(img, alpha, beta, out):
@@ -219,3 +223,13 @@ def setcwd(file_path):
     abspath = os.path.abspath(file_path)
     dname = os.path.dirname(abspath)
     os.chdir(dname)
+
+
+def time_report(path, tic, toc):
+    elapsed = max(tic, toc) - min(tic, toc)
+    file = os.path.basename(path)
+    if elapsed / 60 < 1:
+        print(f'{file} complete after {elapsed:.1f} seconds.')
+    else:
+        print(f'{file} complete after {elapsed / 60:.1f} minutes.')
+
