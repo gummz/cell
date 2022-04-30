@@ -99,8 +99,8 @@ venv_1/
 *H_*
 # Makefile is different by systems
 Makefile
-/shell/pyout
-/shell/err
+/shell/pyout*
+/shell/err*
 /shell/out
 **/output.*
 **/imgs*
