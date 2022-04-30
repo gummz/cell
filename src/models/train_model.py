@@ -14,7 +14,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from src.models.predict_model import get_mask
-import src.models.utils.utils as utils
+import src.data.utils.utils as utils
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -40,11 +40,11 @@ from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders
 # import torchvision
 
 
-def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False):
+def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False, write=False):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
 
-    size = hparam_dict['size']
+    size = hparam_dict['image_size']
     batch_size = hparam_dict['batch_size']
 
     # TODO: send HPC support email
@@ -106,7 +106,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 # forward pass
                 Y_pred = model(x_batch, y_batch)
-                
+
                 # print(x_batch.shape, len(y_batch))
                 # print(np.unique(x_batch.cpu()), '\n' * 5)
                 # print(np.unique(y_batch.cpu()), '\n' * 7)
@@ -135,12 +135,12 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
         toc = time()
         tot_train_losses.append(train_loss)
-        
+
         if i % log_every == 0:
             # loss is nan; cancel training
             if torch.isnan(torch.tensor(train_loss)) or math.isnan(train_loss):
                 print('training loss is nan\n')
-                return 100, 100
+                return train_loss, np.nan
             time_print = f'''Training loss: {train_loss: .3f};
                         Time: {(toc-tic)/60: .1f} minutes'''
             print(time_print)
@@ -161,10 +161,6 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 writer.add_scalar('validation loss', float(val_losses), epoch)
                 tot_val_losses.append(val_losses.item())
-
-                # Save progress every `save_every` epochs
-                if i % save_every == 0 and save:
-                    dump_model(model, time_str)
 
                 # if i == save_every:
                 #     debug_opencv_mask()
@@ -192,8 +188,9 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
             image_grid = create_grid(x_val, y_val, y_hat,
                                      batch_size)
-            writer.add_image(f'epoch_{epoch}', image_grid,
-                             epoch, dataformats='NCHW')
+            if write:
+                writer.add_image(f'epoch_{epoch}', image_grid,
+                                 epoch, dataformats='NCHW')
 
             writer.add_hparams(
                 hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
@@ -203,6 +200,10 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
         if i % log_every == 0:
             # print(f'Current learning rate: {scheduler}')
             print(f'Validation loss: {val_losses.item():.3f}')
+
+        # Save progress every `save_every` epochs
+        if (i + 1) % save_every == 0 and save:
+            dump_model(model, time_str)
 
     # select random images and their target indices
     # images, labels = select_n_random()
@@ -332,22 +333,26 @@ if __name__ == '__main__':
     kernel = MEDIAN_FILTER_KERNEL
     threshold = SIMPLE_THRESHOLD
 
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    device = utils.set_device()
     print(f'Running on {device}.')
 
-    utils.setcwd()
+    utils.setcwd(__file__)
 
     # our dataset has two classes only - background and person
     num_classes = 2
 
-    # Get data
-    # Size of image
-    size = 512
-    batch_size = 8  # 1024, 8; 128, 16
+    # hyperparameters
+    size = 1024
+    batch_size = 3  # 2
     pretrained = True
+    num_epochs = 200  # 500
+    lr = 6.02006e-5  # 0.00001
+    wd = 0.0007618  # 0.001
+    beta1 = 0.51929
+    beta2 = 0.61231
+
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=2, resize=size, manual_select=0)
+        batch_size=batch_size, num_workers=1, resize=size, n_img_ratio=0.1, manual_select=1)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
@@ -360,10 +365,7 @@ if __name__ == '__main__':
 
     params = [p for p in model.parameters() if p.requires_grad]
 
-    num_epochs = 10  # 500
-    lr = 0.00001  # 0.00001
-    wd = 0.001  # 0.001
-    opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.9, 0.99])
+    opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.6459, 0.9595])
 
     loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
                  'loss_classifier', 'loss_objectness']
@@ -375,10 +377,9 @@ if __name__ == '__main__':
         'num_epochs': num_epochs,
         'optimizer': f'{opt}',
         'losses': ';'.join(loss_list),
-        'img_size': size if size else 1024,
+        'image_size': size if size else 1024,
         'batch_size': batch_size,
-        'pretrained': pretrained,
-        'manual_annot': 0
+        'pretrained': pretrained
     }
     # TODO: add "how many weakly annotated"
     # TODO: add /pred/ folder in addition to /runs/
@@ -394,10 +395,12 @@ if __name__ == '__main__':
 
     with SummaryWriter(f'runs/{time_str}') as w:
         losses = train(model, device, opt, num_epochs,
-                       data_tr, data_val, time_str, hparam_dict, w)
+                       data_tr, data_val, time_str, hparam_dict, w, True)
         w.add_text('description', description)
 
     losses = np.array(losses).T
+
+    pickle.dump(model, open(join('interim', f'run_{time_str}')))
 
     # Special note that is saved as the name of a file with
     # a name which is the value of the string `special_mark`
