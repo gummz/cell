@@ -5,13 +5,14 @@ import src.data.utils.utils as utils
 import torch
 import torchvision
 from src.models.BetaCellDataset import BetaCellDataset, get_transform
-from src.models.predict_model import get_prediction, prepare_draw
+from src.models.predict_model import get_prediction
 from src.models.utils.utils import collate_fn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 import src.data.constants as c
 from os.path import join
+import src.visualization.utils as viz
 
 
 def eval_model(model, dataloader, mode='val'):
@@ -30,6 +31,7 @@ def eval_model(model, dataloader, mode='val'):
 
     model.eval()
     for i, (images, targets) in enumerate(dataloader):
+        print('image', i)
         # batch size of 1
         image = images[0]
         image.to(device)
@@ -41,8 +43,8 @@ def eval_model(model, dataloader, mode='val'):
         with autocast():
             pred = get_prediction(model, device, image)
 
-            if i % 10 == 0:
-                output_pred(mode, i, image, pred)
+            # if i % 10 == 0:
+            viz.output_pred(mode, i, image, pred)
 
         cm_mask, score_mask = performance_mask(pred, target)
         scores_mask[i] = np.mean(score_mask)
@@ -52,32 +54,13 @@ def eval_model(model, dataloader, mode='val'):
         scores_bbox[i] = np.mean(score_bbox)
         cm_bbox_tot += cm_bbox
 
+        print(cm_bbox, '\n\n')
+
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
 
     return (cm_mask_tot, avg_score_mask,
             cm_bbox_tot, avg_score_bbox)
-
-
-def output_pred(mode, i, image, pred):
-    image, bboxes, masks = prepare_draw(image, pred)
-    save = join(c.DATA_DIR, c.PRED_DIR, 'eval', mode, str(i))
-    draw_output(image, bboxes, masks, save)
-
-
-def draw_output(image, boxes, masks, save: str):
-
-    if len(boxes) != 0:
-        bboxed_img = draw_bounding_boxes(image, boxes)
-    else:
-        bboxed_img = image
-
-    if len(masks) != 0:
-        masked_img = draw_segmentation_masks(bboxed_img, masks)
-    else:
-        masked_img = image
-
-    utils.imsave(save, masked_img, 512)
 
 
 def performance_bbox(pred, target):
@@ -86,9 +69,7 @@ def performance_bbox(pred, target):
     in a slice.
     '''
     pred_bboxes = pred['boxes']
-    # pred_copy = pred_bboxes.copy()
     target_bboxes = target['boxes']
-    # target_copy = target_bboxes.copy()
 
     # edge cases
     if len(pred_bboxes) == 0 and len(target_bboxes) == 0:
@@ -112,8 +93,6 @@ def performance_bbox(pred, target):
         for j, pred_bbox in enumerate(pred_bboxes):
             iou_scores[j] = calc_iou_bbox(pred_bbox, target_bbox)
 
-        # TODO: remove elements from lists upon matching
-
         max_arg = np.argmax(iou_scores)
         if iou_scores[max_arg] < 0.1:
             fn += 1
@@ -124,8 +103,8 @@ def performance_bbox(pred, target):
             # target_copy[i] = 0
             scores[i] = iou_scores[max_arg]
 
-    # didn't yield a true positive or false negative
-    fp = len(pred_bboxes) - (tp + fn)
+    # didn't yield a true positive
+    fp = len(pred_bboxes) - tp
     confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
 
     # no matches; all predictions are false positives,
@@ -202,8 +181,8 @@ def performance_mask(pred, target):
             scores[i] = calc_iou_mask(suitable_prd, target_mask)
 
     # false positives are all the predictions which
-    # didn't yield a true positive or false negative
-    fp = len(pred_masks) - (tp + fn)
+    # didn't yield a true positive
+    fp = len(pred_masks) - tp
     confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
 
     # no matches; all predictions are false positives,
@@ -236,14 +215,13 @@ if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
 
-    time_str = '12_03_18H_29M_39S'
-    folder = f'interim/run_{time_str}'
-    model = utils.get_model(folder, time_str, utils.set_device())
+    time_str = '29_04_21H_43M_43S'
+    model = utils.get_model(time_str, utils.set_device())
     dataset = BetaCellDataset(
         transforms=get_transform(train=False), mode='val',
         n_img_ratio=1, manual_select=1)
     dataloader = DataLoader(dataset, batch_size=1,
-                            shuffle=True, num_workers=2, collate_fn=collate_fn)
+                            shuffle=False, num_workers=1, collate_fn=collate_fn)
 
     ious = eval_model(model, dataloader)
     print('\nMask CM\n', ious[0], '\n')
@@ -251,5 +229,4 @@ if __name__ == '__main__':
     print('Bbox CM\n', ious[2], '\n')
     print('Bbox IOU\n', ious[3], '\n')
 
-    toc = time()
-    print(f'Evaluation complete after {(toc-tic)/60:.1f} minutes.')
+    print(f'Evaluation complete after {utils.time_report(tic, time())}.')
