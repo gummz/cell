@@ -45,6 +45,10 @@ img = cv2.normalize(img, img, alpha=0, beta=255,
 # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
 
 
+'''
+
+'''
+
 # Operation
 # Median Blur
 # operation = 'medianblur'
@@ -75,7 +79,7 @@ for alpha in np.linspace(0.1, 1, 10):
         for gamma in np.linspace(1, 30, 5):
             img_frangi = frangi(img, alpha=alpha, beta=beta,
                                 gamma=gamma, black_ridges=False)
-            name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}_{black_ridges}'
+            name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
             plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
 # Operation

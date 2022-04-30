@@ -8,11 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 # from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 import src.data.constants as c
+import src.data.utils.utils as utils
 
-# Set working directory to script location
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
+
 
 
 BLOCK_SIZE = 5
@@ -165,7 +163,7 @@ def test():
     For example: Gaussian/Mean preprocess filtering,
                  Gaussian Kernel and Variance, etc.
     '''
-    figures_dir = FIG_DIR
+    figures_dir = c.FIG_DIR
     folder = 'annotate_gridsearch'
 
     images = sorted([image for image in listdir(imgs_path) if '.npy' in image])
@@ -256,4 +254,5 @@ def test():
 
 
 if __name__ == '__main__':
+    utils.setcwd(__file__)
     test()
