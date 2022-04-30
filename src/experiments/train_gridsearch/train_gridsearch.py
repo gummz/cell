@@ -22,6 +22,7 @@ def objective(trial):
 
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
+    amsgrad = trial.suggest_categorical('amsgrad', [True, False])
     batch_size = trial.suggest_int('batch_size', 1, 8)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
@@ -37,7 +38,7 @@ def objective(trial):
     #     [loss_list[1:3]]
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
-    lr = trial.suggest_float('learning_rate', 1e-10, 10, log=True)
+    lr = trial.suggest_float('learning_rate', 1e-8, 1, log=True)
     manual_select = 1  # trial.suggest_int('manual_ratio', 2, 27)
     weight_decay = trial.suggest_float('weight_decay', 1e-5, 10, log=True)
     # end hyperparameters
@@ -58,34 +59,34 @@ def objective(trial):
     params = [p for p in model.parameters() if p.requires_grad]
     opt = optim.Adam(params, lr=lr,
                      weight_decay=weight_decay,
-                     betas=[beta1, beta2])
+                     betas=[beta1, beta2], amsgrad=amsgrad)
 
     # unique identifier for newly saved objects
     now = datetime.datetime.now()
     time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
 
-    with SummaryWriter(f'runs/gridsearch/{time_str}') as w:
-        print(lr, batch_size, image_size,
-              manual_select, '\n')
+    with SummaryWriter(f'runs/gridsearch/{trial.number}') as w:
+        print(lr, beta1, beta2, weight_decay,
+              batch_size, image_size, manual_select, '\n')
         train_loss, val_loss = train(
             model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
 
     # IOU results
-    if not math.isnan(train_loss):
-        results = eval_model(model, data_val, 'val')
-    else:
+    # if not math.isnan(train_loss):
+    #     results = eval_model(model, data_val, 'val')
+    if math.isnan(train_loss):
         return np.nan
 
     # calculate average sensitivity between mask and bboxes
-    tp, fp = results[0][0][0], results[0][1][0]
-    sensitivity_bbox = tp / (fp + tp)
-    tp, fp = results[2][0][0], results[2][1][0]
-    sensitivity_mask = tp / (fp + tp)
-    avg_sensitivity = (sensitivity_bbox + sensitivity_mask) / 2
+    # tp, fp = results[0][0][0], results[0][1][0]
+    # sensitivity_bbox = tp / (fp + tp)
+    # tp, fp = results[2][0][0], results[2][1][0]
+    # sensitivity_mask = tp / (fp + tp)
+    # avg_sensitivity = (sensitivity_bbox + sensitivity_mask) / 2
 
-    print(results)
+    # print(results)
 
-    return avg_sensitivity
+    return val_loss
 
 
 if __name__ == '__main__':
@@ -97,11 +98,13 @@ if __name__ == '__main__':
     now = datetime.datetime.now()
     time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
 
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=40)
-    trial = study.best_trial
-    print(trial)
+    study = optuna.create_study(direction='minimize')
+    study.optimize(objective, n_trials=300)
+
     # save study
+    df = study.trials_dataframe()
+    df.to_csv('train_study.csv')
     pickle.dump(study, open('train_study.pkl', 'wb'))
+
     # print elapsed time of script
     utils.time_report(__file__, tic, time())
