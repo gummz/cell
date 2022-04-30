@@ -1,20 +1,22 @@
 import os
 import pickle
+from os import listdir
 from os.path import join
 from pprint import pp
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import src.data.constants as c
+import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
+import src.visualization.utils as viz
 import torch
 import torchvision
-from os import listdir
 from aicsimageio import AICSImage
 from matplotlib.image import BboxImage
 from PIL import Image
-import src.data.utils.utils as utils
 from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
                                         get_transform)
 from src.models.utils.model import get_instance_segmentation_model
@@ -91,6 +93,17 @@ def get_predictions(model, device, inputs):
                 preds.append(pred)
             # preds = [model([input]) for input in inputs]
 
+    for pred in preds:
+        bboxes = pred['boxes']
+        scores = pred['scores']
+
+        # perform modified NMS algorithm
+        idx = remove_boxes(bboxes, scores)
+        # select boxes by idx
+        pred['boxes'] = pred['boxes'][idx]
+        # select masks by idx
+        pred['masks'] = pred['masks'][idx]
+
     return preds
 
 
@@ -130,9 +143,92 @@ def get_prediction(model, device, input):
     # mask = np.where(mask > 0, True, False)
     # mask = torch.tensor(mask, dtype=torch.bool)
 
+    '''
+    NMS
+    Indices need to be saved because we need to also remove the corresponding masks
+    Apply NMS on all bounding boxes
+    The one with the highest score is returned
+    '''
+
     bboxes = pred[0]['boxes']
+    masks = pred[0]['masks']
+    scores = pred[0]['scores']
+
+    # perform modified NMS algorithm
+    idx = remove_boxes(bboxes, scores)
+    # select boxes by idx
+    pred[0]['boxes'] = pred[0]['boxes'][idx]
+    # select masks by idx
+    pred[0]['masks'] = pred[0]['masks'][idx]
 
     return pred[0]
+
+
+def remove_boxes(bboxes, scores, threshold=0.2):
+    if len(bboxes) == 0:
+        return torch.tensor([], dtype=torch.int64)
+
+    idx = torchvision.ops.nms(bboxes, scores, iou_threshold=threshold)
+    tmp_idx = torch.tensor(range(len(bboxes) - 1))
+    bboxes_copy = bboxes.detach().clone()
+    scores_copy = scores.detach().clone()
+
+    while len(idx) != len(tmp_idx) - 1:
+
+        bboxes_iter = bboxes_copy[idx]
+        scores_iter = scores_copy[idx]
+        # need to remove top scoring box, or else the result
+        # of next NMS will be identical
+        bboxes_iter = bboxes_iter[1:]
+        scores_iter = scores_iter[1:]
+
+        tmp_idx = idx
+        idx = torchvision.ops.nms(
+            bboxes_iter, scores_iter, iou_threshold=threshold)
+
+    # remove all bounding boxes which are inside another
+    # bounding box
+    bboxes_after = bboxes[tmp_idx]
+    bboxes_iter = bboxes[tmp_idx]
+    for i, box in enumerate(bboxes_after):
+        for box2 in bboxes_after:
+            if torch.equal(box, box2):
+                continue
+            # is box inside box2?
+            if bbox_contained(box, box2):
+                # delete box
+                tmp_idx[i] = -1
+                continue
+
+    after_contain_idx = tmp_idx[tmp_idx != -1]
+
+    for i, box in enumerate(bboxes[after_contain_idx]):
+        area = calc_bbox_area(box)
+        # reject small bounding boxes
+        if area <= 4:
+            after_contain_idx[i] = -1
+
+    final_idx = after_contain_idx[after_contain_idx != -1]
+
+    return final_idx
+
+
+def calc_bbox_area(box):
+    width = box[2] - box[0]
+    height = box[3] - box[1]
+
+    return width * height
+
+
+def bbox_contained(box1, box2):
+    cond0 = box1[0] >= box2[0]
+    cond1 = box1[1] >= box2[1]
+    cond2 = box1[2] <= box2[2]
+    cond3 = box1[3] <= box2[3]
+
+    box1_inside_box2 = all((cond0, cond1, cond2, cond3))
+
+    return box1_inside_box2
 
 
 def predict_ssh(raw_data_file, time_idx, device, model, save):
@@ -145,63 +241,22 @@ def predict_ssh(raw_data_file, time_idx, device, model, save):
         pred = get_predictions(model, device, timepoint)
 
         # Draw bounding boxes on slice for debugging
-        Z = raw_data_file.dims['Z'][0]
-        debug_timepoint(save, t, timepoint_raw, pred, Z)
+        # Z = raw_data_file.dims['Z'][0]
+        # viz.debug_timepoint(save, t, timepoint_raw, pred, Z)
 
         chains = CL.get_chains(timepoint, pred, c.SEARCHRANGE)
         chains_tot.append(chains)
 
-    return chains_tot
+    centroids = [(cent.get_center(), cent.get_intensity())
+                 for centers in centroids
+                 for cent in centers]
 
+    centroids_final = [(centroid[0][0], centroid[0][1],
+                        centroid[0][2], centroid[1])
+                       for centroid in centroids
+                       if not np.isnan(centroid[0]).any()]
 
-def prepare_draw(image: np.ndarray, pred: torch.Tensor):
-    '''
-    Prepares data for being drawn via the draw_bounding_boxes
-    and draw_segmentation_masks functions from PyTorch.
-    '''
-    image = image.repeat(3, 1, 1)
-    boxes = pred['boxes']
-
-    masks = [mask > 0.5 for mask in pred['masks']]
-
-    if len(masks) != 0:
-        masks = torch.stack(masks)
-        masks = masks.squeeze(1)
-    else:
-        masks = torch.empty(0)
-
-    image = utils.normalize(image, 0, 255, cv2.CV_8UC1)
-    image = torch.tensor(image)
-
-    return image, boxes, masks
-
-
-def debug_timepoint(save, t, timepoint_raw, pred, Z):
-    # Randomly sample 10 slices to debug (per timepoint)
-    debug_idx = np.random.randint(0, Z, 2)
-    for i, z_slice in enumerate(timepoint_raw[debug_idx]):
-        z_slice = np.int16(z_slice)
-        z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
-
-        boxes = pred[i]['boxes']
-        masks = [mask > 0.5 for mask in pred[i]['masks']]
-
-        if len(masks) == 0:
-            utils.imsave(join(save,
-                              f't-{t}_{i}.jpg'), z_slice, 512)
-            continue
-
-        masks = torch.stack(masks)
-        masks = masks.squeeze(1)
-
-        z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1)
-        z_slice = torch.tensor(z_slice)
-
-        masked_img = draw_segmentation_masks(z_slice, masks)
-        bboxed_img = draw_bounding_boxes(masked_img, boxes)
-
-        utils.imsave(join(save,
-                          f't-{t}_{i}.jpg'), masked_img, 512)
+    return centroids_final
 
 
 def prepare_mrcnn_data(timepoint, device):
@@ -213,8 +268,8 @@ def prepare_mrcnn_data(timepoint, device):
                               dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     z_slices = []
     for z_slice in timepoint:
-        z_slice = cv2.fastNlMeansDenoising(
-            z_slice, z_slice, 11, 7, 21)
+        # z_slice = cv2.fastNlMeansDenoising(
+        #     z_slice, z_slice, 11, 7, 21)
         z_slices.append(z_slice)
     timepoint = np.array(z_slices)
     timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
@@ -247,19 +302,15 @@ if __name__ == '__main__':
     utils.setcwd(__file__)
     mode = 'pred'
     # Running on CUDA?
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    # device = torch.device('cpu')
+    device = utils.set_device()
     print(f'Running on {device}.')
 
     # Get dataloaders
     size = 1024
-    img_idx = 500
-    time_str = '12_03_18H_29M_39S'
-    folder = f'interim/run_{time_str}'
+    time_str = '29_04_21H_43M_43S'
     # data_tr, data_val = get_dataloaders(resize=size)
 
-    model = utils.get_model(folder, time_str, device)
+    model = utils.get_model(time_str, device)
     model.to(device)
 
     # 1. Choose raw data file
@@ -268,30 +319,51 @@ if __name__ == '__main__':
     name = 'LI_2019-02-05_emb5_pos3.lsm'
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
-    utils.make_dir(join(c.DATA_DIR, mode, name))
     save = join(c.DATA_DIR, mode, name)
+    utils.make_dir(save)
 
     # either ssh with full data:
     path = join(c.RAW_DATA_DIR, name)
     raw_data_file = AICSImage(path)
+
     T = raw_data_file.dims['T'][0]
     # ... or local with small debug file:
     # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
 
     # # Choose time range
     time_start = 0
-    time_end = 1
+    time_end = 3
 
     time_range = range(time_start, time_end)
-    centroids = predict_ssh(raw_data_file, range(T),
+    centroids = predict_ssh(raw_data_file, time_range,
                             device, model, save)
-    centroids_save = [[(cent.get_center(), cent.get_intensity())
-                      for cent in centers] for centers in centroids]
-    centroids_save = [(center, intensity)
-                      for center, intensity in centroids_save]
-    print(centroids_save)
+
+    # pickle.dump(centroids_save, open('temp.pkl', 'wb'))
+    # centroids_save = pickle.load(open('temp.pkl', 'rb'))
+    # print(centroids_save)
+    # center_intens = centroids_save[0][0]
+
+    # average intensity: take only pixels above
+    # a certain threshold
+
+    # TODO: investigate nans in center_link
+
+    # print(type(center_intens), type(
+    #     center_intens[0]), type(center_intens[0][2]))
+    # print([(center, intensity)
+    #       for centers in centroids_save
+    #       for center, intensity in centers])
+    # centers_tot = []
+    # for center in centroids_save:
+    #     # print(centers)
+    #     # print(len(centers))
+    #     print(center)
+    #     print(center[0][0])
+
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
 
+    # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
+    # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
+
     print('predict_model.py complete')
-    # np.save(join(path, f'{t:05d}'), centroids)
