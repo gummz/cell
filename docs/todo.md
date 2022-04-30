@@ -1,34 +1,38 @@
-- Evaluate test set
+- Modified Non-Maximum Suppression to eliminate false positives
 
-- Exploratory analysis
-    - Histograms 
+- Visualize centers from predict_model.py
+
+- Feed centers into TrackPy
+
+- Visualize TrackPy results
+
+- Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
 
 - Experiments
     - Active slices
     - Hyperparameter grid search with optuna (incl pretrained)
         - Investigate how much training data is needed
         - Investigate how many images with manual labels are needed 
+        - Investigate if filters (or no filter) is best on original image
     - Preprocessing: filters, thresholds
         - Frangi, median, mean, Gaussian: choose two
         - Adaptive, simple thresholding
 
-- Arrange it such that everything is logged properly; Tensorboard/PyTorch Lightning?
+- Exploratory analysis
+    - Histograms 
 
 - Create `make` commands for json, train, test, etc.
 
 - Create a diary with recent runs (some may need to be rerun)
 
 
-
-
-
-
-
-
-
 - - -
 
 *Done*
+
+- Evaluate test set
+
+- Arrange it such that everything is logged properly; Tensorboard/PyTorch Lightning?
 
 - Create a pipeline which:
 
