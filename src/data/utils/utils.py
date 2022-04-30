@@ -87,7 +87,10 @@ def set_device():
     return device
 
 
-def get_model(folder, time_str: str, device: torch.device):
+def get_model(time_str: str, device: torch.device):
+
+    folder = f'interim/run_{time_str}'
+
     # Load model
     load_path = join(folder, f'model_{time_str}.pkl')
     if device.type == 'cuda':
@@ -181,13 +184,13 @@ def get_raw_array(file_path, which, idx):
 def imsave(path, img, resize=512):
     dirs = os.path.dirname(path)
     make_dir(dirs)
-    if resize:
-        if type(img) != np.ndarray:
-            img = np.array(img)
-        if len(img.shape) > 2:
-            img = img[0]
-        img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
+    if type(img) != np.ndarray:
+        img = np.array(img)
+    if len(img.shape) > 2:
+        img = img[0]
+    if resize:
+        img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
     if path[-4:] not in ['.png', '.jpg']:
         path += '.jpg'
 
@@ -225,11 +228,9 @@ def setcwd(file_path):
     os.chdir(dname)
 
 
-def time_report(path, tic, toc):
+def time_report(tic, toc):
     elapsed = max(tic, toc) - min(tic, toc)
-    file = os.path.basename(path)
     if elapsed / 60 < 1:
-        print(f'{file} complete after {elapsed:.1f} seconds.')
+        return f'{elapsed:.1f} seconds'
     else:
-        print(f'{file} complete after {elapsed / 60:.1f} minutes.')
-
+        return f'{elapsed / 60:.1f} minutes'
