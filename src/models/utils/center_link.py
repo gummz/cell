@@ -91,7 +91,6 @@ class CenterChain():
         owner = links[0].chain
         if owner not in [self, None]:  # links already have an owner chain
             chain = links[0].chain
-            print('Previous owner spotted!')
 
             # need to use adjusted mean to take the mean correctly
             # there may have been a previous mean performed
@@ -118,7 +117,6 @@ class CenterChain():
             link.chain = self
         self.intensity = intensity
         self.links = links
-        print(self.links)
 
     def __len__(self):
         return len(self.links)
