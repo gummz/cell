@@ -21,6 +21,7 @@ from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
                                         get_transform)
 from src.models.utils.model import get_instance_segmentation_model
 from src.models.utils.utils import collate_fn
+from src.visualization import plot_3d
 from torch.utils.data import DataLoader, Subset
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
@@ -242,21 +243,15 @@ def predict_ssh(raw_data_file, time_idx, device, model, save):
 
         # Draw bounding boxes on slice for debugging
         # Z = raw_data_file.dims['Z'][0]
-        # viz.debug_timepoint(save, t, timepoint_raw, pred, Z)
+        # viz.debug_timepoint(join(save, 'debug'), t, timepoint_raw, pred, Z)
 
+        # get center and intensity of all cells in timepoint
         chains = CL.get_chains(timepoint, pred, c.SEARCHRANGE)
         chains_tot.append(chains)
 
-    centroids = [(cent.get_center(), cent.get_intensity())
-                 for centers in centroids
-                 for cent in centers]
+    # TODO: investigate NANs in center_link
 
-    centroids_final = [(centroid[0][0], centroid[0][1],
-                        centroid[0][2], centroid[1])
-                       for centroid in centroids
-                       if not np.isnan(centroid[0]).any()]
-
-    return centroids_final
+    return chains_tot
 
 
 def prepare_mrcnn_data(timepoint, device):
@@ -299,16 +294,16 @@ def predict_local(timepoints, device, model):
 
 
 if __name__ == '__main__':
+
     utils.setcwd(__file__)
     mode = 'pred'
+
     # Running on CUDA?
     device = utils.set_device()
     print(f'Running on {device}.')
 
-    # Get dataloaders
-    size = 1024
+    # choose model id
     time_str = '29_04_21H_43M_43S'
-    # data_tr, data_val = get_dataloaders(resize=size)
 
     model = utils.get_model(time_str, device)
     model.to(device)
@@ -335,33 +330,20 @@ if __name__ == '__main__':
     time_end = 3
 
     time_range = range(time_start, time_end)
-    centroids = predict_ssh(raw_data_file, time_range,
-                            device, model, save)
+    # centroids = predict_ssh(raw_data_file, time_range,
+    #                         device, model, save)
+    # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
+    centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
 
-    # pickle.dump(centroids_save, open('temp.pkl', 'wb'))
-    # centroids_save = pickle.load(open('temp.pkl', 'rb'))
-    # print(centroids_save)
-    # center_intens = centroids_save[0][0]
-
-    # average intensity: take only pixels above
-    # a certain threshold
-
-    # TODO: investigate nans in center_link
-
-    # print(type(center_intens), type(
-    #     center_intens[0]), type(center_intens[0][2]))
-    # print([(center, intensity)
-    #       for centers in centroids_save
-    #       for center, intensity in centers])
-    # centers_tot = []
-    # for center in centroids_save:
-    #     # print(centers)
-    #     # print(len(centers))
-    #     print(center)
-    #     print(center[0][0])
-
+    centroids_np = [(i, centroid[0], centroid[1],
+                     centroid[2], centroid[3])
+                    for i, timepoint in enumerate(centroids)
+                    for centroid in timepoint]
     np.savetxt(
-        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_save)
+        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+
+    plot_3d.save_figures(centroids, join(save, 'timepoints'))
+    plot_3d.create_movie(join(save, 'timepoints'))
 
     # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
     # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
