@@ -10,7 +10,7 @@ import numpy as np
 def debug_timepoint(save, t, timepoint_raw, pred, Z):
     # Randomly sample 10 slices to debug (per timepoint)
     debug_idx = np.random.randint(0, Z, 2)
-    for i, z_slice in enumerate(timepoint_raw[debug_idx]):
+    for i, (idx, z_slice) in enumerate(zip(debug_idx, timepoint_raw[debug_idx])):
         z_slice = np.int16(z_slice)
         z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
 
@@ -19,7 +19,7 @@ def debug_timepoint(save, t, timepoint_raw, pred, Z):
 
         if len(masks) == 0:
             utils.imsave(join(save,
-                              f't-{t}_{i}.jpg'), z_slice, 512)
+                              f't-{t}_{idx}.jpg'), z_slice, 512)
             continue
 
         masks = torch.stack(masks)
@@ -32,7 +32,7 @@ def debug_timepoint(save, t, timepoint_raw, pred, Z):
         bboxed_img = draw_bounding_boxes(masked_img, boxes)
 
         utils.imsave(join(save,
-                          f't-{t}_{i}.jpg'), masked_img, 512)
+                          f't-{t}_{idx}.jpg'), bboxed_img, 512)
 
 
 def prepare_draw(image: np.ndarray, pred: torch.Tensor):

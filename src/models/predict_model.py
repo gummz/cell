@@ -237,19 +237,19 @@ def predict_ssh(raw_data_file, time_idx, device, model, save):
     for t in time_idx:
         timepoint_raw = raw_data_file.get_image_dask_data(
             'ZXY', T=t, C=c.CELL_CHANNEL).compute()
-
+        
+        # prepare data for model, since we're not using
+        # BetaCellDataset class
         timepoint = prepare_mrcnn_data(timepoint_raw, device)
         pred = get_predictions(model, device, timepoint)
 
         # Draw bounding boxes on slice for debugging
-        # Z = raw_data_file.dims['Z'][0]
-        # viz.debug_timepoint(join(save, 'debug'), t, timepoint_raw, pred, Z)
+        Z = raw_data_file.dims['Z'][0]
+        viz.debug_timepoint(join(save, 'debug'), t, timepoint_raw, pred, Z)
 
         # get center and intensity of all cells in timepoint
         chains = CL.get_chains(timepoint, pred, c.SEARCHRANGE)
         chains_tot.append(chains)
-
-    # TODO: investigate NANs in center_link
 
     return chains_tot
 
@@ -330,10 +330,10 @@ if __name__ == '__main__':
     time_end = 3
 
     time_range = range(time_start, time_end)
-    # centroids = predict_ssh(raw_data_file, time_range,
-    #                         device, model, save)
+    centroids = predict_ssh(raw_data_file, time_range,
+                            device, model, save)
     # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
-    centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
+    # centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
 
     centroids_np = [(i, centroid[0], centroid[1],
                      centroid[2], centroid[3])

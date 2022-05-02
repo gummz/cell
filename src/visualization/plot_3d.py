@@ -10,9 +10,10 @@ import cv2
 
 
 def create_movie(location):
+    utils.make_dir(location)
     images = listdir(location)
-    out = cv2.VideoWriter(join(location, 'movie_prediction.avi'),
-                          cv2.VideoWriter_fourcc(*'DIVX'),
+    out = cv2.VideoWriter(join(location, 'movie_prediction.mp4'),
+                          cv2.VideoWriter_fourcc(*'mp4v'),
                           15, (1024, 1024))
     for image in images:
         array = cv2.imread(join(location, image))
@@ -43,14 +44,12 @@ def get_cmap():
 
 
 def save_figures(centroids, save):
-
+    utils.make_dir(save)
     for i, timepoint in enumerate(centroids):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
         points, cmap = prepare_3d(timepoint)
-        print(timepoint, '\n\n')
-        print(points)
-        X, Y, Z = points[:, :3]
-        ax.scatter(X, Y, Z, c=points[:, 3], cmap=cmap)
+        X, Y, Z = np.split(points[:, :3], 3, 1)
+        ax.scatter(X, Y, Z)  # , c=points[:, 3], cmap=cmap)
         plt.savefig(join(save, f'{i}.png'))
 
 

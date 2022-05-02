@@ -86,11 +86,12 @@ class CenterChain():
                        for link in links]
 
         center_mean = np.round(np.mean(centers, axis=0), 2)
-        intensity = np.round(np.mean(intensities, axis=0), 2)
+        intensity = np.round(np.mean(intensities, axis=0), 10)
 
         owner = links[0].chain
         if owner not in [self, None]:  # links already have an owner chain
             chain = links[0].chain
+            print('Previous owner spotted!')
 
             # need to use adjusted mean to take the mean correctly
             # there may have been a previous mean performed
@@ -117,6 +118,7 @@ class CenterChain():
             link.chain = self
         self.intensity = intensity
         self.links = links
+        print(self.links)
 
     def __len__(self):
         return len(self.links)
@@ -265,8 +267,6 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
 
         for mask, bbox in zip(masks, bboxes):  # each box in slice
             center = get_bbox_center(bbox, z)
-            if np.isnan(center).any():
-                print('nan here:', center)
 
             # Coordinates in original slice
             mask_nonzero = np.argwhere(mask.detach().cpu())
