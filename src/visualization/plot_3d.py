@@ -7,19 +7,25 @@ import src.data.constants as c
 import src.data.utils.utils as utils
 from matplotlib.colors import ListedColormap
 import cv2
+import skvideo.io
 
 
 def create_movie(location):
     utils.make_dir(location)
-    images = listdir(location)
-    out = cv2.VideoWriter(join(location, 'movie_prediction.mp4'),
-                          cv2.VideoWriter_fourcc(*'mp4v'),
-                          15, (1024, 1024))
-    for image in images:
+    images = [image for image in listdir(location) if '.png' in image]
+    name = 'movie_prediction.mp4'
+    # out = cv2.VideoWriter(join(location, 'movie_prediction.mp4'),
+    #                       cv2.VideoWriter_fourcc(*'mp4v'),
+    #                       15, (1024, 1024))
+    out_video = np.zeros((len(images), 480, 640))
+    for i, image in enumerate(images):
         array = cv2.imread(join(location, image))
-        out.write(array)
-
-    out.release()
+        # print(array.shape)
+        out_video[i] = array
+        # out.write(array)
+    skvideo.io.vwrite(join(location, name), out_video)
+    # cv2.destroyAllWindows()
+    # out.release()
 
 
 def prepare_3d(timepoint):
