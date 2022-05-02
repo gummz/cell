@@ -1,5 +1,5 @@
 from os import listdir
-from os.path import join
+from os.path import join, splitext
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,27 +10,36 @@ import cv2
 import skvideo.io
 
 
-def create_movie(location):
+def create_movie(location, time_range):
     utils.make_dir(location)
-    images = [image for image in listdir(location) if '.png' in image]
-    name = 'movie_prediction.mp4'
-    # out = cv2.VideoWriter(join(location, 'movie_prediction.mp4'),
-    #                       cv2.VideoWriter_fourcc(*'mp4v'),
-    #                       15, (1024, 1024))
-    out_video = np.zeros((len(images), 480, 640))
+    images = [image for image in listdir(location)
+              if '.png' in image and
+              int(splitext(image)[0]) in time_range]
+
+    name = f'movie_prediction{time_range[0]}_{time_range[-1]}.mp4'
+    rate = '1'
+
+    vid_out = skvideo.io.FFmpegWriter(join(location, name),
+                                      inputdict={
+                                          '-r': rate,
+    },
+        outputdict={
+                                          '-vcodec': 'libx264',
+                                          '-pix_fmt': 'yuv420p',
+                                          '-r': rate,
+    })
+
     for i, image in enumerate(images):
-        array = cv2.imread(join(location, image))
-        # print(array.shape)
-        out_video[i] = array
-        # out.write(array)
-    skvideo.io.vwrite(join(location, name), out_video)
-    # cv2.destroyAllWindows()
-    # out.release()
+        array = cv2.imread(join(location, image))[:, :, 0]
+        vid_out.writeFrame(array)
+
+    vid_out.close()
 
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
-    return points, get_cmap()
+    X, Y, Z, I = np.split(points, 4, 1)
+    return X, Y, Z, I, get_cmap()
 
 
 def get_cmap():
@@ -51,12 +60,25 @@ def get_cmap():
 
 def save_figures(centroids, save):
     utils.make_dir(save)
+    file = save.split('/')[-2]
     for i, timepoint in enumerate(centroids):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-        points, cmap = prepare_3d(timepoint)
-        X, Y, Z = np.split(points[:, :3], 3, 1)
-        ax.scatter(X, Y, Z)  # , c=points[:, 3], cmap=cmap)
-        plt.savefig(join(save, f'{i}.png'))
+        X, Y, Z, I, cmap = prepare_3d(timepoint)
+
+        # switch Z and Y because we want Z to be depth
+        ax.scatter(X, Z, Y, c=I, cmap=cmap)
+
+        ax.set_xlim3d(0, 1025)
+        ax.set_ylim3d(0, 50)
+        ax.set_zlim3d(0, 1025)
+        ax.set_xlabel('X dimension')
+        ax.set_ylabel('Z dimension')
+        ax.set_zlabel('Y dimension')
+        ax.set_title(f'File: {file}\nTimepoint: {i}')
+
+        plt.savefig(join(save, f'{i:05d}.png'),
+                    dpi=300, bbox_inches='tight')
+        plt.close()
 
 
 if __name__ == '__main__':

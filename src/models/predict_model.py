@@ -327,7 +327,7 @@ if __name__ == '__main__':
 
     # # Choose time range
     time_start = 0
-    time_end = 3
+    time_end = 50
 
     time_range = range(time_start, time_end)
     centroids = predict_ssh(raw_data_file, time_range,
@@ -342,8 +342,9 @@ if __name__ == '__main__':
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
-    plot_3d.save_figures(centroids, join(save, 'timepoints'))
-    plot_3d.create_movie(join(save, 'timepoints'))
+    location = join(save, 'timepoints')
+    plot_3d.save_figures(centroids, location)
+    plot_3d.create_movie(location, time_range)
 
     # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
     # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
