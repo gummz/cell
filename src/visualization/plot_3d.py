@@ -1,19 +1,24 @@
-from matplotlib.colors import ListedColormap
-import matplotlib.pyplot as plt
+from os import listdir
 from os.path import join
-from os import listdir, makedirs
+
+import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 import src.data.constants as c
 import src.data.utils.utils as utils
-import tifffile as tiff
+from matplotlib.colors import ListedColormap
+import cv2
 
 
-utils.setcwd(__file__)
+def create_movie(location):
+    images = listdir(location)
+    out = cv2.VideoWriter(join(location, 'movie_prediction.avi'),
+                          cv2.VideoWriter_fourcc(*'DIVX'),
+                          15, (1024, 1024))
+    for image in images:
+        array = cv2.imread(join(location, image))
+        out.write(array)
 
-operation = '3d_plot'
-save = join(c.FIG_DIR, operation)
-utils.make_dir(save)
+    out.release()
 
 
 def prepare_3d(timepoint):
@@ -35,6 +40,25 @@ def get_cmap():
     my_cmap = ListedColormap(my_cmap)
 
     return my_cmap
+
+
+def save_figures(centroids, save):
+
+    for i, timepoint in enumerate(centroids):
+        fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
+        points, cmap = prepare_3d(timepoint)
+        print(timepoint, '\n\n')
+        print(points)
+        X, Y, Z = points[:, :3]
+        ax.scatter(X, Y, Z, c=points[:, 3], cmap=cmap)
+        plt.savefig(join(save, f'{i}.png'))
+
+
+if __name__ == '__main__':
+    operation = '3d_plot'
+    save = join(c.FIG_DIR, operation)
+    utils.make_dir(save)
+
 
 # # files = RAW_FILES[START_IDX:]
 # files = listdir(c.RAW_DATA_DIR)
@@ -82,18 +106,3 @@ def get_cmap():
 #     ax.scatter(X, Y, Z, c=timepoint[0:size, 0:size, :], cmap=my_cmap)
 
 #     plt.savefig(join(save, 'plot.jpg'))
-
-
-if __name__ == '__main__':
-    name = 'LI_2019-02-05_emb5_pos3.lsm'
-    file = 'LI_2019-02-05_emb5_pos3.lsm_0_3.csv'
-    chains_tot = np.load(open(join(c.DATA_DIR, c.PRED_DIR, name, file), 'rb'))
-    figures = []
-    for timepoint in chains_tot:
-        fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-        points, cmap = prepare_3d(timepoint)
-        X, Y, Z = points[:, :3]
-        ax.scatter(X, Y, Z, c=points[:, 3], cmap=cmap)
-        figures.append(fig)
-
-    print('3d_plot.py complete')
