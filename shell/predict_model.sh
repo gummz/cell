@@ -25,7 +25,10 @@
 #BSUB -oo out
 #BSUB -eo err
 
-module load python3/3.8.2
+module load python3/3.8.11
+module load cuda/11.1
+# module load opencv/3.4.16-python-3.8.11-cuda-11.1
+module load ffmpeg/5.0.1
 ###python3 -m venv venv_1
 source ../venv_1/bin/activate
 
