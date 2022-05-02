@@ -1,5 +1,3 @@
-- Modified Non-Maximum Suppression to eliminate false positives
-
 - Visualize centers from predict_model.py
 
 - Feed centers into TrackPy
@@ -13,7 +11,7 @@
     - Hyperparameter grid search with optuna (incl pretrained)
         - Investigate how much training data is needed
         - Investigate how many images with manual labels are needed 
-        - Investigate if filters (or no filter) is best on original image
+        - Investigate which filter (or no filter) is best on original image
     - Preprocessing: filters, thresholds
         - Frangi, median, mean, Gaussian: choose two
         - Adaptive, simple thresholding
@@ -25,10 +23,11 @@
 
 - Create a diary with recent runs (some may need to be rerun)
 
-
 - - -
 
 *Done*
+
+- Modified Non-Maximum Suppression to eliminate false positives
 
 - Evaluate test set
 

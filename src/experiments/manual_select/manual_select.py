@@ -71,7 +71,7 @@ def objective(trial):
         print(batch_size, image_size,
               manual_select, '\n')
         train_loss, val_loss = train(
-            model, device, opt, 50, data_tr, data_val, time_str, hparam_dict, w)
+            model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
 
     results = eval_model(model, data_val, 'val')
     tp, fp = results[0][0][0], results[0][1][0]
@@ -103,4 +103,5 @@ if __name__ == '__main__':
     df.to_csv('manual_select_study.csv')
     pickle.dump(study, open('manual_select_study.pkl', 'wb'))
     # print elapsed time of script
-    utils.time_report(__file__, tic, time())
+    
+    print(f'manual_select.py complete after {utils.time_report(tic, time())}.')
