@@ -23,7 +23,7 @@ def objective(trial):
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
     amsgrad = trial.suggest_categorical('amsgrad', [True, False])
-    batch_size = trial.suggest_int('batch_size', 1, 8)
+    batch_size = trial.suggest_int('batch_size', 1, 32)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
     image_size = 1024  # trial.suggest_int('image_size', 28, 512)
