@@ -315,12 +315,12 @@ if __name__ == '__main__':
     # choose model id
     time_str = '29_04_21H_43M_43S'
 
-    model = utils.get_model(time_str, device)
-    model.to(device)
+    # model = utils.get_model(time_str, device)
+    # model.to(device)
 
     # 1. Choose raw data file
-    names = listdir(c.RAW_DATA_DIR)
-    names = [name for name in names if '.czi' not in name]
+    # names = listdir(c.RAW_DATA_DIR)
+    # names = [name for name in names if '.czi' not in name]
     name = c.PRED_NAME
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
@@ -329,9 +329,9 @@ if __name__ == '__main__':
 
     # either ssh with full data:
     path = join(c.RAW_DATA_DIR, name)
-    raw_data_file = AICSImage(path)
+    # raw_data_file = AICSImage(path)
 
-    T = raw_data_file.dims['T'][0]
+    # T = raw_data_file.dims['T'][0]
     # ... or local with small debug file:
     # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
 
@@ -353,9 +353,11 @@ if __name__ == '__main__':
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
     tracked_centroids = track(centroids_np)
-    print(tracked_centroids)
+    pickle.dump(tracked_centroids,
+                open(join(save, 'tracked_centroids.pkl', 'wb')))
+
     location = join(save, 'timepoints')
-    plot_3d.save_figures(centroids, location)
+    plot_3d.save_figures(tracked_centroids, location)
     plot_3d.create_movie(location, time_range)
 
     # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
