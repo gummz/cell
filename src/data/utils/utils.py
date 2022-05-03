@@ -106,48 +106,55 @@ def get_model(time_str: str, device: torch.device):
     return model
 
 
-def get_raw_array(file_path, which, idx):
+def get_raw_array(file_path, which, idx, channel=c.CELL_CHANNEL):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     Output is 4D (timepoints and xyz spatial dimensions)
     '''
-    raw_data = AICSImage(file_path)
+    if os.path.exists(file_path):
+        raw_data = AICSImage(file_path)
+    else:
+        raw_data = AICSImage()
+        print((
+            f'WARNING: Could not access {file_path}.\n'
+            f'Using sample dataset from {c.SAMPLE_PATH}.'
+        ))
 
     if which == 'timepoint':
         if '.czi' not in file_path:
             if type(idx) == tuple:
                 data = raw_data.get_image_dask_data(
-                    'TZXY', T=idx, C=c.CELL_CHANNEL)
+                    'TZXY', T=idx, C=channel)
             elif type(idx) == int:
                 data = raw_data.get_image_dask_data(
-                    'ZXY', T=idx, C=c.CELL_CHANNEL)
+                    'ZXY', T=idx, C=channel)
         else:
             dims = get_czi_dims(raw_data.metadata)
 
             if type(idx) == tuple:
                 data = raw_data.get_image_dask_data(
-                    'TZXY', T=idx, C=c.CELL_CHANNEL)
+                    'TZXY', T=idx, C=channel)
             elif type(idx) == int:
                 data = raw_data.get_image_dask_data(
-                    'ZXY', T=idx, C=c.CELL_CHANNEL)
+                    'ZXY', T=idx, C=channel)
     elif which == 'slice':
         if '.czi' not in file_path:
             if type(idx) == tuple:
                 data = raw_data.get_image_dask_data(
-                    'TZXY', Z=idx, C=c.CELL_CHANNEL)
+                    'TZXY', Z=idx, C=channel)
             elif type(idx) == int:
                 data = raw_data.get_image_dask_data(
-                    'TXY', Z=idx, C=c.CELL_CHANNEL)
+                    'TXY', Z=idx, C=channel)
         else:
             dims = get_czi_dims(raw_data.metadata)
 
             if type(idx) == tuple:
                 data = raw_data.get_image_dask_data(
-                    'TZXY', Z=idx, C=c.CELL_CHANNEL)
+                    'TZXY', Z=idx, C=channel)
             elif type(idx) == int:
                 data = raw_data.get_image_dask_data(
-                    'TXY', Z=idx, C=c.CELL_CHANNEL)
+                    'TXY', Z=idx, C=channel)
 
     return data
 
