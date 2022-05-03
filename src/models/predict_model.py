@@ -12,6 +12,7 @@ import src.data.constants as c
 import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
 import src.visualization.utils as viz
+from src.tracking.track_cells import track
 import torch
 import torchvision
 from aicsimageio import AICSImage
@@ -155,7 +156,7 @@ def get_prediction(model, device, input):
     masks = pred[0]['masks']
     scores = pred[0]['scores']
 
-    # perform modified NMS algorithm
+    # # perform modified NMS algorithm
     idx = remove_boxes(bboxes, scores)
     # select boxes by idx
     pred[0]['boxes'] = pred[0]['boxes'][idx]
@@ -165,7 +166,7 @@ def get_prediction(model, device, input):
     return pred[0]
 
 
-def remove_boxes(bboxes, scores, threshold=0.2):
+def remove_boxes(bboxes, scores, threshold=0.3):
     if len(bboxes) == 0:
         return torch.tensor([], dtype=torch.int64)
 
@@ -173,6 +174,8 @@ def remove_boxes(bboxes, scores, threshold=0.2):
     tmp_idx = torch.tensor(range(len(bboxes) - 1))
     bboxes_copy = bboxes.detach().clone()
     scores_copy = scores.detach().clone()
+    print('boxes', len(bboxes))
+    print('idx after first nms', len(idx))
 
     while len(idx) != len(tmp_idx) - 1:
 
@@ -186,6 +189,7 @@ def remove_boxes(bboxes, scores, threshold=0.2):
         tmp_idx = idx
         idx = torchvision.ops.nms(
             bboxes_iter, scores_iter, iou_threshold=threshold)
+        print(len(idx), '\n')
 
     # remove all bounding boxes which are inside another
     # bounding box
@@ -237,15 +241,17 @@ def predict_ssh(raw_data_file, time_idx, device, model, save):
     for t in time_idx:
         timepoint_raw = raw_data_file.get_image_dask_data(
             'ZXY', T=t, C=c.CELL_CHANNEL).compute()
-        
+
         # prepare data for model, since we're not using
         # BetaCellDataset class
         timepoint = prepare_mrcnn_data(timepoint_raw, device)
+        # pred = get_predictions(model, device, timepoint)
         pred = get_predictions(model, device, timepoint)
 
         # Draw bounding boxes on slice for debugging
         Z = raw_data_file.dims['Z'][0]
-        viz.debug_timepoint(join(save, 'debug'), t, timepoint_raw, pred, Z)
+        viz.debug_timepoint(join(save, 'debug'), t,
+                            timepoint_raw, pred, Z, 1024)
 
         # get center and intensity of all cells in timepoint
         chains = CL.get_chains(timepoint, pred, c.SEARCHRANGE)
@@ -259,18 +265,22 @@ def prepare_mrcnn_data(timepoint, device):
     Prepares data for input to model if BetaCellDataset
     class is not being used.
     '''
-    timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
-                              dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-    z_slices = []
-    for z_slice in timepoint:
-        # z_slice = cv2.fastNlMeansDenoising(
-        #     z_slice, z_slice, 11, 7, 21)
-        z_slices.append(z_slice)
-    timepoint = np.array(z_slices)
+    # TODO: try this v
+    # timepoint = np.int16(timepoint)
+    # timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
+    #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    # z_slices = []
+    # for z_slice in timepoint:
+    #     # z_slice = cv2.fastNlMeansDenoising(
+    #     #     z_slice, z_slice, 11, 7, 21)
+    #     z_slices.append(z_slice)
+    # timepoint = np.array(z_slices)
     timepoint = cv2.normalize(timepoint, None, alpha=0, beta=1,
                               dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
     timepoint = torch.tensor(timepoint).to(device)
     timepoint = torch.unsqueeze(timepoint, 1)
+    print(np.unique(timepoint.cpu().numpy()))
+    exit()
     return timepoint
 
 
@@ -311,7 +321,7 @@ if __name__ == '__main__':
     # 1. Choose raw data file
     names = listdir(c.RAW_DATA_DIR)
     names = [name for name in names if '.czi' not in name]
-    name = 'LI_2019-02-05_emb5_pos3.lsm'
+    name = c.PRED_NAME
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
     save = join(c.DATA_DIR, mode, name)
@@ -327,21 +337,23 @@ if __name__ == '__main__':
 
     # # Choose time range
     time_start = 0
-    time_end = 50
+    time_end = 3
 
     time_range = range(time_start, time_end)
-    centroids = predict_ssh(raw_data_file, time_range,
-                            device, model, save)
+    # centroids = predict_ssh(raw_data_file, time_range,
+    #                         device, model, save)
     # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
-    # centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
+    centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
 
-    centroids_np = [(i, centroid[0], centroid[1],
+    centroids_np = [(t, centroid[0], centroid[1],
                      centroid[2], centroid[3])
-                    for i, timepoint in enumerate(centroids)
+                    for t, timepoint in enumerate(centroids)
                     for centroid in timepoint]
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
+    tracked_centroids = track(centroids_np)
+    print(tracked_centroids)
     location = join(save, 'timepoints')
     plot_3d.save_figures(centroids, location)
     plot_3d.create_movie(location, time_range)
