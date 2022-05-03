@@ -126,6 +126,8 @@ IMG_EXT = 'png'
 CELL_CHANNEL = 0
 
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
+SAMPLE_PATH = join(DATA_DIR, 'sample.npy')
+
 # EXCEL_SHEET = pd.read_csv(join(DATA_DIR, EXCEL_FILENAME))
 
 # testset_ext = utils.add_ext(list(test_set.keys()))
