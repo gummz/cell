@@ -1,8 +1,16 @@
-- Visualize centers from predict_model.py
+- `slice_to_mip.py`: input is slice of timepoint of file, output is MIP of timepoint of file. Some images will be identical (because they are from the same timepoint) but that's okay.
 
-- Feed centers into TrackPy
+- Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot)
 
-- Visualize TrackPy results
+- Tracking cells
+    - Visualize centers from predict_model.py
+
+    - Feed centers into TrackPy
+
+    - Visualize TrackPy results
+
+- Look at if I can use COCO Eval
+
 
 - Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
 
