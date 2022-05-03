@@ -12,9 +12,9 @@ import skvideo.io
 
 def create_movie(location, time_range):
     utils.make_dir(location)
-    images = [image for image in listdir(location)
+    images = sorted([image for image in listdir(location)
               if '.png' in image and
-              int(splitext(image)[0]) in time_range]
+              int(splitext(image)[0]) in time_range])
 
     name = f'movie_prediction{time_range[0]}_{time_range[-1]}.mp4'
     rate = '1'
