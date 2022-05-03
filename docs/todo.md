@@ -3,14 +3,20 @@
 - Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot)
 
 - Tracking cells
-    - Visualize centers from predict_model.py
-
     - Feed centers into TrackPy
-
-    - Visualize TrackPy results
+    - Visualize TrackPy results in 3D (final output)
+    - Visualize TrackPy results in 2D (for validation)
+        - eval_track.py
+        - Maximal intensity projection
+        - cross/dot markers
+        - colors which are easy to distinguish
+            - intensity of color = intensity of cell?
+        - axes with ticks for easy coordinates
+        - overlay with tubes (channel other than 0)
+        - from `centroids_np`, just use `t`, `x`, `y`, `p` (particle) 
+        - plot coordinates onto MIP of raw timepoint
 
 - Look at if I can use COCO Eval
-
 
 - Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
 
@@ -34,6 +40,8 @@
 - - -
 
 *Done*
+
+- Visualize centers from predict_model.py
 
 - Modified Non-Maximum Suppression to eliminate false positives
 
