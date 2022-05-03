@@ -18,6 +18,8 @@ LOGGING_IMG_SIZE = 512
 CV2_CONNECTED_ALGORITHM = 1
 NUMBER_CONNECTIVITY = 8
 
+PRED_NAME = 'LI_2019-02-05_emb5_pos3.lsm'
+
 # DATA CONSTANTS
 RAW_DATA_DIR = '/dtu-compute/tubes/raw_data'
 # Very important to maintain the order of files in `RAW_FILES`
