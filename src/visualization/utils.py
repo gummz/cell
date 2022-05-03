@@ -7,8 +7,8 @@ import cv2
 import numpy as np
 
 
-def debug_timepoint(save, t, timepoint_raw, pred, Z):
-    # Randomly sample 10 slices to debug (per timepoint)
+def debug_timepoint(save, t, timepoint_raw, pred, Z, size=512):
+    # Randomly sample 2 slices to debug (per timepoint)
     debug_idx = np.random.randint(0, Z, 2)
     for i, (idx, z_slice) in enumerate(zip(debug_idx, timepoint_raw[debug_idx])):
         z_slice = np.int16(z_slice)
@@ -19,7 +19,7 @@ def debug_timepoint(save, t, timepoint_raw, pred, Z):
 
         if len(masks) == 0:
             utils.imsave(join(save,
-                              f't-{t}_{idx}.jpg'), z_slice, 512)
+                              f't-{t}_{idx}.jpg'), z_slice, size)
             continue
 
         masks = torch.stack(masks)
