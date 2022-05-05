@@ -82,6 +82,8 @@ for alpha in np.linspace(0.1, 1, 10):
             name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
             plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
+# TODO: Canny edge detection
+
 # Operation
 # Simple Threshold
 # operation = 'simple_threshold'
