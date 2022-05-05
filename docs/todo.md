@@ -35,7 +35,7 @@
         - Adaptive, simple thresholding
 
 - Exploratory analysis
-    - Histograms 
+    - Histograms, before and after preprocessing
 
 - Create `make` commands for json, train, test, etc.
 

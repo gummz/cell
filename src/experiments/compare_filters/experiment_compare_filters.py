@@ -36,7 +36,7 @@ modification = ''
 images = sorted([image for image in listdir(imgs_path) if '.npy' in image])
 # Get full image paths from filename list `images`
 image_paths = sorted([join(imgs_path, image) for image in images])
-img_idx = 1500
+img_idx = 1000
 path = image_paths[img_idx]
 img_name = images[img_idx].split('.')[0]
 save = join(c.FIG_DIR, mode, img_name)
@@ -45,7 +45,7 @@ save = join(c.FIG_DIR, mode, img_name)
 utils.make_dir(save)
 
 img = np.int16(np.load(path))
-img = cv2.normalize(img, img, alpha=0, beta=255,
+img = cv2.normalize(img, None, alpha=0, beta=255,
                     dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
 
@@ -88,15 +88,24 @@ plt.imsave(join(save, f'img_plt.{ext}'), img)
 #             plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
 # TODO: Canny edge detection
-img_canny_norm = cv2.normalize(img, None, alpha=0, beta=255,
-                               dtype=cv2.CV_16SC1, norm_type=cv2.NORM_MINMAX)
+# img_canny_norm = cv2.normalize(img, None, alpha=0, beta=255,
+#                                dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 operation = 'canny'
-for thresh1 in [20, 50, 80, 100, 150, 200]:
-    for thresh2 in [20, 50, 80, 100, 150, 200]:
-        for aperture_size in [1, 3, 5, 7]:
+for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:
+    for thresh2 in [20, 50, 80, 100, 150, 200][-2:]:
+        for aperture_size in [3, 5, 7]:
             for L2_gradient in [True, False]:
+                img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
+                img = cv2.normalize(img, None, alpha=0,
+                                    beta=1, dtype=cv2.CV_32FC1,
+                                    norm_type=cv2.NORM_MINMAX)
+                img *= np.where((0.05 < img) & (img < 0.3), img * 3, img)
+                img = cv2.normalize(img, None, alpha=0,
+                                    beta=255, dtype=cv2.CV_8UC1,
+                                    norm_type=cv2.NORM_MINMAX)
                 img_canny = cv2.Canny(
-                    img_canny_norm, thresh1, thresh2, aperture_size, L2_gradient)
+                    img, thresh1, thresh2, None,
+                    apertureSize=aperture_size, L2gradient=L2_gradient)
                 name = (f'canny_{thresh1}_{thresh2}'
                         f'_{aperture_size}_{L2_gradient}')
                 utils.imsave(join(save, name), img_canny, 512)
