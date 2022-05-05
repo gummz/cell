@@ -35,7 +35,9 @@
         - Adaptive, simple thresholding
 
 - Exploratory analysis
-    - Histograms, before and after preprocessing
+    - Histograms
+        - Before and after preprocessing
+        - Of train, validation, and test set to compare distributions
 
 - Create `make` commands for json, train, test, etc.
 
