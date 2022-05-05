@@ -26,15 +26,20 @@ def objective(trial):
     batch_size = trial.suggest_int('batch_size', 1, 32)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
-    filters = [
-        None,
-        {'filter': cv2.blur, 'args': [(5, 5)]},
-        {'filter': cv2.GaussianBlur, 'args': [(5, 5), 0]},
-        {'filter': cv2.medianBlur, 'args': [5]},
-        {'filter': cv2.bilateralFilter, 'args': [9, 75, 75]},
-        {'filter': cv2.fastNlMeansDenoising, 'args': [None, 11, 7, 21]}
-    ]
-    img_filter = trial.suggest_categorical('img_filter', filters)
+    # the parameters of these filters have been optimized
+    # with experiments
+    filters = {
+        'none': None,
+        'mean': (cv2.blur, [(5, 5)]),
+        'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
+        'median': (cv2.medianBlur, [5]),
+        'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
+        'nlmeans': (cv2.fastNlMeansDenoising, [None, 11, 7, 21]),
+        'canny': (utils.canny_filter, [None, 20, 20, 3, False])
+    }
+    filter_optim = trial.suggest_categorical('filters', list(filters.keys()))
+    img_filter = filters[filter_optim]
+
     image_size = 1024  # trial.suggest_int('image_size', 28, 512)
     loss_list = [
         'loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
@@ -78,7 +83,7 @@ def objective(trial):
         print(lr, beta1, beta2, weight_decay,
               batch_size, image_size, manual_select, '\n')
         train_loss, val_loss = train(
-            model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
+            model, device, opt, 5, data_tr, data_val, time_str, hparam_dict, w)
 
     # IOU results
     # if not math.isnan(train_loss):
