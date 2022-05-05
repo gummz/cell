@@ -28,7 +28,7 @@ def slice_to_mip(mode, resize, which, ext='jpg'):
         output_path = join(c.DATA_DIR, c.EXTRACT_DIR, folder)
         utils.make_dir(output_path)
 
-        name_str = f'index_{t:05d}_mip.{ext}'
+        name_str = f'{t:05d}_mip.{ext}'
 
         utils.imsave(join(output_path, name_str), data_mip, resize=resize)
 

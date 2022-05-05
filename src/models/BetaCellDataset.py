@@ -25,7 +25,9 @@ random.seed(42)
 class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
-    def __init__(self, root=c.DATA_DIR, transforms=None, resize=1024, mode='train', n_img_ratio=1, manual_select=0):
+    def __init__(self, root=c.DATA_DIR, transforms=None,
+                 resize=1024, mode='train', n_img_ratio=1,
+                 manual_select=0, img_filter=None):
         '''
         Inputs:
 
@@ -121,6 +123,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.masks_full = list(sorted(masks_full))
+        self.img_filter = img_filter
 
     def __getitem__(self, idx):
         # load images and mask
@@ -141,11 +144,14 @@ class BetaCellDataset(torch.utils.data.Dataset):
                          mask_dir, self.masks[idx])
 
         img = np.int16(np.load(img_path))
+
         # PREPROCESSING
         img = cv2.normalize(img, None, alpha=0, beta=255,
                             dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-        # img = cv2.fastNlMeansDenoising(
-        #     img, None, 11, 7, 21)
+        if self.img_filter:
+            img_filter = self.img_filter['filter']
+            args = self.img_filter['args']
+            img = img_filter(img, *args)
         # END PREPROCESSING
 
         mask = np.load(mask_path)
@@ -234,7 +240,9 @@ class BetaCellDataset(torch.utils.data.Dataset):
         return len(self.imgs)
 
 
-def get_dataloaders(root=c.DATA_DIR, batch_size=4, num_workers=1, resize=1024, n_img_ratio=1, manual_select=0):
+def get_dataloaders(root=c.DATA_DIR, batch_size=4,
+                    num_workers=1, resize=1024, n_img_ratio=1,
+                    manual_select=0, img_filter=None):
     '''Get dataloaders.
         resize: resize image in __getitem__ method of dataset class.
 
@@ -243,9 +251,12 @@ def get_dataloaders(root=c.DATA_DIR, batch_size=4, num_workers=1, resize=1024, n
     '''
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
-        root, get_transform(train=True), resize=resize, mode='train', n_img_ratio=n_img_ratio, manual_select=manual_select)
+        root, get_transform(train=True), resize=resize,
+        mode='train', n_img_ratio=n_img_ratio,
+        manual_select=manual_select, img_filter=img_filter)
     dataset_val = BetaCellDataset(
-        root, get_transform(train=False), resize=resize, mode='val', n_img_ratio=1, manual_select=1)
+        root, get_transform(train=False), resize=resize,
+        mode='val', n_img_ratio=1, manual_select=1, img_filter=img_filter)
 
     # split the dataset in train and test set
     # torch.manual_seed(1)
