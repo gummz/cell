@@ -115,7 +115,7 @@ def get_raw_array(file_path, which, idx, channel=c.CELL_CHANNEL):
     if os.path.exists(file_path):
         raw_data = AICSImage(file_path)
     else:
-        raw_data = AICSImage()
+        raw_data = AICSImage(c.SAMPLE_PATH)
         print((
             f'WARNING: Could not access {file_path}.\n'
             f'Using sample dataset from {c.SAMPLE_PATH}.'
