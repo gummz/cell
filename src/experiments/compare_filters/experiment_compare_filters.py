@@ -7,6 +7,7 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
+from time import time
 from skimage.filters import threshold_yen, frangi
 from skimage.exposure import rescale_intensity
 from skimage.io import imread, imsave
@@ -14,17 +15,21 @@ from skimage.io import imread, imsave
 import src.data.constants as c
 import src.data.utils.utils as utils
 
+tic = time()
 utils.setcwd(__file__)
 
 DIR = c.RAW_DATA_DIR
 ext = c.IMG_EXT
 files = c.RAW_FILES
 KERNEL = c.MEDIAN_FILTER_KERNEL
-imgs_path = join('..', c.DATA_DIR, f'{c.IMG_DIR}')
+mode = 'train'
+imgs_path = join('..', c.DATA_DIR, mode, c.IMG_DIR)
+filename = os.path.basename(__file__)
+filename = os.path.splitext(filename)[0]
 
 
 figures_dir = c.FIG_DIR
-folder = 'modify_single'
+folder = filename
 modification = ''
 
 
@@ -34,10 +39,10 @@ image_paths = sorted([join(imgs_path, image) for image in images])
 img_idx = 1500
 path = image_paths[img_idx]
 img_name = images[img_idx].split('.')[0]
-save = join(folder, img_name)
+save = join(c.FIG_DIR, mode, img_name)
 
 # Create image-specific directory
-utils.makedirs(save)
+utils.make_dir(save)
 
 img = np.int16(np.load(path))
 img = cv2.normalize(img, img, alpha=0, beta=255,
@@ -73,16 +78,28 @@ plt.imsave(join(save, f'img_plt.{ext}'), img)
 #             plt.imsave(
 #                 f'{save}/_TEST_{operation}_plt_{img_name}_{i}_{j}_{k}.{ext}', img_denoise)
 
-operation = 'frangi'
-for alpha in np.linspace(0.1, 1, 10):
-    for beta in np.linspace(0.1, 1, 10):
-        for gamma in np.linspace(1, 30, 5):
-            img_frangi = frangi(img, alpha=alpha, beta=beta,
-                                gamma=gamma, black_ridges=False)
-            name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
-            plt.imsave(f'{save}/{name}.{ext}', img_frangi)
+# operation = 'frangi'
+# for alpha in np.linspace(0.1, 1, 10):
+#     for beta in np.linspace(0.1, 1, 10):
+#         for gamma in np.linspace(1, 30, 5):
+#             img_frangi = frangi(img, alpha=alpha, beta=beta,
+#                                 gamma=gamma, black_ridges=False)
+#             name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
+#             plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
 # TODO: Canny edge detection
+img_canny_norm = cv2.normalize(img, None, alpha=0, beta=255,
+                               dtype=cv2.CV_16SC1, norm_type=cv2.NORM_MINMAX)
+operation = 'canny'
+for thresh1 in [20, 50, 80, 100, 150, 200]:
+    for thresh2 in [20, 50, 80, 100, 150, 200]:
+        for aperture_size in [1, 3, 5, 7]:
+            for L2_gradient in [True, False]:
+                img_canny = cv2.Canny(
+                    img_canny_norm, thresh1, thresh2, aperture_size, L2_gradient)
+                name = (f'canny_{thresh1}_{thresh2}'
+                        f'_{aperture_size}_{L2_gradient}')
+                utils.imsave(join(save, name), img_canny, 512)
 
 # Operation
 # Simple Threshold
@@ -113,5 +130,5 @@ for alpha in np.linspace(0.1, 1, 10):
 # plt.show()
 # plt.savefig(f'{save}/{img_name}_{operation}.jpg')
 
-
-print('modify_single.py complete')
+elapsed = utils.time_report(tic, time())
+print(f'{filename} complete after {elapsed}.')
