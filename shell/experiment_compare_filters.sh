@@ -4,7 +4,7 @@
 #BSUB -q gpuv100
 ### For Gpu: -q gpuv100 or gpua100
 ### -- set the job Name --
-#BSUB -J modify_single
+#BSUB -J compare_filters
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 1
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -41,4 +41,4 @@ source ../venv_1/bin/activate
 # python3 -m pip --disable-pip-version-check install scikit-image
 
 # Run file
-python3 ../src/visualization/modify_single.py > pyout
+python3 ../src/experiments/compare_filters/experiment_compare_filters.py > pyout

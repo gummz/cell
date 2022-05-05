@@ -149,8 +149,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         img = cv2.normalize(img, None, alpha=0, beta=255,
                             dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
         if self.img_filter:
-            img_filter = self.img_filter['filter']
-            args = self.img_filter['args']
+            img_filter, args = self.img_filter
             img = img_filter(img, *args)
         # END PREPROCESSING
 

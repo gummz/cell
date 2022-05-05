@@ -61,6 +61,15 @@ def del_multiple(list_object, indices):
             list_object.pop(idx)
 
 
+def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
+    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
+    img_canny = cv2.Canny(
+        img, threshold1, threshold2,
+        apertureSize=aperture_size, L2gradient=L2_gradient)
+
+    return img_canny
+
+
 def get_czi_dims(metadata):
     search_T = './Metadata/Information/Image/SizeT'
     search_Z = './Metadata/Information/Image/SizeZ'
