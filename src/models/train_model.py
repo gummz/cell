@@ -117,7 +117,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 losses = sum(losses)
 
-                if j % 100 == 0:
+                if j % 100 == 0 and write:
                     writer.add_scalar('training loss',
                                       float(scaler.scale(losses)) / 100,
                                       epoch * len(data_tr) + j)
@@ -158,8 +158,9 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 # TODO: make sure scheduler works
                 # by printing out the learning rate each epoch
+                if write:
+                    writer.add_scalar('validation loss', float(val_losses), epoch)
 
-                writer.add_scalar('validation loss', float(val_losses), epoch)
                 tot_val_losses.append(val_losses.item())
 
                 # if i == save_every:
@@ -192,8 +193,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
                 writer.add_image(f'epoch_{epoch}', image_grid,
                                  epoch, dataformats='NCHW')
 
-            writer.add_hparams(
-                hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
+                writer.add_hparams(
+                    hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
 
         scheduler.step(val_losses)
 
