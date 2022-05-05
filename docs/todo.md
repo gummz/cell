@@ -14,6 +14,7 @@
         - axes with ticks for easy coordinates
         - overlay with tubes (channel other than 0)
         - from `centroids_np`, just use `t`, `x`, `y`, `p` (particle) 
+        - turn up signal of cells
         - plot coordinates onto MIP of raw timepoint
 
 - Look at if I can use COCO Eval
