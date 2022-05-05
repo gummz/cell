@@ -1,3 +1,5 @@
+- Submit bug report to AICSImageIO GitHub regarding memory leakage
+
 - `slice_to_mip.py`: input is slice of timepoint of file, output is MIP of timepoint of file. Some images will be identical (because they are from the same timepoint) but that's okay.
 
 - Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot)
@@ -26,6 +28,7 @@
         - Investigate how much training data is needed
         - Investigate how many images with manual labels are needed 
         - Investigate which filter (or no filter) is best on original image
+            - Add Canny edge detection
     - Preprocessing: filters, thresholds
         - Frangi, median, mean, Gaussian: choose two
         - Adaptive, simple thresholding
