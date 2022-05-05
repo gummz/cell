@@ -38,7 +38,7 @@ source ../venv_1/bin/activate
 ###python3 -m pip --disable-pip-version-check install matplotlib
 ###python3 -m pip --disable-pip-version-check install opencv-python==3.4.16.57
 ###python3 -m pip --disable-pip-version-check install -e ../.
-python3 -m pip --disable-pip-version-check install scikit-image
+# python3 -m pip --disable-pip-version-check install scikit-image
 
 # Run file
 python3 ../src/visualization/modify_single.py > pyout
