@@ -1,6 +1,7 @@
 import datetime
 import math
 from time import time
+import cv2
 
 import numpy as np
 import optuna
@@ -9,7 +10,6 @@ import src.data.constants as c
 import src.data.utils.utils as utils
 import pickle
 from src.models.BetaCellDataset import get_dataloaders
-from src.models.eval_model import eval_model
 from src.models.train_model import train
 from src.models.utils.model import get_instance_segmentation_model
 from torch import optim
@@ -26,6 +26,15 @@ def objective(trial):
     batch_size = trial.suggest_int('batch_size', 1, 32)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
+    filters = [
+        None,
+        {'filter': cv2.blur, 'args': [(5, 5)]},
+        {'filter': cv2.GaussianBlur, 'args': [(5, 5), 0]},
+        {'filter': cv2.medianBlur, 'args': [5]},
+        {'filter': cv2.bilateralFilter, 'args': [9, 75, 75]},
+        {'filter': cv2.fastNlMeansDenoising, 'args': [None, 11, 7, 21]}
+    ]
+    img_filter = trial.suggest_categorical('img_filter', filters)
     image_size = 1024  # trial.suggest_int('image_size', 28, 512)
     loss_list = [
         'loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
@@ -45,7 +54,7 @@ def objective(trial):
 
     data_tr, data_val = get_dataloaders(
         root=join('..', c.DATA_DIR),
-        batch_size=batch_size, num_workers=1, resize=image_size, n_img_ratio=0.1, manual_select=manual_select)
+        batch_size=batch_size, num_workers=1, resize=image_size, n_img_ratio=0.1, manual_select=manual_select, img_filter=img_filter)
 
     model = get_instance_segmentation_model(pretrained=True)
     model.to(device)
@@ -53,8 +62,8 @@ def objective(trial):
     hparam_dict = {
         'batch_size': batch_size,
         'losses': ';'.join(loss_list),
+        'image_size': image_size,
         'size': image_size
-
     }
     params = [p for p in model.parameters() if p.requires_grad]
     opt = optim.Adam(params, lr=lr,
@@ -92,14 +101,10 @@ def objective(trial):
 if __name__ == '__main__':
     tic = time()
     optuna.logging.set_verbosity(optuna.logging.DEBUG)
-
     utils.setcwd(__file__)
-    # unique identifier for newly saved objects
-    now = datetime.datetime.now()
-    time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
 
     study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=300)
+    study.optimize(objective, n_trials=800)
 
     # save study
     df = study.trials_dataframe()
@@ -107,4 +112,5 @@ if __name__ == '__main__':
     pickle.dump(study, open('train_study.pkl', 'wb'))
 
     # print elapsed time of script
-    utils.time_report(__file__, tic, time())
+    elapsed = utils.time_report(tic, time())
+    print(f'Training grid search complete in {elapsed}.')
