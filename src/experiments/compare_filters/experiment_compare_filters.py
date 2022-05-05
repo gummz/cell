@@ -88,17 +88,18 @@ plt.imsave(join(save, f'img_plt.{ext}'), img)
 #             plt.imsave(f'{save}/{name}.{ext}', img_frangi)
 
 # TODO: Canny edge detection
-img_canny_norm = cv2.normalize(img, None, alpha=0, beta=255,
-                               dtype=cv2.CV_16SC1, norm_type=cv2.NORM_MINMAX)
+img_canny_norm = cv2.normalize(img, alpha=0, beta=255,
+                               dtype=cv2.CV_8SC1, norm_type=cv2.NORM_MINMAX)
 operation = 'canny'
 for thresh1 in [20, 50, 80, 100, 150, 200]:
     for thresh2 in [20, 50, 80, 100, 150, 200]:
         for aperture_size in [1, 3, 5, 7]:
             for L2_gradient in [True, False]:
-                img_canny = cv2.Canny(
-                    img_canny_norm, thresh1, thresh2, aperture_size, L2_gradient)
                 name = (f'canny_{thresh1}_{thresh2}'
                         f'_{aperture_size}_{L2_gradient}')
+                img_canny = cv2.Canny(
+                    img_canny_norm, thresh1, thresh2, aperture_size, L2_gradient)
+
                 utils.imsave(join(save, name), img_canny, 512)
 
 # Operation
