@@ -27,7 +27,11 @@
     - Active slices
     - Hyperparameter grid search with optuna (incl pretrained)
         - Investigate how much training data is needed
-        - Investigate how many images with manual labels are needed 
+        - Investigate how many images with manual labels are needed
+            - Validate the model on:
+                - no manual labels
+                - incrementally increasing number of manual labels
+                - i.e., load the validation DataLoader with manual_select=0, 0.1, etc.
         - Investigate which filter (or no filter) is best on original image
             - Add Canny edge detection
     - Preprocessing: filters, thresholds
