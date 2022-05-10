@@ -12,7 +12,7 @@ def track(chains: list):
     df_chains = pd.DataFrame(
         chains, columns=columns, dtype=float
     )
-    tr = trackpy.link(df_chains[columns], 5)
+    tr = trackpy.link(df_chains[columns], c.TRACK_RADIUS)
 
     return list(tr.groupby('frame'))
     """
