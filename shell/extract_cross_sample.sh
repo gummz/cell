@@ -3,15 +3,15 @@
 ### -- specify queue -- 
 #BSUB -q hpc
 ### -- set the job Name -- 
-#BSUB -J slice_to_mip
+#BSUB -J extract_cross_sample
 ### -- ask for number of cores (default: 1) -- 
 #BSUB -n 4 
 ### -- specify that the cores must be on the same host -- 
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need 1GB of memory per core/slot -- 
-#BSUB -R "rusage[mem=12GB]"
+#BSUB -R "rusage[mem=3GB]"
 ### -- specify that we want the job to get killed if it exceeds 3 GB per core/slot -- 
-#BSUB -M 13GB
+#BSUB -M 3GB
 ### -- set walltime limit: hh:mm -- 
 #BSUB -W 24:00 
 
@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/data/slice_to_mip.py > pyout_mip
+python3 ../src/data/extract_cross_sample.py > pyout_sample

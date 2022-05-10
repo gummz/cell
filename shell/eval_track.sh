@@ -3,7 +3,7 @@
 ### -- specify queue -- 
 #BSUB -q hpc
 ### -- set the job Name -- 
-#BSUB -J extract_sample
+#BSUB -J eval_track
 ### -- ask for number of cores (default: 1) -- 
 #BSUB -n 4 
 ### -- specify that the cores must be on the same host -- 
@@ -25,6 +25,7 @@
 #BSUB -eo err
 
 module load python3/3.8.11
+module load ffmpeg/5.0.1
 ###python3 -m venv ../venv_1
 source ../venv_1/bin/activate
 
@@ -40,4 +41,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/data/extract_sample.py > pyout_sample
+python3 ../src/tracking/eval_track.py > pyout_track
