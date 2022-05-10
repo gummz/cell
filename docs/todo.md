@@ -1,8 +1,5 @@
-- Submit bug report to AICSImageIO GitHub regarding memory leakage
-
-- `slice_to_mip.py`: input is slice of timepoint of file, output is MIP of timepoint of file. Some images will be identical (because they are from the same timepoint) but that's okay.
-
-- Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot)
+- Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot) (is it?)
+    - Investigate what should be considered a high intensity, so that I can determine when a cell activates
 
 - Tracking cells
     - Feed centers into TrackPy
@@ -41,11 +38,17 @@
 
 - Create `make` commands for json, train, test, etc.
 
-- Create a diary with recent runs (some may need to be rerun)
+- Logging, multithread/multiprocessing, learn tensorboard better
+
+- Submit bug report to AICSImageIO GitHub regarding memory leakage
 
 - - -
 
 *Done*
+
+- `slice_to_mip.py`: input is slice of timepoint of file, output is MIP of timepoint of file. Some images will be identical (because they are from the same timepoint) but that's okay.
+
+- Threshold boxes and masks with regard to score
 
 - Visualize centers from predict_model.py
 
