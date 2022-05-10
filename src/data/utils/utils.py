@@ -9,6 +9,7 @@ from aicsimageio import AICSImage
 import pickle
 import torch
 import matplotlib.pyplot as plt
+import matplotlib as mplt
 import io
 
 
@@ -90,15 +91,36 @@ def get_czi_dims(metadata):
     return dims
 
 
-def set_device():
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    return device
+def get_mask(output):
+    '''Consolidates the masks into one mask.'''
+    if type(output) == dict:  # `output` is direct output of model (from one image)
+        mask = output['masks']
+    else:
+        mask = output  # target is a tensor of masks (from one image)
+
+    mask = torch.squeeze(mask, dim=1)
+
+    if mask.shape[0] != 0:
+        mask = torch.max(mask, dim=0).values
+    else:
+        try:
+            mask = torch.zeros((mask.shape[1], mask.shape[2])).to(
+                mask.get_device())
+        except RuntimeError:  # no GPU
+            mask = torch.zeros((mask.shape[1], mask.shape[2]))
+
+    # mask = np.array(mask)
+    # mask = np.where(mask > 255, 255, mask)
+    # mask = np.where(mask > 200, 255, 0)
+    mask = mask.clone().detach().type(torch.uint8)
+    # torch.tensor(mask, dtype=torch.uint8)
+
+    return mask
 
 
 def get_model(time_str: str, device: torch.device):
 
-    folder = f'interim/run_{time_str}'
+    folder = f'../models/interim/run_{time_str}'
 
     # Load model
     load_path = join(folder, f'model_{time_str}.pkl')
@@ -115,12 +137,15 @@ def get_model(time_str: str, device: torch.device):
     return model
 
 
-def get_raw_array(file_path, which, idx, channel=c.CELL_CHANNEL):
+def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     Output is 4D (timepoints and xyz spatial dimensions)
     '''
+    if t is None and z is None:
+        return None
+
     if os.path.exists(file_path):
         raw_data = AICSImage(file_path)
     else:
@@ -130,40 +155,26 @@ def get_raw_array(file_path, which, idx, channel=c.CELL_CHANNEL):
             f'Using sample dataset from {c.SAMPLE_PATH}.'
         ))
 
-    if which == 'timepoint':
-        if '.czi' not in file_path:
-            if type(idx) == tuple:
-                data = raw_data.get_image_dask_data(
-                    'TZXY', T=idx, C=channel)
-            elif type(idx) == int:
-                data = raw_data.get_image_dask_data(
-                    'ZXY', T=idx, C=channel)
-        else:
-            dims = get_czi_dims(raw_data.metadata)
+    t_tuple = 'T' if type(t) != int or t is None else ''
+    z_tuple = 'Z' if type(z) != int or z is None else ''
+    channel_tuple = 'C' if type(ch) != int or ch is None else ''
+    order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
 
-            if type(idx) == tuple:
-                data = raw_data.get_image_dask_data(
-                    'TZXY', T=idx, C=channel)
-            elif type(idx) == int:
-                data = raw_data.get_image_dask_data(
-                    'ZXY', T=idx, C=channel)
-    elif which == 'slice':
-        if '.czi' not in file_path:
-            if type(idx) == tuple:
-                data = raw_data.get_image_dask_data(
-                    'TZXY', Z=idx, C=channel)
-            elif type(idx) == int:
-                data = raw_data.get_image_dask_data(
-                    'TXY', Z=idx, C=channel)
-        else:
-            dims = get_czi_dims(raw_data.metadata)
+    data = None
 
-            if type(idx) == tuple:
-                data = raw_data.get_image_dask_data(
-                    'TZXY', Z=idx, C=channel)
-            elif type(idx) == int:
-                data = raw_data.get_image_dask_data(
-                    'TXY', Z=idx, C=channel)
+    if t is not None and z is None:
+        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
+        data = raw_data.get_image_dask_data(
+            order, T=t, C=ch)
+
+    elif t is None and z is not None:
+        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
+        data = raw_data.get_image_dask_data(
+            order, Z=z, C=ch)
+
+    elif t is not None and z is not None:
+        data = raw_data.get_image_dask_data(
+            order, T=t, Z=z, C=ch)
 
     return data
 
@@ -200,15 +211,19 @@ def get_raw_array(file_path, which, idx, channel=c.CELL_CHANNEL):
 def imsave(path, img, resize=512):
     dirs = os.path.dirname(path)
     make_dir(dirs)
-
-    if type(img) != np.ndarray:
-        img = np.array(img)
-    if len(img.shape) > 2:
-        img = img[0]
-    if resize:
-        img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
     if path[-4:] not in ['.png', '.jpg']:
         path += '.jpg'
+
+    if type(img) == mplt.figure.Figure:
+        img.savefig(path)
+        return
+    else:
+        if type(img) != np.ndarray:
+            img = np.array(img)
+        if len(img.shape) > 2:
+            img = img[0]
+        if resize:
+            img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
     plt.imsave(path, img)
 
@@ -224,10 +239,15 @@ def make_dir(path):
             pass
 
 
-def normalize(img, alpha, beta, out):
-    if type(img) != np.ndarray:
-        img = np.array(img)
-    return cv2.normalize(img, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
+def normalize(image, alpha, beta, out, device=None):
+    if type(image) == torch.Tensor:
+        image = image.cpu().numpy()
+        normalized = cv2.normalize(image, None, alpha=alpha,
+                                   beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
+        return torch.tensor(normalized,
+                            device=device
+                            if device else set_device())
+    return cv2.normalize(image, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
 
 
 def record_dict(t, slice_idx):
@@ -235,6 +255,16 @@ def record_dict(t, slice_idx):
     # slice_idx = [str(idx) for idx in slice_idx]
     record = {t: slice_idx}
     return record
+
+
+def set_device(device_str: str = None):
+    if device_str:
+        device = torch.device(device_str)
+        return device
+
+    device = torch.device(
+        'cuda') if torch.cuda.is_available() else torch.device('cpu')
+    return device
 
 
 def setcwd(file_path):
