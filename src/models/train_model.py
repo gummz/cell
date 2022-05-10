@@ -13,7 +13,7 @@ from memory_profiler import profile
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from src.models.predict_model import get_mask
+from src.data.utils.utils import get_mask
 import src.data.utils.utils as utils
 import torch
 import torch.nn as nn
@@ -42,6 +42,7 @@ from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders
 
 def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False, write=False):
     '''Train'''
+    torch.backends.cudnn.benchmark = True
     print(f'Training has begun for model: {time_str}')
 
     size = hparam_dict['image_size']
@@ -52,7 +53,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # 2 gb used
 
     scheduler = ReduceLROnPlateau(opt, threshold=0.01, verbose=True)
-    log_every = 1  # How often to print out losses
+    log_every = 5  # How often to print out losses
     save_every = 10  # How often to save model
     scaler = GradScaler()
     loss_list = hparam_dict['losses'].split(';')
@@ -133,7 +134,6 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
             # End training loop for epoch
 
-        toc = time()
         tot_train_losses.append(train_loss)
 
         if i % log_every == 0:
@@ -141,8 +141,9 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
             if torch.isnan(torch.tensor(train_loss)) or math.isnan(train_loss):
                 print('training loss is nan\n')
                 return train_loss, np.nan
+            elapsed = utils.time_report(tic, time())
             time_print = f'''Training loss: {train_loss: .3f};
-                        Time: {(toc-tic)/60: .1f} minutes'''
+                        Time: {elapsed}'''
             print(time_print)
 
         # Validation
@@ -158,8 +159,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 # TODO: make sure scheduler works
                 # by printing out the learning rate each epoch
-                if write:
-                    writer.add_scalar('validation loss', float(val_losses), epoch)
+                # if write:
+                writer.add_scalar('validation loss', float(val_losses), epoch)
 
                 tot_val_losses.append(val_losses.item())
 
@@ -173,8 +174,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
                 # yhat_boxes = [y['boxes']] .....
                 # Convert y_hat to CUDA
                 # y_hat = to_device([y_hat], device)
-                y_hat = [{k: v.to(device) for k, v in t.items()}
-                         for t in y_hat]
+                # y_hat = [{k: v.to(device) for k, v in t.items()}
+                #          for t in y_hat]
                 # Strip everything except masks
                 y_hat, y_val = y_to_mask([y_hat, y_val])
                 # Consolidate masks in batch
@@ -183,18 +184,16 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
             # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
             x_val = [x.squeeze() for x in x_val]
-            # print([x.shape for x in x_val])
-            # print([y.shape for y in y_hat])
-            # print([y.shape for y in y_val], '\n\n')
 
+        if write:
             image_grid = create_grid(x_val, y_val, y_hat,
                                      batch_size)
-            if write:
-                writer.add_image(f'epoch_{epoch}', image_grid,
-                                 epoch, dataformats='NCHW')
 
-                writer.add_hparams(
-                    hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
+            writer.add_image(f'epoch_{epoch}', image_grid,
+                             epoch, dataformats='NCHW')
+
+            # writer.add_hparams(
+            #     hparam_dict, {'hparam/loss': val_losses.item()}, run_name=f'runs/{time_str}')
 
         scheduler.step(val_losses)
 
@@ -240,7 +239,6 @@ def to_device(tensor_list, device):
         elif type(batch) == torch.Tensor:
             batch = [x.to(device) for x in batch]
         main_list.append(batch)
-    print(main_list[0][0].is_cuda)
     return main_list
 
 
@@ -283,10 +281,7 @@ def debug_opencv_mask():
 
 def dump_model(model, time_str):
     # Make folder unique to this run in order to save model and loss
-    try:
-        utils.make_dir(save)
-    except FileExistsError:
-        pass
+    utils.make_dir(save)
 
     pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
 
@@ -353,7 +348,7 @@ if __name__ == '__main__':
     beta2 = 0.61231
 
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=1, resize=size, n_img_ratio=0.1, manual_select=1)
+        batch_size=batch_size, num_workers=1, resize=size, n_img_select=0.1, manual_select=1)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
@@ -396,7 +391,7 @@ if __name__ == '__main__':
 
     with SummaryWriter(f'runs/{time_str}') as w:
         losses = train(model, device, opt, num_epochs,
-                       data_tr, data_val, time_str, hparam_dict, w, True)
+                       data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
         w.add_text('description', description)
 
     losses = np.array(losses).T
