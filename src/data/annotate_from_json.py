@@ -220,5 +220,5 @@ if __name__ == "__main__":
     utils.setcwd(__file__)
     # for mode in ['train', 'val', 'test']:
     annotate_from_json(mode='train')
-    utils.time_report(__file__, tic, time())
-
+    elapsed = utils.time_report(tic, time())
+    print(f'annotate_from_json completed after {elapsed}.')
