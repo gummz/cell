@@ -259,7 +259,7 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
     masks_tot = [pred['masks'] for pred in preds]
     centers_tot = []
 
-    image_iter = zip(timepoint.squeeze(1), masks_tot, bboxes_tot)
+    image_iter = zip(timepoint, masks_tot, bboxes_tot)
     for z, (z_slice, masks, bboxes) in enumerate(image_iter):  # each slice
         centers = []
 

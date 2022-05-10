@@ -8,12 +8,11 @@ import pickle
 
 
 def track(chains: list):
-    print(len(chains), len(chains[0]))
-
+    columns = ['frame', 'x', 'y', 'z', 'intensity']
     df_chains = pd.DataFrame(
-        chains, columns=['frame', 'x', 'y', 'z', 'intensity'], dtype=float
+        chains, columns=columns, dtype=float
     )
-    tr = trackpy.link(df_chains[['frame', 'x', 'y', 'z']], 5)
+    tr = trackpy.link(df_chains[columns], 5)
 
     return list(tr.groupby('frame'))
     """

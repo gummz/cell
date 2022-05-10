@@ -6,17 +6,19 @@ import numpy as np
 import src.data.constants as c
 import src.data.utils.utils as utils
 from matplotlib.colors import ListedColormap
-import cv2
 import skvideo.io
+import src.visualization.utils as viz
+
+from src.tracking.eval_track import eval_track
 
 
 def create_movie(location, time_range):
     utils.make_dir(location)
     images = sorted([image for image in listdir(location)
-              if '.png' in image and
-              int(splitext(image)[0]) in time_range])
+                     if '.png' in image and
+                     int(splitext(image)[0]) in time_range])
 
-    name = f'movie_prediction{time_range[0]}_{time_range[-1]}.mp4'
+    name = f'movie_prediction_{time_range[0]}_{time_range[-1]}.mp4'
     rate = '1'
 
     vid_out = skvideo.io.FFmpegWriter(join(location, name),
@@ -30,7 +32,7 @@ def create_movie(location, time_range):
     })
 
     for i, image in enumerate(images):
-        array = cv2.imread(join(location, image))[:, :, 0]
+        array = plt.imread(join(location, image))
         vid_out.writeFrame(array)
 
     vid_out.close()
@@ -38,8 +40,10 @@ def create_movie(location, time_range):
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
-    X, Y, Z, I = np.split(points, 4, 1)
-    return X, Y, Z, I, get_cmap()
+    print(points.shape)
+    print(points)
+    _, X, Y, Z, I, P = np.split(points, 6, 1)
+    return X, Y, Z, I, P, get_cmap()
 
 
 def get_cmap():
@@ -61,12 +65,23 @@ def get_cmap():
 def save_figures(centroids, save):
     utils.make_dir(save)
     file = save.split('/')[-2]
-    for i, timepoint in enumerate(centroids):
+    max_array = [frame.intensity.values for _, frame in centroids]
+    max_array = np.concatenate(max_array)
+    # colors = viz.get_colors(max_array, 'winter')
+    for j, (_, frame) in enumerate(centroids):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-        X, Y, Z, I, cmap = prepare_3d(timepoint)
+        X, Y, Z, I, P, cmap = prepare_3d(frame)
+
+        # TODO: normalize I for frames in `centroids`
 
         # switch Z and Y because we want Z to be depth
-        ax.scatter(X, Z, Y, c=I, cmap=cmap)
+        for x, y, z, i, p in zip(X, Y, Z, I, P):
+            if i < c.ACTIVE_THRESHOLD:
+                marker = 'x'
+            else:
+                marker = 'o'
+            ax.scatter(x, z, y, c=i, cmap=cmap, marker=marker)
+            ax.text(x, z, y, p)
 
         ax.set_xlim3d(0, 1025)
         ax.set_ylim3d(0, 50)

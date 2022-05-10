@@ -107,8 +107,6 @@ def get_prediction(model, device, input):
         # only choose one image
         # visualize this exact image I'm sending to the model
         input = input.to(device)
-        # print(np.unique(img.cpu()))
-        # TODO: put target into model to see if it segments
         pred = model([input])
 
     # pred list only has one item because we only chose one image

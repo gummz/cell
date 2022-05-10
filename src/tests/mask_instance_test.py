@@ -30,7 +30,6 @@ for segments, outputs in zip(segments_list, outputs_list):
         # But this doesn't matter because only nonzero
         # is being tested below.
 
-        # TODO: something wrong in the != 1 case
         # no::: the algorithm detected a blob that wans't there.
         # tolerance for erroneous detections?
 

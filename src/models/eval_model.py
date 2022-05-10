@@ -21,7 +21,7 @@ def eval_model(model, dataloader, mode='val'):
             (With Optuna in grid search, not in here)
     '''
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = utils.set_device()
     print(f'Running on {device}.')
 
     scores_mask = np.zeros(len(dataloader))
@@ -215,11 +215,10 @@ if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
 
-    time_str = '29_04_21H_43M_43S'
-    model = utils.get_model(time_str, utils.set_device())
+    model = utils.get_model(c.MODEL_STR, utils.set_device())
     dataset = BetaCellDataset(
         transforms=get_transform(train=False), mode='val',
-        n_img_ratio=1, manual_select=1)
+        n_img_select=1, manual_select=1)
     dataloader = DataLoader(dataset, batch_size=1,
                             shuffle=False, num_workers=1, collate_fn=collate_fn)
 

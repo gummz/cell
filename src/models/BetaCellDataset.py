@@ -26,7 +26,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
     '''Dataset class for beta cell data'''
 
     def __init__(self, root=c.DATA_DIR, transforms=None,
-                 resize=1024, mode='train', n_img_ratio=1,
+                 resize=1024, mode='train', n_img_select=1,
                  manual_select=0, img_filter=None):
         '''
         Inputs:
@@ -55,12 +55,12 @@ class BetaCellDataset(torch.utils.data.Dataset):
         masks_full = sorted([mask for mask in listdir(
             join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask])
 
-        if n_img_ratio < 1:
+        if n_img_select < 1:
             # don't need min( len(imgs), len(masks_full) )
             # yet because we don't yet know how many full
             # annotations the user has asked for (i.e.
             # manual_select); that is below this clause
-            k = int(n_img_ratio * len(imgs))
+            k = int(n_img_select * len(imgs))
             imgs = imgs[:k]
             masks = masks[:k]
             masks_full = masks_full[:k]
@@ -77,6 +77,11 @@ class BetaCellDataset(torch.utils.data.Dataset):
             #                           min(len_imgs, len(masks_full)), n_img_include)
             # for img_list in [imgs, masks, masks_full]:
             #     utils.del_multiple(img_list, index)
+        elif n_img_select > 1:
+            k = n_img_select
+            imgs = imgs[:k]
+            masks = masks[:k]
+            masks_full = masks_full[:k]
 
         # masks:       ----------------------------
         # masks_full:  ----------
@@ -225,6 +230,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
             img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
             img = F.pil_to_tensor(Image.fromarray(img))
+            # img = img.unsqueeze(0)
 
         # TODO:
         # https://stackoverflow.com/questions/66370250/how-does-pytorch-dataloader-interact-with-a-pytorch-dataset-to-transform-batches
@@ -240,7 +246,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
 
 def get_dataloaders(root=c.DATA_DIR, batch_size=4,
-                    num_workers=1, resize=1024, n_img_ratio=1,
+                    num_workers=1, resize=1024, n_img_select=1,
                     manual_select=0, img_filter=None):
     '''Get dataloaders.
         resize: resize image in __getitem__ method of dataset class.
@@ -251,11 +257,11 @@ def get_dataloaders(root=c.DATA_DIR, batch_size=4,
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
         root, get_transform(train=True), resize=resize,
-        mode='train', n_img_ratio=n_img_ratio,
+        mode='train', n_img_select=n_img_select,
         manual_select=manual_select, img_filter=img_filter)
     dataset_val = BetaCellDataset(
         root, get_transform(train=False), resize=resize,
-        mode='val', n_img_ratio=1, manual_select=1, img_filter=img_filter)
+        mode='val', n_img_select=1, manual_select=1, img_filter=img_filter)
 
     # split the dataset in train and test set
     # torch.manual_seed(1)

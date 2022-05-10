@@ -119,7 +119,7 @@ for alpha in np.linspace(0.1, 1, 10):
             name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
             utils.imsave(join(save, operation, name), img_frangi)
 
-# TODO: Canny edge detection
+
 operation = 'canny'
 utils.make_dir(join(save, operation))
 for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:

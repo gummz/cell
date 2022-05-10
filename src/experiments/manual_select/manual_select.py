@@ -7,7 +7,7 @@ from os.path import join
 import src.data.constants as c
 import src.data.utils.utils as utils
 import pickle
-from src.models.BetaCellDataset import get_dataloaders
+from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
 from src.models.eval_model import eval_model
 from src.models.train_model import train
 from src.models.utils.model import get_instance_segmentation_model
@@ -44,9 +44,13 @@ def objective(trial):
     weight_decay = 0.0007618
     # end hyperparameters
 
+    root = join('..', c.DATA_DIR)
     data_tr, data_val = get_dataloaders(
-        root=join('..', c.DATA_DIR),
-        batch_size=batch_size, num_workers=1, resize=image_size, n_img_ratio=0.1, manual_select=manual_select)
+        root=root,
+        batch_size=batch_size, num_workers=1, resize=image_size, n_img_select=0.1, manual_select=manual_select)
+    data_val_no_manual = BetaCellDataset(root=root,
+                                         transforms=get_transform(train=False), resize=image_size,
+                                         mode='val', n_img_select=1, manual_select=0, img_filter=None)
 
     model = get_instance_segmentation_model(pretrained=True)
     model.to(device)
@@ -73,7 +77,12 @@ def objective(trial):
         train_loss, val_loss = train(
             model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
 
+    # need to eval model twice for every trial
+    # once where validation set has no manual labels,
+    # and once where validation set has all manual labels
+    # (to get a better feeling for how well it does)
     results = eval_model(model, data_val, 'val')
+    results_no_manual = eval_model(model, data_val_no_manual, 'val')
     tp, fp = results[0][0][0], results[0][1][0]
     sensitivity = tp / (fp + tp)
     # return val_loss
@@ -103,5 +112,5 @@ if __name__ == '__main__':
     df.to_csv('manual_select_study.csv')
     pickle.dump(study, open('manual_select_study.pkl', 'wb'))
     # print elapsed time of script
-    
+
     print(f'manual_select.py complete after {utils.time_report(tic, time())}.')
