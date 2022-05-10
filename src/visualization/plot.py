@@ -9,8 +9,6 @@ from matplotlib.colors import ListedColormap
 import skvideo.io
 import src.visualization.utils as viz
 
-from src.tracking.eval_track import eval_track
-
 
 def create_movie(location, time_range):
     utils.make_dir(location)
@@ -40,9 +38,8 @@ def create_movie(location, time_range):
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
-    print(points.shape)
-    print(points)
-    _, X, Y, Z, I, P = np.split(points, 6, 1)
+    _, X, Y, Z, I, P = [array[0]
+                        for array in np.split(points.T, 6)]
     return X, Y, Z, I, P, get_cmap()
 
 
@@ -80,6 +77,7 @@ def save_figures(centroids, save):
                 marker = 'x'
             else:
                 marker = 'o'
+
             ax.scatter(x, z, y, c=i, cmap=cmap, marker=marker)
             ax.text(x, z, y, p)
 
@@ -89,9 +87,10 @@ def save_figures(centroids, save):
         ax.set_xlabel('X dimension')
         ax.set_ylabel('Z dimension')
         ax.set_zlabel('Y dimension')
-        ax.set_title(f'File: {file}\nTimepoint: {i}')
+        ax.set_title(f'File: {file}\nTimepoint: {j}')
 
-        plt.savefig(join(save, f'{i:05d}.png'),
+        plt.show()
+        plt.savefig(join(save, f'{j:05d}.png'),
                     dpi=300, bbox_inches='tight')
         plt.close()
 
