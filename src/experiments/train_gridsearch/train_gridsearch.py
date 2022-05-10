@@ -23,24 +23,25 @@ def objective(trial):
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
     amsgrad = trial.suggest_categorical('amsgrad', [True, False])
-    batch_size = trial.suggest_int('batch_size', 1, 32)
+    batch_sizes = (32, 64, 128, 256)
+    batch_size = trial.suggest_categorical('batch_size', batch_sizes)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
     # the parameters of these filters have been optimized
     # with experiments
     filters = {
         'none': None,
-        'mean': (cv2.blur, [(5, 5)]),
-        'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
-        'median': (cv2.medianBlur, [5]),
-        'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
+        # 'mean': (cv2.blur, [(5, 5)]),
+        # 'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
+        # 'median': (cv2.medianBlur, [5]),
+        # 'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
         'nlmeans': (cv2.fastNlMeansDenoising, [None, 11, 7, 21]),
-        'canny': (utils.canny_filter, [None, 20, 20, 3, False])
+        'canny': (utils.canny_filter, [20, 20, 3, False])
     }
     filter_optim = trial.suggest_categorical('filters', list(filters.keys()))
     img_filter = filters[filter_optim]
 
-    image_size = 1024  # trial.suggest_int('image_size', 28, 512)
+    image_size = 128  # trial.suggest_int('image_size', 28, 512)
     loss_list = [
         'loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
         'loss_classifier', 'loss_objectness'
@@ -52,14 +53,14 @@ def objective(trial):
     #     [loss_list[1:3]]
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
-    lr = trial.suggest_float('learning_rate', 1e-8, 1, log=True)
+    lr = trial.suggest_float('learning_rate', 1e-10, 1e-3, log=True)
     manual_select = 1  # trial.suggest_int('manual_ratio', 2, 27)
-    weight_decay = trial.suggest_float('weight_decay', 1e-5, 10, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2)
     # end hyperparameters
 
     data_tr, data_val = get_dataloaders(
         root=join('..', c.DATA_DIR),
-        batch_size=batch_size, num_workers=1, resize=image_size, n_img_ratio=0.1, manual_select=manual_select, img_filter=img_filter)
+        batch_size=batch_size, num_workers=4, resize=image_size, n_img_select=200, manual_select=manual_select, img_filter=img_filter)
 
     model = get_instance_segmentation_model(pretrained=True)
     model.to(device)
@@ -80,10 +81,10 @@ def objective(trial):
     time_str = f'{now.day:02d}_{now.month:02d}_{now.hour}H_{now.minute}M_{now.second}S'
 
     with SummaryWriter(f'runs/gridsearch/{trial.number}') as w:
-        print(lr, beta1, beta2, weight_decay,
+        print('\n', lr, beta1, beta2, weight_decay,
               batch_size, image_size, manual_select, '\n')
         train_loss, val_loss = train(
-            model, device, opt, 5, data_tr, data_val, time_str, hparam_dict, w)
+            model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
 
     # IOU results
     # if not math.isnan(train_loss):
