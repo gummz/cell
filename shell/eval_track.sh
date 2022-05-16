@@ -22,10 +22,11 @@
 ### -- Specify the output and error file. %J is the job-id -- 
 ### -- -o and -e mean append, -oo and -eo mean overwrite -- 
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_track
 
 module load python3/3.8.11
 module load ffmpeg/5.0.1
+opencv/3.2.0
 ###python3 -m venv ../venv_1
 source ../venv_1/bin/activate
 
