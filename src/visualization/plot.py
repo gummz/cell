@@ -3,7 +3,10 @@ from os.path import join, splitext
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
+import subprocess as sp
 import src.data.constants as c
+import cv2
 import src.data.utils.utils as utils
 from matplotlib.colors import ListedColormap
 import skvideo.io
@@ -15,32 +18,48 @@ def create_movie(location, time_range):
     images = sorted([image for image in listdir(location)
                      if '.png' in image and
                      int(splitext(image)[0]) in time_range])
+    start, end = time_range[0], time_range[-1]
+    name = f'movie_prediction_{start}_{end}.mp4'
 
-    name = f'movie_prediction_{time_range[0]}_{time_range[-1]}.mp4'
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # video = cv2.VideoWriter(join(location, name), fourcc, 1, (1200, 1548))
+
     rate = '1'
-
     vid_out = skvideo.io.FFmpegWriter(join(location, name),
                                       inputdict={
                                           '-r': rate,
     },
         outputdict={
-                                          '-vcodec': 'libx264',
+                                          '-vcodec': 'mpeg4',
                                           '-pix_fmt': 'yuv420p',
                                           '-r': rate,
     })
-
+    # vcodecs:
+    #    libx264
+    # mpeg4
+    # mp4als
     for i, image in enumerate(images):
         array = plt.imread(join(location, image))
+        array = array[:, :, :-1]
+        # print(array.shape)
+        # print(np.histogram(array))
+        # array = utils.normalize(array, 0, 255, cv2.CV_8UC1)
+        # video.write(array)
+        # print(array.shape)
+        # print(np.histogram(array))
         vid_out.writeFrame(array)
 
     vid_out.close()
+    # cv2.destroyAllWindows()
+    # video.release()
 
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
     _, X, Y, Z, I, P = [array[0]
                         for array in np.split(points.T, 6)]
-    return X, Y, Z, I, P, get_cmap()
+    return (X, Y, Z, I,
+            np.array(P, dtype=int), get_cmap())
 
 
 def get_cmap():
@@ -78,8 +97,8 @@ def save_figures(centroids, save):
             else:
                 marker = 'o'
 
-            ax.scatter(x, z, y, c=i, cmap=cmap, marker=marker)
-            ax.text(x, z, y, p)
+            ax.scatter(x, z, y, cmap=cmap, marker=marker)
+            # ax.text(x, z, y, p)
 
         ax.set_xlim3d(0, 1025)
         ax.set_ylim3d(0, 50)
@@ -89,7 +108,6 @@ def save_figures(centroids, save):
         ax.set_zlabel('Y dimension')
         ax.set_title(f'File: {file}\nTimepoint: {j}')
 
-        plt.show()
         plt.savefig(join(save, f'{j:05d}.png'),
                     dpi=300, bbox_inches='tight')
         plt.close()
