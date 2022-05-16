@@ -197,11 +197,10 @@ def bbox_contained(box1, box2):
     return box1_inside_box2
 
 
-def predict_ssh(raw_data_file: AICSImage,
-                time_idx: range,
-                device: torch.device,
-                model, save: str) -> list(tuple):
-    path = join(c.RAW_DATA_DIR, c.PRED_FILE)
+def predict(path: str,
+            time_idx: range,
+            device: torch.device,
+            model, save: str) -> list(tuple):
     chains_tot = []
 
     for t in time_idx:
@@ -215,9 +214,8 @@ def predict_ssh(raw_data_file: AICSImage,
         preds = get_predictions(model, device, timepoint)
 
         # Draw bounding boxes on slice for debugging
-        Z = raw_data_file.dims['Z'][0]
         viz.output_sample(join(save, 'debug'), t,
-                          timepoint_raw, preds, Z, 1024, device)
+                          timepoint_raw, preds, 1024, device)
 
         # adjust slices from being model inputs to being
         # inputs to get_chains
@@ -266,25 +264,6 @@ def prepare_model_input(array, device):
     return array
 
 
-def predict_local(timepoints, device, model):
-    # List to record centroids for all timepoints
-    # so each element represents centroids from a
-    # certain timepoint
-    centroids_list = []
-    for t, timepoint in enumerate(timepoints):
-        #  timepoint = raw_data_file.get_image_dask_data(
-        # 'ZYX', T=t, C=c.CELL_CHANNEL).compute()
-        timepoint = prepare_model_input(timepoint, device)
-        pred = get_predictions(model, device, timepoint)
-        centroids = CL.get_chains(timepoint, pred)
-
-        np.savetxt(join(c.DATA_DIR, f't_{t:02d}.csv'), centroids)
-
-        centroids_list.append(centroids)
-
-    return centroids_list
-
-
 if __name__ == '__main__':
 
     utils.setcwd(__file__)
@@ -308,18 +287,17 @@ if __name__ == '__main__':
 
     # either ssh with full data:
     path = join(c.RAW_DATA_DIR, c.PRED_FILE)
-    raw_data_file = AICSImage(path)
 
-    T = raw_data_file.dims['T'][0]
     # ... or local with small debug file:
-    # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
+    # path = np.load(c.SAMPLE_PATH)
 
     # # Choose time range
     time_start = 0
     time_end = 10
 
     time_range = range(time_start, time_end)
-    # centroids = predict_ssh(raw_data_file, time_range,
+    # path = join(c.RAW_DATA_DIR, c.PRED_FILE)
+    # centroids = predict(path, time_range,
     #                         device, model, save)
     # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
     centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
@@ -337,7 +315,8 @@ if __name__ == '__main__':
                 open(join(save, 'tracked_centroids.pkl'), 'wb'))
 
     location = join(save, 'timepoints')
-    plot.save_figures(tracked_centroids, location)
+    frames = tuple(tracked_centroids.groupby('frame'))
+    plot.save_figures(frames, location)
     plot.create_movie(location, time_range)
 
     # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])

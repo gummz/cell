@@ -11,10 +11,11 @@ import cv2
 import numpy as np
 
 
-def output_sample(save, t, timepoint_raw, pred, Z, size=512, device=None):
+def output_sample(save, t, timepoint_raw, pred, size=512, device=None):
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
     # Randomly sample 2 slices to debug (per timepoint)
+    Z = timepoint_raw.shape[0]
     debug_idx = np.random.randint(0, Z, 2)
     for i, (idx, z_slice) in enumerate(zip(debug_idx, timepoint_raw[debug_idx])):
         z_slice = np.int16(z_slice)
@@ -70,7 +71,7 @@ def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
 
 
 def get_colors(
-        max_array: ArrayLike,
+        max_item: ArrayLike,
         colormap: str):
     '''
     Returns color value for integer p.
@@ -85,9 +86,12 @@ def get_colors(
         color
     '''
     # find ceiling of color scale
-    scale_max = np.max(max_array)
-    if type(scale_max) == np.float64:
-        scale_max = len(max_array)
+    if type(max_item) == int:
+        # max_item is requested number of colors
+        scale_max = max_item
+    elif isinstance(max_item.dtype, np.dtype('float64')):
+        scale_max = len(max_item)
+
     cmap = plt.get_cmap(colormap)
     colors = [cmap(i) for i in np.linspace(0, 1, scale_max)]
 
