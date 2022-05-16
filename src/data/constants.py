@@ -6,12 +6,14 @@ from os.path import join
 ACTIVE_SLICES_RATIO = 0.025
 
 # CELL ACTIVATION THRESHOLD
-ACTIVE_THRESHOLD = 0.5
+ACTIVE_THRESHOLD = 1e-2
 
-# NEXT CENTER SEARCH RANGE
+# NEXT CENTER SEARCH RADIUS (pixels)
+# (stitching cells together between slices)
 SEARCHRANGE = 20
 
-# TRACKING RADIUS
+# TRACKING RADIUS (pixels)
+# (tracking cells in 3D space)
 TRACK_RADIUS = 10
 
 # LOGGING IMAGE SIZE
