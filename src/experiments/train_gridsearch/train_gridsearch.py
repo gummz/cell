@@ -31,10 +31,10 @@ def objective(trial):
     # with experiments
     filters = {
         'none': None,
-        # 'mean': (cv2.blur, [(5, 5)]),
-        # 'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
-        # 'median': (cv2.medianBlur, [5]),
-        # 'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
+        'mean': (cv2.blur, [(5, 5)]),
+        'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
+        'median': (cv2.medianBlur, [5]),
+        'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
         'nlmeans': (cv2.fastNlMeansDenoising, [None, 11, 7, 21]),
         'canny': (utils.canny_filter, [20, 20, 3, False])
     }
@@ -109,8 +109,9 @@ if __name__ == '__main__':
     optuna.logging.set_verbosity(optuna.logging.DEBUG)
     utils.setcwd(__file__)
 
+    # create study
     study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=800)
+    study.optimize(objective, n_trials=300)
 
     # save study
     df = study.trials_dataframe()
