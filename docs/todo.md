@@ -1,5 +1,13 @@
+- Histogram of all files to see which activation threshold to use
+
+- Use external video service to make videos from pngs
+
+- Join two or more studies (grid search)
+
 - Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot) (is it?)
     - Investigate what should be considered a high intensity, so that I can determine when a cell activates
+    - Use histogram over all timepoints of all
+        - sequential processing, one at a time, save to disk
 
 - Tracking cells
     - Feed centers into TrackPy
@@ -28,7 +36,7 @@
             - Validate the model on:
                 - no manual labels
                 - incrementally increasing number of manual labels
-                - i.e., load the validation DataLoader with manual_select=0, 0.1, etc.
+                - i.e., load the validation DataLoader with manual_select=0, and =1
         - Investigate which filter (or no filter) is best on original image
             - Add Canny edge detection
     - Preprocessing: filters, thresholds

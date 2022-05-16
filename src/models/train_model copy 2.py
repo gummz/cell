@@ -81,10 +81,6 @@ def train(model, opt, epochs, data_tr, data_val, time_str):
     '''Train'''
     print(f'Training has begun for model: {time_str}')
 
-    # TODO: send HPC support email
-    # regarding why it runs out of memory but shows only
-    # 2 gb used
-
     scheduler = ReduceLROnPlateau(opt, threshold=0.01, verbose=True)
     log_every = 1  # How often to print out losses
     save_every = 10  # How often to save model
