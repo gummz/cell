@@ -24,9 +24,11 @@ def eval_track(tracked_centroids, time_range,
     # choose colormap
     cmap = 'tab20'
 
+    # choose marker size
+    marker_size = 20
+
     # folder is: pred/eval/track/
     # create relevant directories
-    utils.make_dir(location)
     tracking_folder = 'with_tracking'
     utils.make_dir(join(location, tracking_folder))
 
@@ -48,8 +50,6 @@ def eval_track(tracked_centroids, time_range,
         name = f'{t:05d}'
 
         # don't output if it's already there
-        # if f'{name}.png' in images:
-        #     print(f'{name}.png', 'in images')
         if not os.path.exists(join(location, f'{name}.png')):
             exists = False
 
@@ -58,56 +58,78 @@ def eval_track(tracked_centroids, time_range,
 
             cells_mip = np.max(data[:, :, :, channels[0]], axis=0)
             cells_scale = skimage.exposure.rescale_intensity(
-                cells_mip, in_range='image', out_range=(200, 255))
+                cells_mip, in_range=(0, 255), out_range=(220, 255))
+            cells_nl = utils.normalize(cells_scale, 220, 255, cv2.CV_8UC1)
+            cells_nl = cv2.fastNlMeansDenoising(cells_nl, None, 11, 7, 21)
             # normalize ...
             # cells_scale = utils.normalize(cells_scale, 200, 255, cv2.CV_8UC1)
-            cells_rgb = np.zeros((*cells_scale.shape, 3))
-            cells_rgb[:, :, 1] = cells_scale
+            # cells_rgb = np.zeros((*cells_scale.shape, 3))
+            # cells_rgb[:, :, 1] = cells_scale
             # cv2.cvtColor(cells_scale.astype(np.float32),
             #                         cv2.COLOR_GRAY2RGB)
 
             tubes_mip = np.max(data[:, :, :, channels[1]], axis=0)
-            # tubes_mip = utils.normalize(tubes_mip, 0, 255, cv2.CV_8UC1)
-            tubes_rgb = np.zeros((*tubes_mip.shape, 3))
-            tubes_rgb[:, :, 2] = tubes_mip
+            tubes_mip = utils.normalize(tubes_mip, 0, 255, cv2.CV_8UC1)
+            # tubes_rgb = np.zeros((*tubes_mip.shape, 3))
+            # tubes_rgb[:, :, 2] = tubes_mip
             # cv2.cvtColor(tubes_mip.astype(np.float32),
             #                         cv2.COLOR_GRAY2RGB)
 
             # linear blend between cells and tubes
-            alpha = 0.95
-            blended = cv2.addWeighted(cells_rgb, alpha, tubes_rgb, 1 - alpha,
+            alpha = 0.90
+            blended = cv2.addWeighted(cells_nl.astype(np.float32), alpha,
+                                      tubes_mip.astype(np.float32), 1 - alpha,
                                       0, None, dtype=-1)
-            
-            utils.imsave(join(location, f'{name}.png'), blended[:, :, 1])
+
+            utils.imsave(join(location, f'{name}.png'), blended)
 
             # output cells and tubes for debugging
             utils.imsave(
-                join(location, f'{name}_cells_scale.jpg'), cells_rgb)
-            utils.imsave(
-                join(location, f'{name}_cells_mip.jpg'), cells_mip)
-            utils.imsave(join(location, f'{name}_tubes.jpg'), tubes_rgb)
+                join(location, f'{name}_cells.png'), cells_scale)
+            utils.imsave(join(location, f'{name}_tubes.png'), tubes_mip)
 
         X, Y, P, I = (frame[c] for c in columns)
 
+        plt.figure(figsize=(20, 12))
+        # TODO: mark all three plots
+        plt.subplot(132)
         for x, y, p, i in zip(X, Y, P, I):
             if i < c.ACTIVE_THRESHOLD:
                 marker = 'x'
             else:
                 marker = 'o'
-            plt.plot(x, y, c=colors[p], marker=marker)
+            plt.plot(x, y, c=colors[p], marker=marker, markersize=marker_size)
 
         if exists:
             blended = plt.imread(join(location, f'{name}.png'))
+            cells_mip = plt.imread(join(location, f'{name}_cells.png'))
+            tubes_mip = plt.imread(join(location, f'{name}_tubes.png'))
+
         save = join(location, tracking_folder, f'{t:05d}.png')
 
-        plt.imshow(blended, extent=(0, 1024, 1024, 0))
+        plt.imshow(blended, extent=(0, 1024, 1024, 0), cmap='gray')
         # plt.xlim(left=0, right=1024)
         plt.xlabel('X dimension')
         plt.xlim(left=0, right=1024)
         # plt.ylim(bottom=0, top=1024)
         plt.ylabel('Y dimension')
         plt.ylim(bottom=1024, top=0)
-        plt.title(f'Tracked beta cells for\nfile: {filename}, timepoint: {t}')
+        plt.title('Tracked cells with tubes overlay')
+
+        plt.subplot(131)
+        plt.title('Beta cell channel (0)')
+        plt.imshow(cells_mip, cmap='gray')
+        plt.axis('off')
+
+        plt.subplot(133)
+        plt.title('Tubes channel (1)')
+        plt.imshow(tubes_mip, cmap='gray')
+        plt.axis('off')
+
+        plt.title(
+            f'Tracked beta cells for\nfile: {filename}, timepoint: {t}',
+            fontsize=30)
+        plt.tight_layout()
         plt.savefig(save, dpi=300)
         plt.close()
 
@@ -120,7 +142,7 @@ if __name__ == '__main__':
 
     tracked_centroids = pickle.load(
         open(join(c.DATA_DIR, c.PRED_DIR, c.PRED_FILE, 'tracked_centroids.pkl'), 'rb'))
-    location = join(c.DATA_DIR, c.PRED_DIR,
+    location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
                     'eval', 'track_2D', c.PRED_FILE)
     utils.make_dir(location)
 
