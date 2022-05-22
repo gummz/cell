@@ -98,7 +98,7 @@ def get_colors(
     return colors
 
 
-def output_pred(mode, i, image, pred, save=None, compare=False):
+def output_pred(mode, i, image, pred, save=None, compare=False, dpi=None):
     image, bboxes, masks = prepare_draw(image, pred)
 
     if len(bboxes) != 0:
@@ -107,25 +107,29 @@ def output_pred(mode, i, image, pred, save=None, compare=False):
         bboxed_img = image
 
     if len(masks) != 0:
-        masked_img = utils.get_mask(masks)  # .repeat(3, 1, 1)
-        # TODO: use torch.where instead of this
-        stack = torch.stack([masked_img.cpu(), bboxed_img[0]])
-        pred_img = (torch.max(stack, dim=0, keepdim=True)[0]
-                    .squeeze().squeeze())
-
+        masked_img = utils.get_mask(masks).cpu()  # .repeat(3, 1, 1)
+        pred_img = torch.where(masked_img > 0, masked_img,
+                               bboxed_img[0])
+        # stack = torch.stack([masked_img.cpu(), bboxed_img[0]])
+        # pred_img = (torch.max(stack, dim=0, keepdim=True)[0]
+        #             .squeeze().squeeze())
     else:
         pred_img = bboxed_img
 
     if not save:
-        save = join(c.DATA_DIR, c.PRED_DIR, 'eval', mode, str(i))
+        save = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                    'eval', mode, f'{i:05d}')
+    draw_output(image[0].cpu(), pred_img.cpu().squeeze(), save, compare, dpi)
 
-    draw_output(image[0].cpu(), pred_img, save, compare)
 
-
-def draw_output(image, pred_img, save, compare):
+def draw_output(image, pred_img, save, compare, dpi):
+    utils.make_dir(save)
 
     if compare:
-        figure = plt.figure()
+        if dpi:
+            figure = plt.figure(dpi=dpi)
+        else:
+            figure = plt.figure()
         x_dim, y_dim = 'X dimension', 'Y dimension'
 
         plt.subplot(121)
@@ -139,6 +143,7 @@ def draw_output(image, pred_img, save, compare):
         plt.xlabel(x_dim), plt.ylabel(y_dim)
 
         utils.imsave(save, figure)
+        plt.close()
 
     else:
         utils.imsave(save, pred_img, False)
