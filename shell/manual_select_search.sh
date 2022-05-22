@@ -4,12 +4,16 @@
 #BSUB -q gpuv100
 ### -- set the job Name --
 #BSUB -J manual_select_search
+
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 1
+#BSUB -n 4
+#BSUB -R "span[hosts=1]"
+#BSUB -R "select[gpu32gb]"
+
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 9:00
+#BSUB -W 23:00
 # request 5GB of system-memory
 #BSUB -R "rusage[mem=15GB]"
 ### -- set the email address --
@@ -23,7 +27,7 @@
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_manual
 
 module load python3/3.8.11
 module load cuda/11.1
@@ -46,4 +50,4 @@ source ../venv_1/bin/activate
 
 # Run file
 ###PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:5000' 
-python3 ../src/experiments/manual_select/manual_select.py > pyout
+python3 ../src/experiments/manual_select/manual_select.py > pyout_manual
