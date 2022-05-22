@@ -1,7 +1,6 @@
 # from aicsimageio import AICSImage
 from os.path import join
 
-
 # ACTIVE SLICES RATIO
 ACTIVE_SLICES_RATIO = 0.025
 
@@ -96,7 +95,8 @@ TIMEPOINTS_TEST = [280, 289]
 PROJECT_DIR = '/zhome/e2/e/154260/cell/'
 
 # To be used within the src/[subfolder] directories
-DATA_DIR = '../../data/interim/'
+DATA_DIR = '/work3/s203004/data/interim/'
+PROJECT_DATA_DIR = '../../data/interim/'
 EXPERIMENT_DIR = '../experiments/'
 
 IMG_DIR = 'imgs'
