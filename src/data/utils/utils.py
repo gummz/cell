@@ -71,6 +71,12 @@ def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
     return img_canny
 
 
+def calc_sensitivity(confusion_matrix):
+    tp, fn = confusion_matrix[0][0], confusion_matrix[0][1]
+    sensitivity = tp / (fn + tp)
+    return sensitivity
+
+
 def get_czi_dims(metadata):
     search_T = './Metadata/Information/Image/SizeT'
     search_Z = './Metadata/Information/Image/SizeZ'
@@ -137,12 +143,14 @@ def get_model(time_str: str, device: torch.device):
     return model
 
 
-def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
+def get_raw_array(file_path, t=None, z=None,
+                  ch=c.CELL_CHANNEL):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     Output is 4D (timepoints and xyz spatial dimensions)
     '''
+
     if t is None and z is None:
         return None
 
@@ -155,20 +163,18 @@ def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
             f'Using sample dataset from {c.SAMPLE_PATH}.'
         ))
 
-    t_tuple = 'T' if type(t) != int or t is None else ''
-    z_tuple = 'Z' if type(z) != int or z is None else ''
+    t_tuple = 'T' if has_len(t) or t is None else ''
+    z_tuple = 'Z' if has_len(z) != int or z is None else ''
     channel_tuple = 'C' if type(ch) != int or ch is None else ''
     order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
 
     data = None
 
     if t is not None and z is None:
-        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
         data = raw_data.get_image_dask_data(
             order, T=t, C=ch)
 
     elif t is None and z is not None:
-        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
         data = raw_data.get_image_dask_data(
             order, Z=z, C=ch)
 
@@ -178,39 +184,21 @@ def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
 
     return data
 
-    # if train:
-    #     timepoints = c.TIMEPOINTS[index]
-    #     # z-dimension
-    #     D = c.RAW_FILE_DIMENSIONS[index]
-    #     file = c.RAW_FILES[index]
-    # else:
-    #     timepoints = c.TIMEPOINTS_TEST[index]
-    #     D = c.RAW_FILE_DIMENSIONS_TEST[index]
-    #     file = c.RAW_FILES_GENERALIZE[index]
 
-    # file_path = join(c.RAW_DATA_DIR, file)
-    # num_samples = int(timepoints * sample)
+def has_len(obj):
+    obj_method = getattr(obj, 'len', None)
+    return callable(obj_method)
 
-    # with TiffFile(file_path) as f:
-    #     # If only every second image contains beta cells
-    #     if every_second:
-    #         pages = f.pages[::2]
-    #     else:
-    #         pages = f.pages
 
-    #     images = [page.asarray()[0, :, :] for page in pages]
-    #     images = torch.tensor(images, dtype=torch.uint8)
-    #     images = images.view((timepoints, D))
-    #     idx = torch.multinomial(num_samples=num_samples,
-    #                             replacement=False)
-    #     images = images[idx]
-
-    #     return images
+def is_int(number):
+    types = [np.int32, np.int16, np.int64, int]
+    return type(number) in types
 
 
 def imsave(path, img, resize=512):
     dirs = os.path.dirname(path)
     make_dir(dirs)
+
     if path[-4:] not in ['.png', '.jpg']:
         path += '.jpg'
 
@@ -218,13 +206,15 @@ def imsave(path, img, resize=512):
         img.savefig(path)
         return
     else:
-        if type(img) != np.ndarray:
+        if type(img) == torch.Tensor:
+            img = np.array(img.cpu())
+        elif type(img) == list:
             img = np.array(img)
+
         if len(img.shape) > 2:
             img = img[0]
         if resize:
             img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
-
     plt.imsave(path, img)
 
 
