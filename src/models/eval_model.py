@@ -15,14 +15,11 @@ from os.path import join
 import src.visualization.utils as viz
 
 
-def eval_model(model, dataloader, mode='val'):
+def eval_model(model, dataloader, mode, device, save=None):
     '''Calculates IOU for chosen set for the input model.
     TODO: Use with TensorBoard (add_scalar)
             (With Optuna in grid search, not in here)
     '''
-
-    device = utils.set_device()
-    print(f'Running on {device}.')
 
     scores_mask = np.zeros(len(dataloader))
     scores_bbox = np.zeros(len(dataloader))
@@ -31,10 +28,9 @@ def eval_model(model, dataloader, mode='val'):
 
     model.eval()
     for i, (images, targets) in enumerate(dataloader):
-        print('image', i)
         # batch size of 1
         image = images[0]
-        image.to(device)
+        image = image.to(device)
         target = targets[0]
 
         # move inputs to device
@@ -43,8 +39,9 @@ def eval_model(model, dataloader, mode='val'):
         with autocast():
             pred = get_prediction(model, device, image)
 
-            # if i % 10 == 0:
-            viz.output_pred(mode, i, image, pred)
+        if i % 40 == 0:
+            save_path = join(save, f'{i:05d}')
+            viz.output_pred(mode, i, image.squeeze(), pred, save_path, True, 300)
 
         cm_mask, score_mask = performance_mask(pred, target)
         scores_mask[i] = np.mean(score_mask)
@@ -53,8 +50,6 @@ def eval_model(model, dataloader, mode='val'):
         cm_bbox, score_bbox = performance_bbox(pred, target)
         scores_bbox[i] = np.mean(score_bbox)
         cm_bbox_tot += cm_bbox
-
-        print(cm_bbox, '\n\n')
 
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
@@ -214,15 +209,15 @@ def calc_iou_mask(pred_mask, target_mask):
 if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
-
-    model = utils.get_model(c.MODEL_STR, utils.set_device())
+    device = utils.set_device()
+    model = utils.get_model(c.MODEL_STR, device)
     dataset = BetaCellDataset(
         transforms=get_transform(train=False), mode='val',
         n_img_select=1, manual_select=1)
     dataloader = DataLoader(dataset, batch_size=1,
                             shuffle=False, num_workers=1, collate_fn=collate_fn)
 
-    ious = eval_model(model, dataloader)
+    ious = eval_model(model, dataloader, device)
     print('\nMask CM\n', ious[0], '\n')
     print('Mask IOU\n', ious[1], '\n')
     print('Bbox CM\n', ious[2], '\n')
