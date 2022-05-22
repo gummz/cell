@@ -9,13 +9,14 @@ def get_slice_record(index, mode):
     record_path = join(c.DATA_DIR, mode, c.IMG_DIR, 'slice_record.csv')
     slice_record = pd.read_csv(
         record_path, sep='\t', header=0, dtype={'name': str})
+    columns = slice_record.columns
     rec = slice_record.iloc[index]
-    name, file, t, z = (rec[col] for col in rec.columns)
+    name, file, t, z = (rec[col] for col in columns)
     return name, file, t, z
 
 
 if __name__ == '__main__':
-    index = 88
+    index = 285
     mode = 'train'
     # whether the user wants a specific timepoint
     # of his choosing regardless of slice index above
@@ -24,7 +25,7 @@ if __name__ == '__main__':
     # which:
     # Should the extract be one timepoint across slices,
     # or one slice across timepoints?
-    which = 'timepoint'  # or which = 'slice'
+    which = 'slice'  # which = timepoint or which = slice
 
     utils.setcwd(__file__)
 
