@@ -4,6 +4,7 @@ from time import time
 import cv2
 
 import numpy as np
+import torch
 import optuna
 from os.path import join
 import src.data.constants as c
@@ -23,7 +24,7 @@ def objective(trial):
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
     amsgrad = trial.suggest_categorical('amsgrad', [True, False])
-    batch_sizes = (32, 64, 128, 256)
+    batch_sizes = (4, 8, 32)
     batch_size = trial.suggest_categorical('batch_size', batch_sizes)
     beta1 = trial.suggest_float('beta1', 0, 1)
     beta2 = trial.suggest_float('beta2', 0, 1)
@@ -53,14 +54,14 @@ def objective(trial):
     #     [loss_list[1:3]]
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
-    lr = trial.suggest_float('learning_rate', 1e-10, 1e-3, log=True)
+    lr = trial.suggest_float('learning_rate', 1e-10, 1e-4, log=True)
     manual_select = 1  # trial.suggest_int('manual_ratio', 2, 27)
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2)
+    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2, log=True)
     # end hyperparameters
 
     data_tr, data_val = get_dataloaders(
         root=join('..', c.DATA_DIR),
-        batch_size=batch_size, num_workers=4, resize=image_size, n_img_select=200, manual_select=manual_select, img_filter=img_filter)
+        batch_size=batch_size, num_workers=4, resize=image_size, n_img_select=(100, 1), manual_select=(manual_select, 1), img_filter=img_filter)
 
     model = get_instance_segmentation_model(pretrained=True)
     model.to(device)
@@ -83,13 +84,13 @@ def objective(trial):
     with SummaryWriter(f'runs/gridsearch/{trial.number}') as w:
         print('\n', lr, beta1, beta2, weight_decay,
               batch_size, image_size, manual_select, '\n')
-        train_loss, val_loss = train(
-            model, device, opt, 15, data_tr, data_val, time_str, hparam_dict, w)
+        train_losses, val_losses = train(
+            model, device, opt, 30, data_tr, data_val, time_str, hparam_dict, w)
 
     # IOU results
     # if not math.isnan(train_loss):
     #     results = eval_model(model, data_val, 'val')
-    if math.isnan(train_loss):
+    if math.isnan(np.mean(train_losses)):
         return np.nan
 
     # calculate average sensitivity between mask and bboxes
@@ -101,7 +102,7 @@ def objective(trial):
 
     # print(results)
 
-    return val_loss
+    return val_losses[-1]
 
 
 if __name__ == '__main__':
@@ -111,7 +112,7 @@ if __name__ == '__main__':
 
     # create study
     study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=300)
+    study.optimize(objective, n_trials=75)
 
     # save study
     df = study.trials_dataframe()
