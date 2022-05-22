@@ -1,3 +1,11 @@
+- Look at results from broad gridsearch and narrow it down
+
+- manual search both where n_img_select is 1100, and where n_img_select == manual_select (compare in thesis to see which is better)
+
+- Graph to show validation loss as a function of a hyperparameter (since I have many)
+
+- Train model on new annotations, manual_select on new annotations, predict and track with new model, output eval_track with new model
+
 - Histogram of all files to see which activation threshold to use
 
 - Use external video service to make videos from pngs
@@ -28,6 +36,25 @@
 
 - Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
 
+- Exploratory analysis
+    - Histograms
+        - Before and after preprocessing
+        - Of train, validation, and test set to compare distributions
+
+- Create `make` commands for json, train, test, etc.
+
+- Logging, multithread/multiprocessing, learn tensorboard better
+
+- Submit bug report to AICSImageIO GitHub regarding memory leakage
+
+- Packages for 3D visualization
+
+- Kasra segmentations
+
+- - -
+
+*Done*
+
 - Experiments
     - Active slices
     - Hyperparameter grid search with optuna (incl pretrained)
@@ -43,20 +70,7 @@
         - Frangi, median, mean, Gaussian: choose two
         - Adaptive, simple thresholding
 
-- Exploratory analysis
-    - Histograms
-        - Before and after preprocessing
-        - Of train, validation, and test set to compare distributions
-
-- Create `make` commands for json, train, test, etc.
-
-- Logging, multithread/multiprocessing, learn tensorboard better
-
-- Submit bug report to AICSImageIO GitHub regarding memory leakage
-
-- - -
-
-*Done*
+- Show plots of val and train losses in manual_search
 
 - `slice_to_mip.py`: input is slice of timepoint of file, output is MIP of timepoint of file. Some images will be identical (because they are from the same timepoint) but that's okay.
 
