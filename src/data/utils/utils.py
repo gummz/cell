@@ -62,15 +62,6 @@ def del_multiple(list_object, indices):
             list_object.pop(idx)
 
 
-def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
-    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
-    img_canny = cv2.Canny(
-        img, threshold1, threshold2,
-        apertureSize=aperture_size, L2gradient=L2_gradient)
-
-    return img_canny
-
-
 def calc_sensitivity(confusion_matrix):
     tp, fn = confusion_matrix[0][0], confusion_matrix[0][1]
     sensitivity = tp / (fn + tp)
@@ -103,7 +94,6 @@ def get_mask(output):
         mask = output['masks']
     else:
         mask = output  # target is a tensor of masks (from one image)
-
     mask = torch.squeeze(mask, dim=1)
 
     if mask.shape[0] != 0:
@@ -118,6 +108,7 @@ def get_mask(output):
     # mask = np.array(mask)
     # mask = np.where(mask > 255, 255, mask)
     # mask = np.where(mask > 200, 255, 0)
+    mask *= 255
     mask = mask.clone().detach().type(torch.uint8)
     # torch.tensor(mask, dtype=torch.uint8)
 
@@ -195,7 +186,7 @@ def is_int(number):
     return type(number) in types
 
 
-def imsave(path, img, resize=512):
+def imsave(path, img, resize=512, cmap=None):
     dirs = os.path.dirname(path)
     make_dir(dirs)
 
@@ -212,10 +203,14 @@ def imsave(path, img, resize=512):
             img = np.array(img)
 
         if len(img.shape) > 2:
-            img = img[0]
+            print('Unintended: image has shape', img.shape)
         if resize:
             img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
-    plt.imsave(path, img)
+
+    if cmap:
+        plt.imsave(path, img, cmap=cmap)
+    else:
+        plt.imsave(path, img)
 
 
 def make_dir(path):
@@ -236,7 +231,7 @@ def normalize(image, alpha, beta, out, device=None):
                                    beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
         return torch.tensor(normalized,
                             device=device
-                            if device else set_device())
+                            if device else torch.device('cpu'))
     return cv2.normalize(image, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
 
 
