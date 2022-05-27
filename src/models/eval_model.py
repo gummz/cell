@@ -9,6 +9,7 @@ from src.models.predict_model import get_prediction
 from src.models.utils.utils import collate_fn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
+import src.models.train_model as train
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 import src.data.constants as c
 from os.path import join
@@ -33,15 +34,19 @@ def eval_model(model, dataloader, mode, device, save=None):
         image = image.to(device)
         target = targets[0]
 
-        # move inputs to device
-        target['masks'] = [mask.to(device) for mask in target['masks']]
-        target['boxes'] = [box.to(device) for box in target['boxes']]
+        # move target to device
+        target['masks'] = target['masks'].to(device)
+        target['boxes'] = target['boxes'].to(device)
         with autocast():
             pred = get_prediction(model, device, image)
 
         if i % 40 == 0:
             save_path = join(save, f'{i:05d}')
-            viz.output_pred(mode, i, image.squeeze(), pred, save_path, True, 300)
+            target_mask = utils.get_mask(target['masks']) * 255
+            inputs = (image.cpu(), pred, target_mask.cpu())
+            titles = ('Original', 'Prediction', 'Ground Truth')
+            grid = (1, 3)
+            viz.output_pred(mode, i, inputs, titles, grid, save_path, True, 300)
 
         cm_mask, score_mask = performance_mask(pred, target)
         scores_mask[i] = np.mean(score_mask)
@@ -111,8 +116,8 @@ def performance_bbox(pred, target):
         return confusion_matrix, np.array([0])
 
     # count remaining false positives as score 0
-    fps = [0 for item in range(fp)]
-    scores = list(scores) + fps
+    fps = tuple(0 for item in range(fp))
+    scores = tuple(scores) + fps
 
     return confusion_matrix, scores
 
@@ -189,8 +194,8 @@ def performance_mask(pred, target):
         return confusion_matrix, np.array([0])
 
     # count remaining false positives as score 0
-    fps = [0 for item in range(fp)]
-    scores = list(scores) + fps
+    fps = tuple(0 for item in range(fp))
+    scores = tuple(scores) + fps
 
     return confusion_matrix, scores
 
