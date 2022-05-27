@@ -1,3 +1,5 @@
+- Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
+
 - Look at results from broad gridsearch and narrow it down
 
 - manual search both where n_img_select is 1100, and where n_img_select == manual_select (compare in thesis to see which is better)
