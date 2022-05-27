@@ -7,7 +7,7 @@ from os.path import join
 import pickle
 
 
-def track(chains: list):
+def track(chains: list) -> pd.DataFrame:
     columns = ['frame', 'x', 'y', 'z', 'intensity']
     df_chains = pd.DataFrame(
         chains, columns=columns, dtype=float
@@ -28,6 +28,20 @@ def track(chains: list):
     by looking at the embryo in question over timepoints.
     """
 
+
+def calc_turnon(tracked_centroids: pd.DataFrame) -> dict:
+    '''
+    For each cell in the dataframe, returns the timepoint 
+    at which the cell is considered to have "turned on."
+    '''
+    particles = tracked_centroids.groupby('particle')
+    for _, particle in particles:
+        I = particle['intensity']
+        # calculation needs to be proportional to
+        # maximum and minimum intensity
+        max_val, min_val = np.max(I), np.min(I)
+        diff = max_val - min_val
+        
 
 if __name__ == "__main__":
     pass
