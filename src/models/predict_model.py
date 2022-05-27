@@ -24,7 +24,7 @@ from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
                                         get_transform)
 from src.models.utils.model import get_instance_segmentation_model
 from src.models.utils.utils import collate_fn
-from src.tracking.track_cells import track
+import src.tracking.track_cells as tracker
 from src.visualization import plot
 from torch.utils.data import DataLoader, Subset
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
@@ -247,8 +247,11 @@ def prepare_model_input(array, device):
     #     #     z_slice, z_slice, 11, 7, 21)
     #     z_slices.append(z_slice)
     # timepoint = np.array(z_slices)
-
+    
     array = utils.normalize(array, 0, 1, cv2.CV_32F, device)
+    img_filter, args = c.FILTERS['bilateral']
+    print(array.shape)
+    array = img_filter(array, *args)
     array = torch.tensor(array, device=device)
 
     dim_inputs = len(array.shape)
@@ -282,7 +285,7 @@ if __name__ == '__main__':
     name = c.PRED_FILE
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
-    save = join(c.DATA_DIR, mode, name)
+    save = join(c.PROJECT_DATA_DIR, mode, name)
     utils.make_dir(save)
 
     # either ssh with full data:
@@ -296,11 +299,11 @@ if __name__ == '__main__':
     time_end = 10
 
     time_range = range(time_start, time_end)
-    # path = join(c.RAW_DATA_DIR, c.PRED_FILE)
-    # centroids = predict(path, time_range,
-    #                         device, model, save)
-    # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
-    centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
+    path = join(c.RAW_DATA_DIR, c.PRED_FILE)
+    centroids = predict(path, time_range,
+                        device, model, save)
+    pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
+    # centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
 
     centroids_np = [(t, centroid[0], centroid[1],
                      centroid[2], centroid[3])
@@ -309,7 +312,7 @@ if __name__ == '__main__':
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
-    tracked_centroids = track(centroids_np)
+    tracked_centroids = tracker.track(centroids_np)
 
     pickle.dump(tracked_centroids,
                 open(join(save, 'tracked_centroids.pkl'), 'wb'))
