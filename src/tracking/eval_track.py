@@ -16,8 +16,7 @@ import src.visualization.utils as viz
 from matplotlib import pyplot as plt
 
 
-def eval_track(tracked_centroids, time_range,
-               filename, location):
+def eval_track(tracked_centroids, filename, location):
     # use `tracked_centroids`'s frame, x, y, p
     # to overlay the points onto MIP of raw image
 
@@ -25,7 +24,7 @@ def eval_track(tracked_centroids, time_range,
     cmap = 'tab20'
 
     # choose marker size
-    marker_size = 20
+    marker_size = 15
 
     # folder is: pred/eval/track/
     # create relevant directories
@@ -41,12 +40,12 @@ def eval_track(tracked_centroids, time_range,
     channels = [c.CELL_CHANNEL, c.TUBE_CHANNEL]
     columns = ['x', 'y', 'particle', 'intensity']
 
-    exists = True  # assume image exists until proven otherwise
     # overlay points in each frame on corresponding
     # raw MIP image
     frames = tuple(tracked_centroids.groupby('frame'))
+    time_range = range(len(frames))
     for t, (_, frame) in zip(time_range, frames):
-
+        exists = True  # assume image exists until proven otherwise
         name = f'{t:05d}'
 
         # don't output if it's already there
@@ -76,62 +75,79 @@ def eval_track(tracked_centroids, time_range,
             #                         cv2.COLOR_GRAY2RGB)
 
             # linear blend between cells and tubes
-            alpha = 0.90
-            blended = cv2.addWeighted(cells_nl.astype(np.float32), alpha,
-                                      tubes_mip.astype(np.float32), 1 - alpha,
-                                      0, None, dtype=-1)
+            # alpha = 0.90
+            # blended = cv2.addWeighted(cells_nl.astype(np.float32), alpha,
+            #                           tubes_mip.astype(np.float32), 1 - alpha,
+            #                           0, None, dtype=-1)
 
-            utils.imsave(join(location, f'{name}.png'), blended)
+            tubes_mip = utils.normalize(tubes_mip, 0, 1, cv2.CV_32FC1)
+            cells_nl = utils.normalize(cells_nl, 0, 1, cv2.CV_32FC1)
 
-            # output cells and tubes for debugging
-            utils.imsave(
-                join(location, f'{name}_cells.png'), cells_scale)
-            utils.imsave(join(location, f'{name}_tubes.png'), tubes_mip)
+            combined = np.zeros((1024, 1024, 4), dtype=np.float32)
+            combined[:, :, 0] = cells_nl
+            combined[:, :, 1] = tubes_mip  # np.round(blended).astype(np.uint8)
+            combined[:, :, 2] = 0.
+            combined[:, :, 3] = 1.
+
+            utils.imsave(join(location, f'{name}.png'),
+                         combined, False)
+
+            # output cells and tubes
+            utils.imsave(join(location, f'{name}_cells.png'),
+                         cells_scale, False, 'Reds')
+            utils.imsave(join(location, f'{name}_tubes.png'),
+                         tubes_mip, False, 'viridis')
 
         X, Y, P, I = (frame[c] for c in columns)
 
         plt.figure(figsize=(20, 12))
-        # TODO: mark all three plots
-        plt.subplot(132)
-        for x, y, p, i in zip(X, Y, P, I):
-            if i < c.ACTIVE_THRESHOLD:
-                marker = 'x'
-            else:
-                marker = 'o'
-            plt.plot(x, y, c=colors[p], marker=marker, markersize=marker_size)
+
+        # plot markers on beta cell channel and combined
+        # image
+        for i in range(2):
+            plt.subplot(1, 3, i + 1)
+            plot_markers(marker_size, colors, X, Y, P, I)
 
         if exists:
-            blended = plt.imread(join(location, f'{name}.png'))
-            cells_mip = plt.imread(join(location, f'{name}_cells.png'))
+            combined = plt.imread(join(location, f'{name}.png'))
+            cells_scale = plt.imread(join(location, f'{name}_cells.png'))
             tubes_mip = plt.imread(join(location, f'{name}_tubes.png'))
 
         save = join(location, tracking_folder, f'{t:05d}.png')
 
-        plt.imshow(blended, extent=(0, 1024, 1024, 0), cmap='gray')
-        # plt.xlim(left=0, right=1024)
+        plt.subplot(131)
+        plt.title('Beta cell channel (0)')
+        plt.imshow(cells_scale, cmap='Reds')
+
+        plt.subplot(132)
+        plt.imshow(combined, extent=(0, 1024, 1024, 0))
         plt.xlabel('X dimension')
         plt.xlim(left=0, right=1024)
-        # plt.ylim(bottom=0, top=1024)
         plt.ylabel('Y dimension')
         plt.ylim(bottom=1024, top=0)
         plt.title('Tracked cells with tubes overlay')
 
-        plt.subplot(131)
-        plt.title('Beta cell channel (0)')
-        plt.imshow(cells_mip, cmap='gray')
-        plt.axis('off')
-
         plt.subplot(133)
         plt.title('Tubes channel (1)')
-        plt.imshow(tubes_mip, cmap='gray')
-        plt.axis('off')
+        plt.imshow(tubes_mip, cmap='viridis')
 
-        plt.title(
+        plt.suptitle(
             f'Tracked beta cells for\nfile: {filename}, timepoint: {t}',
             fontsize=30)
+
         plt.tight_layout()
         plt.savefig(save, dpi=300)
         plt.close()
+
+
+def plot_markers(marker_size, colors, X, Y, P, I):
+    for x, y, p, i in zip(X, Y, P, I):
+        if i < c.ACTIVE_THRESHOLD:
+            marker = 'x'
+        else:
+            marker = 'o'
+        plt.plot(x, y, c=colors[p], marker=marker,
+                 markersize=marker_size, markeredgewidth=5)
 
 
 if __name__ == '__main__':
@@ -146,10 +162,10 @@ if __name__ == '__main__':
                     'eval', 'track_2D', c.PRED_FILE)
     utils.make_dir(location)
 
-    time_range = range(10)
-    eval_track(tracked_centroids, time_range,
-               c.PRED_FILE, location)
+    eval_track(tracked_centroids, c.PRED_FILE, location)
 
+    frames = tuple(tracked_centroids.groupby('frame'))
+    time_range = range(len(frames))
     plot.create_movie(join(location, 'with_tracking'),
                       time_range)
 
