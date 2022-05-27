@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from matplotlib import pyplot as plt
 import pandas as pd
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
@@ -11,7 +12,8 @@ import cv2
 import numpy as np
 
 
-def output_sample(save, t, timepoint_raw, pred, size=512, device=None):
+def output_sample(save: str, t: int, timepoint_raw, pred,
+                  size: int = 512, device=None):
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
     # Randomly sample 2 slices to debug (per timepoint)
@@ -19,7 +21,6 @@ def output_sample(save, t, timepoint_raw, pred, size=512, device=None):
     debug_idx = np.random.randint(0, Z, 2)
     for i, (idx, z_slice) in enumerate(zip(debug_idx, timepoint_raw[debug_idx])):
         z_slice = np.int16(z_slice)
-        z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
 
         boxes = pred[i]['boxes']
         masks = pred[i]['masks']  # [mask > 0.5 for mask in pred[i]['masks']]
@@ -32,8 +33,9 @@ def output_sample(save, t, timepoint_raw, pred, size=512, device=None):
         # masks = torch.stack(masks)
         # masks = masks.squeeze(1).to(device)
 
+        z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
         z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1)
-        z_slice = torch.tensor(z_slice, device=device).unsqueeze(0)
+        z_slice = z_slice.clone().detach().unsqueeze(0)
 
         # consolidate masks into one array
         mask = utils.get_mask(masks).unsqueeze(0)
@@ -44,7 +46,7 @@ def output_sample(save, t, timepoint_raw, pred, size=512, device=None):
         bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())
 
         utils.imsave(join(save,
-                          f't-{t}_{idx}.jpg'), bboxed_img, 512)
+                          f't-{t}_{idx}.jpg'), bboxed_img[0], 512)
 
 
 def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
@@ -54,7 +56,7 @@ def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
     '''
     # convert grayscale to RGB
     # image = image.repeat(3, 1, 1)
-    image = image.unsqueeze(0)
+    # image = image.unsqueeze(0)
 
     boxes = pred['boxes']
     # masks = [mask > 0.5 for mask in pred['masks']]
@@ -98,52 +100,71 @@ def get_colors(
     return colors
 
 
-def output_pred(mode, i, image, pred, save=None, compare=False, dpi=None):
+def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
+                grid: tuple[int], save=None, compare: bool = False,
+                dpi: int = None):
+    '''
+    Outputs images, and their predictions and labels. First two items of `inputs`
+    are assumed to be the image array and prediction dictionary, respectively.
+    '''
+    image, pred = inputs[:2]
     image, bboxes, masks = prepare_draw(image, pred)
 
     if len(bboxes) != 0:
         bboxed_img = draw_bounding_boxes(image.cpu(), bboxes)
     else:
-        bboxed_img = image
+        bboxed_img = image.squeeze()
 
     if len(masks) != 0:
-        masked_img = utils.get_mask(masks).cpu()  # .repeat(3, 1, 1)
-        pred_img = torch.where(masked_img > 0, masked_img,
+        masked_img = utils.get_mask(masks).cpu()
+        scalar = torch.tensor(255, dtype=torch.uint8)
+        # Threshold 50 comes from function "performance_mask" where threshold
+        # is defined as 50 pixels out of 255
+        pred_img = torch.where(masked_img > 50, scalar,
                                bboxed_img[0])
-        # stack = torch.stack([masked_img.cpu(), bboxed_img[0]])
-        # pred_img = (torch.max(stack, dim=0, keepdim=True)[0]
-        #             .squeeze().squeeze())
     else:
-        pred_img = bboxed_img
+        pred_img = bboxed_img.squeeze()
 
     if not save:
         save = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
                     'eval', mode, f'{i:05d}')
-    draw_output(image[0].cpu(), pred_img.cpu().squeeze(), save, compare, dpi)
+    # draw_output(image[0].cpu(), pred_img.cpu().squeeze(), save, compare, dpi)
+    images = (image.squeeze(), pred_img)
+    if len(inputs) > 2:
+        rest = inputs[2:]
+        rest = (item.cpu() for item in rest)
+        images = (*images, *rest)
+
+    draw_output(images, titles, grid, save, compare, dpi)
 
 
-def draw_output(image, pred_img, save, compare, dpi):
+def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
+                grid: tuple[int], save: str, compare: bool,
+                dpi: int):
     utils.make_dir(save)
 
     if compare:
+        len_arr = len(titles)
+        fig_size = (8 + len_arr * 2, 5 + len_arr)
         if dpi:
-            figure = plt.figure(dpi=dpi)
+            figure = plt.figure(dpi=dpi, figsize=fig_size)
         else:
-            figure = plt.figure()
+            figure = plt.figure(figsize=fig_size)
         x_dim, y_dim = 'X dimension', 'Y dimension'
 
-        plt.subplot(121)
-        plt.imshow(image)
-        plt.title('Original image')
-        plt.xlabel(x_dim), plt.ylabel(y_dim)
+        iterable = enumerate(zip(images, titles))
+        for i, (image, title) in iterable:
+            plt.subplot(*grid, i + 1)
+            plt.imshow(image.squeeze())
+            plt.title(title)
+            plt.xlabel(x_dim)
+            plt.ylabel(y_dim)
 
-        plt.subplot(122)
-        plt.imshow(pred_img)
-        plt.title('Prediction')
-        plt.xlabel(x_dim), plt.ylabel(y_dim)
-
+        name = os.path.basename(save)
+        plt.suptitle(f'Prediction for image #{int(name)}', fontsize=25)
+        plt.tight_layout()
         utils.imsave(save, figure)
         plt.close()
 
     else:
-        utils.imsave(save, pred_img, False)
+        utils.imsave(save, images[1], False)
