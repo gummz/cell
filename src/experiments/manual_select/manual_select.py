@@ -38,7 +38,8 @@ def objective(manual_select, n_epochs, device):
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
     lr = 6.02006e-5
-    n_img_select = 1100  # = manual_select later
+    # 1100  # = manual_select later
+    n_img_select = manual_select if manual_select > 0 else 200
     weight_decay = 0.0007618
     # end hyperparameters
 
@@ -75,8 +76,6 @@ def objective(manual_select, n_epochs, device):
             model, device, opt, n_epochs, data_tr, data_val, time_str, hparam_dict, w, save=False, write=True)
 
     # reload validation dataloaders with batch size of 1
-    # TODO: turn off shuffle! to be consistent when comparing
-    # between manual and no manual
     _, data_val = get_dataloaders(
         root=root, batch_size=1, num_workers=num_workers,
         resize=image_size, n_img_select=(1, 1),
@@ -112,7 +111,7 @@ def objective(manual_select, n_epochs, device):
             sans_mask_score, train_loss, val_loss)
 
 
-def score_report(result):
+def score_report(result: tuple):
     sens = f'bbox: {result[0]:.2f}, mask: {result[2]:.2f}'
     sens_sans = f'bbox: {result[4]:.2f}, mask: {result[6]:.2f}'
     print(f'\nSensitivity with manuals: {sens}')
@@ -128,10 +127,11 @@ if __name__ == '__main__':
     tic = time()
     device = utils.set_device()
     utils.setcwd(__file__)
+    debug = False
 
     n_labels = 1100
-    increment = 200
-    n_epochs = 30
+    n_epochs = 2 if debug else 30
+    increment = 500 if debug else 200
     n_trials = int(n_labels / increment) + 1
 
     iterable = range(0, n_labels, increment)
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     # 9: results from objective function
     # n_epochs * 2: train and validation loss for all epochs
     # 2: average train and val loss over epochs
-    study = np.empty((n_trials, 9 + n_epochs * 2 + 2))
+    study = np.empty((n_trials, 10 + n_epochs * 2 + 2))
 
     # perform study
     for i, manual_select in enumerate(iterable):
@@ -161,7 +161,8 @@ if __name__ == '__main__':
             train_loss = np.pad(train_loss, pad)
             val_loss = np.pad(val_loss, pad)
 
-        study[i] = (manual_select, *result[:-2],
+        n_img_select = manual_select if manual_select > 0 else 300
+        study[i] = (n_img_select, manual_select, *result[:-2],
                     *train_loss, *val_loss, mean_tr, mean_val)
 
         # output results of current iteration
