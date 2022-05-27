@@ -325,6 +325,7 @@ def bce_loss(y_real, y_pred):
 
 
 if __name__ == '__main__':
+    tic = time()
 
     # Environment variable for memory management
     alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
@@ -347,20 +348,21 @@ if __name__ == '__main__':
     num_classes = 2
 
     # hyperparameters
-    size = 512
-    batch_size = 32  # 2
+    size = 1024
+    batch_size = 8  # 2
     pretrained = True
     num_epochs = 30  # 500
-    lr = 6.02006e-5  # 0.00001
-    wd = 0.0007618  # 0.001
-    beta1 = 0.51929
-    beta2 = 0.61231
-    n_img_select = 1100
+    lr = 3.418507038460298e-06
+    wd = 1.2957404400334042e-08
+    beta1 = 0.2438598958001344
+    beta2 = 0.9849760264270886
+    n_img_select = 1101
     manual_select = 1
+    img_filter = 'bilateral'
 
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=1, resize=size,
-        n_img_select=(n_img_select, 1), manual_select=(manual_select, 1))
+        batch_size=batch_size, num_workers=4, resize=size,
+        n_img_select=(n_img_select, 1), manual_select=(manual_select, 1), img_filter=img_filter)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
@@ -372,7 +374,6 @@ if __name__ == '__main__':
     save = f'interim/run_{time_str}'
 
     params = [p for p in model.parameters() if p.requires_grad]
-    # betas: 0.6459, 0.9595
     opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[beta1, beta2])
 
     loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
@@ -408,33 +409,8 @@ if __name__ == '__main__':
 
     losses = np.array(losses).T
 
-    pickle.dump(model, open(join('interim', f'run_{time_str}')))
+    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
-    # Special note that is saved as the name of a file with
-    # a name which is the value of the string `special_mark`
-    # special_mark = 'all_losses'
-    # if special_mark:
-    #     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
-
-    # np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
-    # pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
-
-    # plt.subplot(121)
-    # plt.plot(losses[0])
-    # title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-    # plt.title(title_train)
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Total loss')
-
-    # plt.subplot(122)
-    # plt.plot(losses[1])
-    # title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-    # plt.title(title_val)
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Total loss')
-
-    # plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
-
-    # TODO: optuna
-    # compare with and without autocast for training of final model
-    # optuna: what losses to include?
+    elapsed = utils.time_report(tic, time())
+    print('train_model finished after', elapsed)
+    
