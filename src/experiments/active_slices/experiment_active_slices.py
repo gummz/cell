@@ -205,7 +205,8 @@ if __name__ == '__main__':
     # data_tr, data_val = get_dataloaders(resize=size)
 
     # 1. Choose raw data file
-    name = list(c.RAW_FILES_GENERALIZE.keys())[1]
+    name = list(c.RAW_FILES_TRAIN.keys())[1]
+    names = list(c.RAW_FILES_TRAIN.keys())
     name = utils.add_ext([name])
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
@@ -213,19 +214,20 @@ if __name__ == '__main__':
     utils.make_dir(join(save, name))
 
     # either ssh with full data:
-    path = join(c.RAW_DATA_DIR, name)
-    raw_data_file = AICSImage(path)
-    # ... or local with small debug file:
-    # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
+    for name in names:
+        path = join(c.RAW_DATA_DIR, name)
+        raw_data_file = AICSImage(path)
+        # ... or local with small debug file:
+        # timepoints = np.load(join(c.DATA_DIR, 'sample.npy'))
 
-    # # Choose time range
-    time_start = 0
-    time_end = 1
+        # # Choose time range
+        time_start = 0
+        time_end = 10
 
-    # 2. Loop over each timepoint at a time
-    time_range = range(time_start, time_end)
-    centroids = predict_ssh(raw_data_file, [10, 100],
-                            device, None)
+        # 2. Loop over each timepoint at a time
+        time_range = range(time_start, time_end)
+        centroids = predict_ssh(raw_data_file, time_range,
+                                device, None)
     centroids_save = [(cent.get_center(), cent.get_intensity())
                       for centers in centroids for cent in centers]
     np.savetxt(
