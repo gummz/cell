@@ -128,20 +128,14 @@ class BetaCellDataset(torch.utils.data.Dataset):
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.masks_full = list(sorted(masks_full))
-        self.img_filter = img_filter
+        self.img_filter = c.FILTERS[img_filter] if img_filter else None
 
     def __getitem__(self, idx):
         # load images and mask
         img_path = join(self.root, self.mode,
                         c.IMG_DIR, self.imgs[idx])
-        # if self.mode == 'train':
-        #     print('chosen index', self.masks[idx], idx)
-        #     print('masks_full', self.masks_full)
-        #     print('len masks', len(self.masks))
 
         if self.masks[idx] in self.masks_full:
-            # if self.mode == 'train':
-            #     print(f'Selected full annotation for index {idx} and mode {self.mode}.')
             mask_dir = c.MASK_DIR_FULL
         else:
             mask_dir = c.MASK_DIR
