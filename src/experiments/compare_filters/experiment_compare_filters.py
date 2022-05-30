@@ -8,15 +8,14 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 from time import time
-from skimage.filters import threshold_yen, frangi
+from skimage import filters  # threshold_yen, frangi
 from skimage.exposure import rescale_intensity
-from skimage.io import imread, imsave
-# from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+
 import src.data.constants as c
 import src.data.utils.utils as utils
 
 mode = 'train'
-img_idx = 1000
+img_idx = 1500
 
 tic = time()
 utils.setcwd(__file__)
@@ -160,15 +159,16 @@ for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:
 # _, thresh = cv2.threshold(img_blur, SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
 # cv2.imwrite(f'{save}/{operation}_{img_name}.png', thresh)
 
-# # Operation
-# # Rescale intensity
-# operation = 'rescale_intensity'
-# yen_threshold = threshold_yen(img_blur)
-# bright = rescale_intensity(img_blur, (0, yen_threshold), (0, 255))
-# # bright = Image.fromarray(bright)
+# Operation
+# Rescale intensity
+operation = 'rescale_intensity'
+yen_threshold = filters.threshold_yen(img_blur)
+for thresh in range(80, 220, 20):
+    bright = filters.rescale_intensity(
+        img_blur, (0, yen_threshold), (220, 255))
+    utils.imsave(join(save, operation, thresh), bright)
 
-# cv2.imwrite(f'{save}/{img_name}_{operation}.jpg', bright)
-
+# bright = Image.fromarray(bright)
 
 # # Operation
 # # Generate and save histogram of intensified image
