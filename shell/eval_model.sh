@@ -5,7 +5,7 @@
 ### -- set the job Name --
 #BSUB -J eval
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 1
+#BSUB -n 4
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
@@ -23,7 +23,7 @@
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_eval
 
 module load python3/3.8.11
 ###python3 -m venv venv_1

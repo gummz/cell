@@ -10,6 +10,7 @@ from src.models.utils.utils import collate_fn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 import src.models.train_model as train
+import torchmetrics.functional as F
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 import src.data.constants as c
 from os.path import join
@@ -40,13 +41,14 @@ def eval_model(model, dataloader, mode, device, save=None):
         with autocast():
             pred = get_prediction(model, device, image)
 
-        if i % 40 == 0:
+        if True:  # i % 40 == 0:
             save_path = join(save, f'{i:05d}')
             target_mask = utils.get_mask(target['masks']) * 255
             inputs = (image.cpu(), pred, target_mask.cpu())
             titles = ('Original', 'Prediction', 'Ground Truth')
             grid = (1, 3)
-            viz.output_pred(mode, i, inputs, titles, grid, save_path, True, 300)
+            viz.output_pred(mode, i, inputs, titles,
+                            grid, save_path, True, 300)
 
         cm_mask, score_mask = performance_mask(pred, target)
         scores_mask[i] = np.mean(score_mask)
@@ -59,8 +61,8 @@ def eval_model(model, dataloader, mode, device, save=None):
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
 
-    return (cm_mask_tot, avg_score_mask,
-            cm_bbox_tot, avg_score_bbox)
+    return (cm_bbox_tot, avg_score_bbox,
+            cm_mask_tot, avg_score_mask)
 
 
 def performance_bbox(pred, target):
@@ -69,6 +71,7 @@ def performance_bbox(pred, target):
     in a slice.
     '''
     pred_bboxes = pred['boxes']
+    len_pred = len(pred_bboxes)
     target_bboxes = target['boxes']
 
     # edge cases
@@ -87,24 +90,23 @@ def performance_bbox(pred, target):
     scores = np.zeros(len(target_bboxes))
     tp = 0  # true postives
     fn = 0  # false negatives
+    taken = []
 
     for i, target_bbox in enumerate(target_bboxes):
-        iou_scores = np.zeros(len(pred_bboxes))
+        iou_scores = np.zeros(len_pred)
         for j, pred_bbox in enumerate(pred_bboxes):
             iou_scores[j] = calc_iou_bbox(pred_bbox, target_bbox)
 
         max_arg = np.argmax(iou_scores)
-        if iou_scores[max_arg] < 0.1:
+        if iou_scores[max_arg] < 0.2:
             fn += 1
-            scores[i] = 0
-        else:
+        elif max_arg not in taken:
+            taken.append(max_arg)
             tp += 1
-            # pred_copy[max_arg] = 0
-            # target_copy[i] = 0
             scores[i] = iou_scores[max_arg]
 
     # didn't yield a true positive
-    fp = len(pred_bboxes) - tp
+    fp = len_pred - tp
     confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
 
     # no matches; all predictions are false positives,
@@ -132,7 +134,6 @@ def performance_mask(pred, target):
     # pred_mask == target_mask, sum, the one with the highest
     # sum value is deemed to be matched with this instance
     # of the prediction
-    thresh = 50
     pred_masks = pred['masks']
     target_masks = target['masks']
 
@@ -151,34 +152,37 @@ def performance_mask(pred, target):
 
     pred_masks_nonzero = [mask > thresh for mask in pred_masks]
     target_masks_nonzero = [mask != 0 for mask in target_masks]
+
     scores = np.zeros(len(target_masks))
     tp = 0  # true positives
     fn = 0  # false negatives
 
     # if (len(pred_masks_nonzero) == 0 and len(target_masks_nonzero) != 0) or False:
     #     return scores
-
+    taken = []
     # find the most similar mask among all target masks
     for i, target_mask in enumerate(target_masks_nonzero):
-        max_sum = 0
+        max_iou = 0
+        idx = 0
         for j, pred_mask in enumerate(pred_masks_nonzero):
-            same = pred_mask == target_mask
-            summed = torch.sum(same.flatten())
+            iou = calc_iou_mask(pred_mask, target_mask)
 
-            if summed > max_sum:
-                max_sum = summed
+            if iou > max_iou:
+                max_iou = iou
                 idx = j
 
-        if max_sum < 625:  # 25**2 out of 255**2
+        if max_iou < 0.2:  # 25**2 out of 255**2
             # we don't bother with marking this as a match
             fn += 1
-            scores[i] = 0
-        else:
+        elif idx not in taken:
             # here, the most suitable predicted mask has been found
-            suitable_prd = pred_masks[idx]
-            tp += 1
 
-            scores[i] = calc_iou_mask(suitable_prd, target_mask)
+            # take the mask out of consideration
+            taken.append(idx)
+
+            # suitable_prd = pred_masks_nonzero[idx]
+            tp += 1
+            scores[i] = max_iou
 
     # false positives are all the predictions which
     # didn't yield a true positive
@@ -201,9 +205,10 @@ def performance_mask(pred, target):
 
 
 def calc_iou_mask(pred_mask, target_mask):
-    inter_cond = (pred_mask == 1) == (target_mask == 1)
+    inter_cond = torch.logical_and(pred_mask, target_mask)
     area_inter = torch.sum(inter_cond.flatten())
-    union_cond = (pred_mask == 1) == (target_mask == 1)
+
+    union_cond = torch.logical_or(pred_mask, target_mask)
     area_union = torch.sum(union_cond.flatten())
 
     iou = area_inter / area_union
@@ -214,18 +219,22 @@ def calc_iou_mask(pred_mask, target_mask):
 if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
+    mode = 'val'
     device = utils.set_device()
-    model = utils.get_model(c.MODEL_STR, device)
-    dataset = BetaCellDataset(
-        transforms=get_transform(train=False), mode='val',
-        n_img_select=1, manual_select=1)
-    dataloader = DataLoader(dataset, batch_size=1,
-                            shuffle=False, num_workers=1, collate_fn=collate_fn)
+    save = join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval', 'seg_2d', f'model_{c.MODEL_STR}', mode)
 
-    ious = eval_model(model, dataloader, device)
-    print('\nMask CM\n', ious[0], '\n')
-    print('Mask IOU\n', ious[1], '\n')
-    print('Bbox CM\n', ious[2], '\n')
-    print('Bbox IOU\n', ious[3], '\n')
+    model = utils.get_model(c.MODEL_STR, device)
+
+    dataset = BetaCellDataset(
+        transforms=get_transform(train=False), mode=mode,
+        n_img_select=1, manual_select=1, img_filter='bilateral')
+    dataloader = DataLoader(dataset, batch_size=1,
+                            shuffle=False, num_workers=4, collate_fn=collate_fn)
+
+    ious = eval_model(model, dataloader, 'val', device, save)
+    print('\Bbox CM\n', ious[0], '\n')
+    print('Bbox IOU\n', ious[1], '\n')
+    print('Mask CM\n', ious[2], '\n')
+    print('Mask IOU\n', ious[3], '\n')
 
     print(f'Evaluation complete after {utils.time_report(tic, time())}.')
