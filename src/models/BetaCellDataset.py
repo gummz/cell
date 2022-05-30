@@ -9,6 +9,7 @@ import torch
 from PIL import Image
 import src.data.constants as c
 from src.models.utils import transforms as T
+import skimage
 from src.models.utils.utils import collate_fn
 import src.data.utils.utils as utils
 from torch.utils.data import DataLoader
@@ -144,16 +145,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
         img = np.int16(np.load(img_path))
 
-        # PREPROCESSING
-        img = cv2.normalize(img, None, alpha=0, beta=255,
-                            dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-        if self.img_filter:
-            # TODO: change self.img_filter to string and define filters
-            # in constants.py
-            img_filter, args = self.img_filter
-            img = img_filter(img, *args)
-        # END PREPROCESSING
-
         mask = np.load(mask_path)
         mask = np.array(mask)
 
@@ -222,9 +213,24 @@ class BetaCellDataset(torch.utils.data.Dataset):
         target["centroids"] = centroids
 
         if self.transforms is not None:
+            # PREPROCESSING
+            img = cv2.normalize(img, None, alpha=0, beta=255,
+                                dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+
             # img, target = self.transforms(img, target)
+            # img = skimage.exposure.rescale_intensity(
+            #     img, in_range=(0, 255), out_range=(200, 255))
+            # img = img.astype(np.uint8)
+            # img_filter, args = c.FILTERS['nlmeans']
+            # img = img_filter(img, *args)
+            if self.img_filter:
+                # in constants.py
+                img_filter, args = self.img_filter
+                img = img_filter(img, *args)
+
             img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
+
             img = F.pil_to_tensor(Image.fromarray(img))
             # img = img.unsqueeze(0)
 
