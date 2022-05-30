@@ -7,12 +7,13 @@ from os.path import join
 import pickle
 
 
-def track(chains: list) -> pd.DataFrame:
+def track(chains: list, track_radius=c.TRACK_RADIUS) -> pd.DataFrame:
     columns = ['frame', 'x', 'y', 'z', 'intensity']
     df_chains = pd.DataFrame(
         chains, columns=columns, dtype=float
     )
-    tr = trackpy.link(df_chains[columns], c.TRACK_RADIUS)
+
+    tr = trackpy.link(df_chains[columns], track_radius)
 
     # tr_filter = list(tr.groupby('particle'))
     # # filter out short tracks
