@@ -16,16 +16,21 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
                   size: int = 512, device=None):
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
+
     # Randomly sample 2 slices to debug (per timepoint)
     Z = timepoint_raw.shape[0]
     debug_idx = np.random.randint(0, Z, 2)
-    for i, (idx, z_slice) in enumerate(zip(debug_idx, timepoint_raw[debug_idx])):
+
+    iterable = zip(debug_idx, timepoint_raw[debug_idx])
+    for i, (idx, z_slice) in enumerate(iterable):
         z_slice = np.int16(z_slice)
 
         boxes = pred[i]['boxes']
         masks = pred[i]['masks']  # [mask > 0.5 for mask in pred[i]['masks']]
 
         if len(masks) == 0:
+            plt.imshow(z_slice)
+            plt.title(f'Number of detections: {len(boxes)}')
             utils.imsave(join(save,
                               f't-{t}_{idx}.jpg'), z_slice, size)
             continue
@@ -33,17 +38,20 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
         # masks = torch.stack(masks)
         # masks = masks.squeeze(1).to(device)
 
-        z_slice = torch.tensor(z_slice).repeat(3, 1, 1)
-        z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1)
+        z_slice = torch.tensor(z_slice, device=device).repeat(3, 1, 1)
+        z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1, device)
         z_slice = z_slice.clone().detach().unsqueeze(0)
 
         # consolidate masks into one array
         mask = utils.get_mask(masks).unsqueeze(0)
         # overlay masks onto slice
 
-        masked_img = torch.where(mask > 0, mask, z_slice[0])
+        masked_img = torch.where(mask > 50, mask, z_slice[0])
 
         bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())
+
+        plt.imshow(bboxed_img[0])
+        plt.title(f'Number of detections: {len(boxes)}')
 
         utils.imsave(join(save,
                           f't-{t}_{idx}.jpg'), bboxed_img[0], 512)
@@ -127,7 +135,7 @@ def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
 
     if not save:
         save = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                    'eval', mode, f'{i:05d}')
+                    'eval', mode)
     # draw_output(image[0].cpu(), pred_img.cpu().squeeze(), save, compare, dpi)
     images = (image.squeeze(), pred_img)
     if len(inputs) > 2:
@@ -135,11 +143,11 @@ def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
         rest = (item.cpu() for item in rest)
         images = (*images, *rest)
 
-    draw_output(images, titles, grid, save, compare, dpi)
+    draw_output(images, titles, grid, save, i, compare, dpi)
 
 
 def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
-                grid: tuple[int], save: str, compare: bool,
+                grid: tuple[int], save: str, idx: int, compare: bool,
                 dpi: int):
     utils.make_dir(save)
 
@@ -160,8 +168,7 @@ def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
             plt.xlabel(x_dim)
             plt.ylabel(y_dim)
 
-        name = os.path.basename(save)
-        plt.suptitle(f'Prediction for image #{int(name)}', fontsize=25)
+        plt.suptitle(f'Prediction for image #{idx}', fontsize=25)
         plt.tight_layout()
         utils.imsave(save, figure)
         plt.close()
