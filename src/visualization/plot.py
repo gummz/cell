@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import subprocess as sp
+
+import pandas as pd
 import src.data.constants as c
 import cv2
 import src.data.utils.utils as utils
@@ -81,23 +83,25 @@ def get_cmap():
 def save_figures(centroids, save):
     utils.make_dir(save)
     file = save.split('/')[-2]
-    max_array = [frame.intensity.values for _, frame in centroids]
-    max_array = np.concatenate(max_array)
-    # colors = viz.get_colors(max_array, 'winter')
-    for j, (_, frame) in enumerate(centroids):
+    max_item = len(tuple(pd.unique(centroids['particle'])))
+
+    colors = viz.get_colors(max_item, 'tab20')
+
+    frames = centroids.groupby('frame')
+    for j, (_, frame) in enumerate(frames):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
         X, Y, Z, I, P, cmap = prepare_3d(frame)
 
         # TODO: normalize I for frames in `centroids`
 
-        # switch Z and Y because we want Z to be depth
         for x, y, z, i, p in zip(X, Y, Z, I, P):
             if i < c.ACTIVE_THRESHOLD:
                 marker = 'x'
             else:
                 marker = 'o'
 
-            ax.scatter(x, z, y, cmap=cmap, marker=marker)
+            # switch Z and Y because we want Z to be depth
+            ax.scatter(x, z, y, cmap=colors[p], marker=marker)
             # ax.text(x, z, y, p)
 
         ax.set_xlim3d(0, 1025)

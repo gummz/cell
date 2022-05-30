@@ -24,7 +24,7 @@ def eval_track(tracked_centroids, filename, location):
     cmap = 'tab20'
 
     # choose marker size
-    marker_size = 15
+    marker_size = 10
 
     # folder is: pred/eval/track/
     # create relevant directories
@@ -36,6 +36,7 @@ def eval_track(tracked_centroids, filename, location):
     max_item = len(tracked_centroids.groupby('particle'))
     # get unique colors for each detected cell
     colors = viz.get_colors(max_item, cmap)
+
     path = join(c.RAW_DATA_DIR, filename)
     channels = [c.CELL_CHANNEL, c.TUBE_CHANNEL]
     columns = ['x', 'y', 'particle', 'intensity']
@@ -147,7 +148,7 @@ def plot_markers(marker_size, colors, X, Y, P, I):
         else:
             marker = 'o'
         plt.plot(x, y, c=colors[p], marker=marker,
-                 markersize=marker_size, markeredgewidth=5)
+                 markersize=marker_size, markeredgewidth=3)
 
 
 if __name__ == '__main__':
@@ -156,17 +157,20 @@ if __name__ == '__main__':
     # output 2D movie
     name = c.PRED_FILE
 
+    load_location = join(c.DATA_DIR, c.PRED_DIR,
+                         c.PRED_FILE, 'tracked_centroids.pkl')
     tracked_centroids = pickle.load(
-        open(join(c.DATA_DIR, c.PRED_DIR, c.PRED_FILE, 'tracked_centroids.pkl'), 'rb'))
-    location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                    'eval', 'track_2D', c.PRED_FILE)
-    utils.make_dir(location)
+        open(load_location, 'rb'))
 
-    eval_track(tracked_centroids, c.PRED_FILE, location)
+    save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                         'eval', 'track_2D', c.PRED_FILE)
+    utils.make_dir(save_location)
+
+    eval_track(tracked_centroids, c.PRED_FILE, save_location)
 
     frames = tuple(tracked_centroids.groupby('frame'))
     time_range = range(len(frames))
-    plot.create_movie(join(location, 'with_tracking'),
+    plot.create_movie(join(save_location, 'with_tracking'),
                       time_range)
 
     elapsed = utils.time_report(tic, time())
