@@ -117,8 +117,12 @@ def threshold_masks(masks, threshold=0.5):
     segmentations (i.e., model has to be more certain
     in its predictions).
     '''
-    print(masks.dtype, type(threshold), type(0.)))
-    return torch.where(masks > threshold, masks, 0.)
+    dtype, device = masks.dtype, masks.device
+    threshold = torch.tensor(threshold, dtype=dtype,
+                             device=device)
+    zero = torch.tensor(0, dtype=dtype,
+                        device=device)
+    return torch.where(masks > threshold, masks, zero)
 
 
 def remove_boxes(bboxes, scores, nms_threshold=0.3):
