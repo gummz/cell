@@ -6,7 +6,7 @@ from multiprocessing.spawn import prepare
 from os import listdir
 from os.path import join
 from pprint import pp
-
+import skimage
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,18 +73,16 @@ def get_predictions(model,
             for input in inputs:
                 pred = model([input])[0]
                 preds.append(pred)
-            # preds = [model([input]) for input in inputs]
 
     for pred in preds:
-        bboxes = pred['boxes']
-        scores = pred['scores']
-
         # perform modified NMS algorithm
-        idx = remove_boxes(bboxes, scores)
+        idx = remove_boxes(pred['boxes'], pred['scores'])
         # select boxes by idx
         pred['boxes'] = pred['boxes'][idx]
         # select masks by idx
         pred['masks'] = pred['masks'][idx]
+
+        pred['masks'] = threshold_masks(pred['masks'])
 
     return preds
 
@@ -96,30 +94,43 @@ def get_prediction(model, device, input):
     # Predict the image with batch index `img_idx`
     # with the model
     with torch.no_grad():
-        pred = model([input])
+        pred = model([input])[0]
 
-    bboxes = pred[0]['boxes']
-    scores = pred[0]['scores']
+    bboxes = pred['boxes']
+    scores = pred['scores']
 
-    # # perform modified NMS algorithm
+    # perform modified NMS algorithm
     idx = remove_boxes(bboxes, scores)
     # select boxes by idx
-    pred[0]['boxes'] = pred[0]['boxes'][idx]
+    pred['boxes'] = pred['boxes'][idx]
     # select masks by idx
-    pred[0]['masks'] = pred[0]['masks'][idx]
+    pred['masks'] = pred['masks'][idx]
 
-    return pred[0]
+    pred['masks'] = threshold_masks(pred['masks'])
+
+    return pred
 
 
-def remove_boxes(bboxes, scores, threshold=0.3):
+def threshold_masks(masks, threshold=0.5):
+    '''
+    Thresholds masks to make more concise
+    segmentations (i.e., model has to be more certain
+    in its predictions).
+    '''
+    print(masks.dtype, type(threshold), type(0.)))
+    return torch.where(masks > threshold, masks, 0.)
+
+
+def remove_boxes(bboxes, scores, nms_threshold=0.3):
     if len(bboxes) == 0:
         return torch.tensor([], dtype=torch.int64)
 
-    select = scores > 0.2
+    # reject uncertain predictions
+    select = scores > 0.5
     bboxes = bboxes[select]
     scores = scores[select]
 
-    idx = torchvision.ops.nms(bboxes, scores, iou_threshold=threshold)
+    idx = torchvision.ops.nms(bboxes, scores, iou_threshold=nms_threshold)
 
     # #TODO: better: find clusters of bounding boxes, and run
     # NMS on them separately
@@ -202,18 +213,18 @@ def predict(path: str,
             device: torch.device,
             model, save: str) -> list(tuple):
     chains_tot = []
-
+    data = AICSImage(path)
     for t in time_idx:
         timepoint_raw = utils.get_raw_array(
-            path, t=t).compute()
+            data, t=t).compute()
 
         # prepare data for model, since we're not using
         # BetaCellDataset class
         timepoint = prepare_model_input(timepoint_raw, device)
-        # pred = get_predictions(model, device, timepoint)
+
         preds = get_predictions(model, device, timepoint)
 
-        # Draw bounding boxes on slice for debugging
+        # draw bounding boxes on slice for debugging
         viz.output_sample(join(save, 'debug'), t,
                           timepoint_raw, preds, 1024, device)
 
@@ -223,6 +234,8 @@ def predict(path: str,
         # get center and intensity of all cells in timepoint
         chains = CL.get_chains(timepoint, preds, c.SEARCHRANGE)
         chains_tot.append(chains)
+
+        del timepoint_raw
 
     return chains_tot
 
@@ -247,11 +260,15 @@ def prepare_model_input(array, device):
     #     #     z_slice, z_slice, 11, 7, 21)
     #     z_slices.append(z_slice)
     # timepoint = np.array(z_slices)
-    
+
     array = utils.normalize(array, 0, 1, cv2.CV_32F, device)
+    # array = [skimage.exposure.rescale_intensity(
+    #     z_slice, in_range=(0, 1), out_range=(220 / 255, 1))
+    #     for z_slice in array]
+
+    # apply filter
     img_filter, args = c.FILTERS['bilateral']
-    print(array.shape)
-    array = img_filter(array, *args)
+    array = [img_filter(z_slice, *args) for z_slice in array]
     array = torch.tensor(array, device=device)
 
     dim_inputs = len(array.shape)
@@ -296,7 +313,7 @@ if __name__ == '__main__':
 
     # # Choose time range
     time_start = 0
-    time_end = 10
+    time_end = 50
 
     time_range = range(time_start, time_end)
     path = join(c.RAW_DATA_DIR, c.PRED_FILE)
@@ -312,14 +329,14 @@ if __name__ == '__main__':
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
-    tracked_centroids = tracker.track(centroids_np)
+    tracked_centroids = tracker.track(centroids_np, 100)
 
     pickle.dump(tracked_centroids,
                 open(join(save, 'tracked_centroids.pkl'), 'wb'))
+    tracked_centroids.to_csv(join(save, 'tracked_centroids.csv'))
 
     location = join(save, 'timepoints')
-    frames = tuple(tracked_centroids.groupby('frame'))
-    plot.save_figures(frames, location)
+    plot.save_figures(tracked_centroids, location)
     plot.create_movie(location, time_range)
 
     # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
