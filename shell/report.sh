@@ -31,4 +31,4 @@ module load python3/3.8.11
 source ../venv_1/bin/activate
 
 # Run file
-python3 ../src/data/make_dataset_val.py > pyout
+python3 ../src/visualization/report.py > pyout
