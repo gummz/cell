@@ -150,9 +150,6 @@ def performance_mask(pred, target):
         confusion_matrix = np.array([[0, fn], [0, np.nan]])
         return confusion_matrix, np.array([0])
 
-    pred_masks_nonzero = [mask > thresh for mask in pred_masks]
-    target_masks_nonzero = [mask != 0 for mask in target_masks]
-
     scores = np.zeros(len(target_masks))
     tp = 0  # true positives
     fn = 0  # false negatives
@@ -161,10 +158,10 @@ def performance_mask(pred, target):
     #     return scores
     taken = []
     # find the most similar mask among all target masks
-    for i, target_mask in enumerate(target_masks_nonzero):
+    for i, target_mask in enumerate(target_masks > 0):
         max_iou = 0
         idx = 0
-        for j, pred_mask in enumerate(pred_masks_nonzero):
+        for j, pred_mask in enumerate(pred_masks > 0):
             iou = calc_iou_mask(pred_mask, target_mask)
 
             if iou > max_iou:
