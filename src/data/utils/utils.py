@@ -134,25 +134,34 @@ def get_model(time_str: str, device: torch.device):
     return model
 
 
-def get_raw_array(file_path, t=None, z=None,
+def get_raw_array(data, t=None, z=None,
                   ch=c.CELL_CHANNEL):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     Output is 4D (timepoints and xyz spatial dimensions)
+
+    If get_raw_array needs to be used multiple times in the same script,
+    drawing from the same raw data file, it's better to pass an AICSImage
+    as `input`.
     '''
 
     if t is None and z is None:
-        return None
+        raise ValueError('Either time, slice dimension, or both must be specified.')
 
-    if os.path.exists(file_path):
-        raw_data = AICSImage(file_path)
+    if isinstance(data, str):  # `data` is path to file, not file itself
+        if os.path.exists(data):
+            raw_data = AICSImage(data)
+        else:
+            raw_data = AICSImage(c.SAMPLE_PATH)
+            print((
+                f'WARNING: Could not access {data}.\n'
+                f'Using sample dataset from {c.SAMPLE_PATH}.'
+            ))
+    elif isinstance(data, AICSImage):  # `data` is file itself
+        raw_data = data
     else:
-        raw_data = AICSImage(c.SAMPLE_PATH)
-        print((
-            f'WARNING: Could not access {file_path}.\n'
-            f'Using sample dataset from {c.SAMPLE_PATH}.'
-        ))
+        raise ValueError('Unknown data type for `data`.')
 
     t_tuple = 'T' if has_len(t) or t is None else ''
     z_tuple = 'Z' if has_len(z) != int or z is None else ''
