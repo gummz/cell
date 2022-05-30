@@ -1,3 +1,9 @@
+- Threshold masks AFTER thresholding scores! So we already have masks with object score over 0.5. Do this to get more precise segmentations. Do this first in eval_model and see how it affect average mask score.
+
+- Print out calculation of intensity in centroids script to see if numbers are accurate
+
+- Make contribution to aicsimageio: warn user when a datafile from the same path has been created multiple times
+
 - Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
 
 - Look at results from broad gridsearch and narrow it down
