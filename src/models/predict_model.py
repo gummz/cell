@@ -1,40 +1,20 @@
 from __future__ import annotations
 
-import os
 import pickle
-from multiprocessing.spawn import prepare
-from os import listdir
 from os.path import join
-from pprint import pp
-import skimage
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import src.data.constants as c
 import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
+from torchvision.transforms import functional as F
 import src.visualization.utils as viz
 import torch
 import torchvision
-from aicsimageio import AICSImage
-from matplotlib.image import BboxImage
 from PIL import Image
-from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
-                                        get_transform)
-from src.models.utils.model import get_instance_segmentation_model
-from src.models.utils.utils import collate_fn
+from aicsimageio import AICSImage
 import src.tracking.track_cells as tracker
 from src.visualization import plot
-from torch.utils.data import DataLoader, Subset
-from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
-
-
-def get_masks(outputs):
-    masks = [get_mask(output) for output in outputs]
-    masks = torch.stack(masks, dim=0)
-
-    return masks
 
 
 def get_predictions(model,
@@ -130,7 +110,7 @@ def remove_boxes(bboxes, scores, nms_threshold=0.3):
         return torch.tensor([], dtype=torch.int64)
 
     # reject uncertain predictions
-    select = scores > 0.5
+    select = scores > 0.1
     bboxes = bboxes[select]
     scores = scores[select]
 
@@ -244,7 +224,7 @@ def predict(path: str,
     return chains_tot
 
 
-def prepare_model_input(array, device):
+def prepare_model_input(timepoint, device):
     ''''
     Prepares data for input to model if BetaCellDataset
     class is not being used.
@@ -265,27 +245,43 @@ def prepare_model_input(array, device):
     #     z_slices.append(z_slice)
     # timepoint = np.array(z_slices)
 
-    array = utils.normalize(array, 0, 1, cv2.CV_32F, device)
+    timepoint = utils.normalize(np.int16(timepoint), 0, 1, cv2.CV_32F, device)
     # array = [skimage.exposure.rescale_intensity(
     #     z_slice, in_range=(0, 1), out_range=(220 / 255, 1))
     #     for z_slice in array]
 
     # apply filter
-    img_filter, args = c.FILTERS['bilateral']
-    array = [img_filter(z_slice, *args) for z_slice in array]
-    array = torch.tensor(array, device=device)
+    # img_filter, args = c.FILTERS['bilateral']
+    # array = [img_filter(z_slice, *args) for z_slice in array]
+    # array = torch.tensor(array, device=device)
 
-    dim_inputs = len(array.shape)
-    dim_squeeze = len(array.squeeze())
+    timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
+                              dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    img_filter, args = c.FILTERS['bilateral']
+
+    timepoint = [img_filter(z_slice, *args)
+                 for z_slice in timepoint]
+    timepoint = torch.tensor(timepoint, device=device)
+
+    timepoint = cv2.normalize(timepoint.cpu().numpy(), None, alpha=0, beta=1,
+                              dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
+
+    timepoint = [F.pil_to_tensor(Image.fromarray(z_slice))
+                 for z_slice in timepoint]
+    timepoint = torch.stack(timepoint)
+    timepoint = timepoint.to(device)
+
+    dim_inputs = len(timepoint.shape)
+    dim_squeeze = len(timepoint.squeeze().shape)
     if dim_inputs != dim_squeeze:
-        array = torch.unsqueeze(array, -3)
+        timepoint = torch.unsqueeze(timepoint, -3)
 
     # turn 4d tensor into list of 3d tensors
     # (format which is required by model)
-    if len(array.shape) == 4:
-        array = [item for item in array]
+    if len(timepoint.shape) == 4:
+        timepoint = [item for item in timepoint]
 
-    return array
+    return timepoint
 
 
 if __name__ == '__main__':

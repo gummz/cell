@@ -231,7 +231,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
             img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
 
-            img = F.pil_to_tensor(Image.fromarray(img))
+            img = torch.tensor(img)
             # img = img.unsqueeze(0)
 
         # TODO:
