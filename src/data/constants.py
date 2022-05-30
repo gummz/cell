@@ -14,7 +14,7 @@ SEARCHRANGE = 20
 
 # TRACKING RADIUS (pixels)
 # (tracking cells in 3D space)
-TRACK_RADIUS = 10
+TRACK_RADIUS = 30
 
 # LOGGING IMAGE SIZE
 LOGGING_IMG_SIZE = 512
@@ -136,6 +136,9 @@ TUBE_CHANNEL = 1
 
 MODEL_STR = '25_05_16H_51M_45S'
 # 29_04_21H_43M_43S
+# :::::
+#
+# '28_05_12H_38M_47S'
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
 SAMPLE_PATH = join(DATA_DIR, 'sample.npy')
 
