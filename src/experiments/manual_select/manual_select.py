@@ -7,6 +7,7 @@ import numpy as np
 from os.path import join
 import src.data.constants as c
 import src.data.utils.utils as utils
+from pprint import pprint
 from torch.utils.data import DataLoader
 import pickle
 from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
@@ -17,7 +18,7 @@ from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 
 
-def objective(manual_select, n_epochs, device):
+def objective(n_img_select, manual_select, n_epochs, device):
 
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
@@ -39,7 +40,7 @@ def objective(manual_select, n_epochs, device):
     # losses = trial.suggest_categorical('losses', loss_selection)
     lr = 6.02006e-5
     # 1100  # = manual_select later
-    n_img_select = manual_select if manual_select > 0 else 200
+    # n_img_select = 1100  # manual_select if manual_select > 0 else 200
     weight_decay = 0.0007618
     # end hyperparameters
 
@@ -96,6 +97,10 @@ def objective(manual_select, n_epochs, device):
     results_no_manual = eval_model(
         model, data_val_no_manual, 'val', device, join(save, 'sans'))
 
+    cm_bbox = results[0]
+    cm_mask = results[2]
+    cm_sans_bbox = results_no_manual[0]
+    cm_sans_mask = results_no_manual[2]
     sens_bbox = utils.calc_sensitivity(results[0])
     sens_mask = utils.calc_sensitivity(results[2])
     sens_sans_bbox = utils.calc_sensitivity(results_no_manual[0])
@@ -106,18 +111,19 @@ def objective(manual_select, n_epochs, device):
     # TODO: separate into manual and automatic annotations
     # in this function
 
-    return (sens_bbox, bbox_score, sens_mask, mask_score,
+    return (cm_bbox, cm_mask, cm_sans_bbox, cm_sans_mask,
+            sens_bbox, bbox_score, sens_mask, mask_score,
             sens_sans_bbox, sans_bbox_score, sens_sans_mask,
             sans_mask_score, train_loss, val_loss)
 
 
 def score_report(result: tuple):
-    sens = f'bbox: {result[0]:.2f}, mask: {result[2]:.2f}'
-    sens_sans = f'bbox: {result[4]:.2f}, mask: {result[6]:.2f}'
+    sens = f'bbox: {result[4]:.2f}, mask: {result[6]:.2f}'
+    sens_sans = f'bbox: {result[8]:.2f}, mask: {result[10]:.2f}'
     print(f'\nSensitivity with manuals: {sens}')
     print(f'Sensitivity without manuals: {sens_sans}')
-    score = f'bbox: { result[1]:.2f}, mask: {result[3]:.2f}'
-    score_sans = f'bbox: {result[5]:.2f}, mask: {result[7]:.2f}'
+    score = f'bbox: { result[5]:.2f}, mask: {result[7]:.2f}'
+    score_sans = f'bbox: {result[9]:.2f}, mask: {result[11]:.2f}'
     print(f'Average score: {score}')
     print(f'Average sans score: {score_sans}')
     print()
@@ -130,8 +136,8 @@ if __name__ == '__main__':
     debug = False
 
     n_labels = 1100
-    n_epochs = 2 if debug else 30
-    increment = 500 if debug else 200
+    n_epochs = 1 if debug else 30
+    increment = 1100 if debug else 200
     n_trials = int(n_labels / increment) + 1
 
     iterable = range(0, n_labels, increment)
@@ -143,14 +149,26 @@ if __name__ == '__main__':
     # 9: results from objective function
     # n_epochs * 2: train and validation loss for all epochs
     # 2: average train and val loss over epochs
-    study = np.empty((n_trials, 10 + n_epochs * 2 + 2))
+    study = np.empty((n_trials, 16))
+    tr_col = (f'tr_loss_{i}' for i in range(n_epochs))
+    val_col = (f'val_loss_{i}' for i in range(n_epochs))
+    # print(len(tr_col), len(val_col))
+    columns = ['n_img', 'n_manual', 'cm_bbox', 'cm_mask', 'cm_sans_bbox',
+               'cm_sans_mask', 'sens_bbox', 'bbox_score', 'sens_mask',
+               'mask_score', 'sens_sans_bbox', 'sans_bbox_score',
+               'sens_sans_mask', 'sans_mask_score',
+               'mean_tr_loss', 'mean_val_loss']
+    # print(study.shape, len(columns))
+    # for i, column in enumerate(columns):
+    #     print(i, column)
+    study = pd.DataFrame(study, columns=columns, dtype=object)
 
     # perform study
     for i, manual_select in enumerate(iterable):
         print('=' * 60, '\n' + '=' * 60)
         print('Number of manually labeled images:', manual_select)
-
-        result = objective(manual_select, n_epochs, device)
+        n_img_select = 1100  # manual_select if manual_select > 0 else 200
+        result = objective(n_img_select, manual_select, n_epochs, device)
         train_loss, val_loss = result[-2], result[-1]
         mean_tr = np.mean(train_loss)
         mean_val = np.mean(val_loss)
@@ -161,24 +179,14 @@ if __name__ == '__main__':
             train_loss = np.pad(train_loss, pad)
             val_loss = np.pad(val_loss, pad)
 
-        n_img_select = manual_select if manual_select > 0 else 300
-        study[i] = (n_img_select, manual_select, *result[:-2],
-                    *train_loss, *val_loss, mean_tr, mean_val)
+        study.iloc[i] = (n_img_select, manual_select, *result[:-2],
+                         mean_tr, mean_val)
 
         # output results of current iteration
         score_report(result)
 
     # save study
-    # tr_col = (f'tr_loss_{i}' for i in range(n_epochs))
-    # val_col = (f'val_loss_{i}' for i in range(n_epochs))
-    # print(len(tr_col), len(val_col))
-    # columns = ['n_manual', 'sens_bbox', 'bbox_score', 'sens_mask', 'mask_score'
-    #            'sens_sans_bbox', 'sans_bbox_score' 'sens_sans_mask',
-    #            'sans_mask_score', *tr_col, *val_col, 'mean_tr_loss',
-    #            'mean_val_loss']
-    # print(len(columns))
-    df = pd.DataFrame(study)
-    df.to_csv('manual_select_study.csv')
+    study.to_csv('manual_select_study.csv')
     pickle.dump(study, open('manual_select_study.pkl', 'wb'))
 
     # print elapsed time of script
