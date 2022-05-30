@@ -73,7 +73,7 @@ def objective(n_img_select, manual_select, n_epochs, device):
     with SummaryWriter(f'runs/manual_{manual_select}') as w:
         print(batch_size, image_size,
               manual_select, '\n')
-        train_loss, val_loss = train(
+        model, train_loss, val_loss = train(
             model, device, opt, n_epochs, data_tr, data_val, time_str, hparam_dict, w, save=False, write=True)
 
     # reload validation dataloaders with batch size of 1

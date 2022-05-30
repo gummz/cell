@@ -1,4 +1,5 @@
 # from skimage.io import imread
+import copy
 import datetime
 import os
 import pickle
@@ -75,6 +76,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
     for i, epoch in enumerate(range(epochs)):
         model.train()  # train mode
+        model_keep = copy.deepcopy(model)
+
         tic = time()
         print(f'\n* Epoch {epoch+1}/{epochs}')
 
@@ -203,14 +206,19 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
             dump_model(model, time_str)
 
         # early stopping
-        patience = 15  # number of epochs to wait for validation loss to improve
-        if i > patience:
-            early_thresh = 0.95  # ratio threshold at which to stop at
+        patience = 5  # number of epochs to wait for validation loss to improve
+        if i > patience and i % patience == 0:
             val_prev = tot_val_losses[i-patience:i]
             val_now = val_loss
-            if val_now / np.mean(val_prev) > early_thresh:
+            stop_cond = (val_now > val for val in val_prev)
+            if all(stop_cond):
+                # last five val losses are all smaller than
+                # current val loss
                 print('Early stopping activated; stopping training.')
+                model = model_keep
                 break
+            else:
+                model_keep = copy.deepcopy(model)
 
         # end epoch
 
@@ -225,7 +233,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
 
-    return tot_train_losses, tot_val_losses
+    return model, tot_train_losses, tot_val_losses
+    # TODO: add model to return
 
 
 def create_grid(x_val, y_val, y_hat, batch_size):
@@ -403,14 +412,13 @@ if __name__ == '__main__':
                         '''
 
     with SummaryWriter(f'runs/{time_str}') as w:
-        losses = train(model, device, opt, num_epochs,
-                       data_tr, data_val, time_str, hparam_dict, w, save=True, write=False)
+        model, train_loss, val_loss = train(model, device, opt, num_epochs,
+                                            data_tr, data_val, time_str, hparam_dict,
+                                            w, save=True, write=False)
         w.add_text('description', description)
 
-    losses = np.array(losses).T
-
-    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
+    pickle.dump(model, open(
+        join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
     elapsed = utils.time_report(tic, time())
     print('train_model finished after', elapsed)
-    
