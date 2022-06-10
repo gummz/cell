@@ -1,7 +1,6 @@
-project_name
-==============================
+# My M.Sc. project
 
-Beta cell segmentation in pancreas
+# Beta cell detection, segmentation, and tracking
 
 Project Organization
 ------------
