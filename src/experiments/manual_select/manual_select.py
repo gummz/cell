@@ -129,61 +129,75 @@ def score_report(result: tuple):
     print()
 
 
-if __name__ == '__main__':
-    tic = time()
-    device = utils.set_device()
-    utils.setcwd(__file__)
-    debug = False
+def perform_study(objective, device):
 
+    debug = False
     n_labels = 1100
     n_epochs = 1 if debug else 30
     increment = 1100 if debug else 200
     n_trials = int(n_labels / increment) + 1
+
+    columns = ['n_img', 'n_manual', 'cm_bbox', 'cm_mask', 'cm_sans_bbox',
+               'cm_sans_mask', 'sens_bbox', 'bbox_score', 'sens_mask',
+               'mask_score', 'sens_sans_bbox', 'sans_bbox_score',
+               'sens_sans_mask', 'sans_mask_score',
+               'mean_tr_loss', 'mean_val_loss']
+
+    study = pd.DataFrame(np.empty((n_trials, 16)),
+                         columns=columns, dtype=object)
 
     iterable = range(0, n_labels, increment)
     if n_labels not in iterable:
         iterable = (*iterable, n_labels)
         n_trials += 1
 
-    # shape of study array:
-    # 9: results from objective function
-    # n_epochs * 2: train and validation loss for all epochs
-    # 2: average train and val loss over epochs
-    study = np.empty((n_trials, 16))
-    tr_col = (f'tr_loss_{i}' for i in range(n_epochs))
-    val_col = (f'val_loss_{i}' for i in range(n_epochs))
-    # print(len(tr_col), len(val_col))
-    columns = ['n_img', 'n_manual', 'cm_bbox', 'cm_mask', 'cm_sans_bbox',
-               'cm_sans_mask', 'sens_bbox', 'bbox_score', 'sens_mask',
-               'mask_score', 'sens_sans_bbox', 'sans_bbox_score',
-               'sens_sans_mask', 'sans_mask_score',
-               'mean_tr_loss', 'mean_val_loss']
-    # print(study.shape, len(columns))
-    # for i, column in enumerate(columns):
-    #     print(i, column)
-    study = pd.DataFrame(study, columns=columns, dtype=object)
-
-    # perform study
     for i, manual_select in enumerate(iterable):
         print('=' * 60, '\n' + '=' * 60)
         print('Number of manually labeled images:', manual_select)
-        n_img_select = 1100  # manual_select if manual_select > 0 else 200
+
+        # n_img_select = 1100
+        #   if number of images should be constant
+        # n_img_select = manual_select
+        #   if number of images should be same as
+        #   no. manual labels
+        n_img_select = manual_select if manual_select != 0 else increment
+        print('Number of images in training set:', n_img_select)
+
         result = objective(n_img_select, manual_select, n_epochs, device)
         train_loss, val_loss = result[-2], result[-1]
         mean_tr = np.mean(train_loss)
         mean_val = np.mean(val_loss)
 
         # if early stopping activated, fill rest of epochs with zeros
-        if len(train_loss) < n_epochs:
-            pad = (0, n_epochs - len(train_loss))
-            train_loss = np.pad(train_loss, pad)
-            val_loss = np.pad(val_loss, pad)
+        # if len(train_loss) < n_epochs:
+        #     pad = (0, n_epochs - len(train_loss))
+        #     train_loss = np.pad(train_loss, pad)
+        #     val_loss = np.pad(val_loss, pad)
 
         study.iloc[i] = (n_img_select, manual_select, *result[:-2],
                          mean_tr, mean_val)
 
         # output results of current iteration
         score_report(result)
+
+        return study
+
+
+if __name__ == '__main__':
+    tic = time()
+    device = utils.set_device()
+    utils.setcwd(__file__)
+
+    # print(len(tr_col), len(val_col))
+    
+
+    # shape of study array:
+    # 9: results from objective function
+    # n_epochs * 2: train and validation loss for all epochs
+    # 2: average train and val loss over epochs
+
+    # perform study
+    study = perform_study(objective, device)
 
     # save study
     study.to_csv('manual_select_study.csv')
