@@ -10,11 +10,11 @@ ACTIVE_THRESHOLD = 1e-2
 
 # NEXT CENTER SEARCH RADIUS (pixels)
 # (stitching cells together between slices)
-SEARCHRANGE = 20
+SEARCHRANGE = 50
 
 # TRACKING RADIUS (pixels)
 # (tracking cells in 3D space)
-TRACK_RADIUS = 30
+TRACK_RADIUS = 100
 
 # LOGGING IMAGE SIZE
 LOGGING_IMG_SIZE = 512
