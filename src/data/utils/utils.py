@@ -115,9 +115,10 @@ def get_mask(output):
     return mask
 
 
-def get_model(time_str: str, device: torch.device):
+def get_model(time_str: str, device: torch.device, ):
 
-    folder = f'../models/interim/run_{time_str}'
+    folder = join(c.PROJECT_DIR, 'src', 'models',
+                  'interim', f'run_{time_str}')
 
     # Load model
     load_path = join(folder, f'model_{time_str}.pkl')
@@ -147,7 +148,8 @@ def get_raw_array(data, t=None, z=None,
     '''
 
     if t is None and z is None:
-        raise ValueError('Either time, slice dimension, or both must be specified.')
+        raise ValueError(
+            'Either time, slice dimension, or both must be specified.')
 
     if isinstance(data, str):  # `data` is path to file, not file itself
         if os.path.exists(data):
@@ -204,6 +206,7 @@ def imsave(path, img, resize=512, cmap=None):
 
     if type(img) == mplt.figure.Figure:
         img.savefig(path)
+        plt.close()
         return
     else:
         if type(img) == torch.Tensor:
