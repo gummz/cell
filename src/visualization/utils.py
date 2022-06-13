@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import random
 from matplotlib import pyplot as plt
 import pandas as pd
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
@@ -13,13 +14,16 @@ import numpy as np
 
 
 def output_sample(save: str, t: int, timepoint_raw, pred,
-                  size: int = 512, device=None):
+                  size: int = 512, device='cpu'):
+    utils.make_dir(save)
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
 
     # Randomly sample 2 slices to debug (per timepoint)
     Z = timepoint_raw.shape[0]
-    debug_idx = np.random.randint(0, Z, 2)
+    # debug_idx = np.random.randint(0, Z, 2)
+    debug_idx = [Z - int(Z / 2), Z - int(Z / 3), Z - int(Z / 4)]
+    debug_idx = range(Z)
 
     iterable = zip(debug_idx, timepoint_raw[debug_idx])
     for i, (idx, z_slice) in enumerate(iterable):
@@ -29,32 +33,51 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
         masks = pred[i]['masks']  # [mask > 0.5 for mask in pred[i]['masks']]
 
         if len(masks) == 0:
+            figure = plt.figure()
             plt.imshow(z_slice)
             plt.title(f'Number of detections: {len(boxes)}')
             utils.imsave(join(save,
-                              f't-{t}_{idx}.jpg'), z_slice, size)
+                              f't-{t}_{idx}.jpg'), figure, size)
             continue
 
         # masks = torch.stack(masks)
         # masks = masks.squeeze(1).to(device)
-
-        z_slice = torch.tensor(z_slice, device=device).repeat(3, 1, 1)
-        z_slice = utils.normalize(z_slice, 0, 255, cv2.CV_8UC1, device)
-        z_slice = z_slice.clone().detach().unsqueeze(0)
-
         # consolidate masks into one array
         mask = utils.get_mask(masks).unsqueeze(0)
         # overlay masks onto slice
 
-        masked_img = torch.where(mask > 50, mask, z_slice[0])
+        # z_slice = torch.tensor(z_slice, device=device).repeat(3, 1, 1)
+        z_slice = utils.normalize(z_slice, 0, 1, cv2.CV_32FC1, device)
+        # temporarily
+        z_slice = torch.tensor(z_slice, device=mask.device,
+                               dtype=mask.dtype)
+        zero = torch.tensor(0, device=mask.device, dtype=mask.dtype)
 
-        bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())
+        assert z_slice.shape == mask.shape, \
+            'Shapes of slice and mask must match'
+        assert z_slice.dtype == mask.dtype, \
+            'Dtypes of slice and mask must match'
 
-        plt.imshow(bboxed_img[0])
-        plt.title(f'Number of detections: {len(boxes)}')
+        masked_img = torch.where(mask > zero, mask, z_slice.unsqueeze(0))
 
-        utils.imsave(join(save,
-                          f't-{t}_{idx}.jpg'), bboxed_img[0], 512)
+        bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())[0]
+
+        assert bboxed_img.shape == z_slice.shape, \
+            'Bounding box image and slice image shapes must match'
+
+        # plt.subplot(121)
+        # plt.imshow(bboxed_img[0])
+        # plt.title(f'Number of detections: {len(boxes)}')
+        # plt.subplot(122)
+        # plt.imshow(z_slice)
+        # plt.title('Ground Truth')
+
+        # utils.imsave(join(save,
+        #                   f't-{t}_{idx}.jpg'), figure, 512)
+        images = (bboxed_img, z_slice.squeeze().cpu())
+        titles = ('Prediction', 'Ground Truth')
+        grid = (1, 2)
+        draw_output(images, titles, grid, save, compare=True)
 
 
 def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
@@ -84,6 +107,7 @@ def get_colors(
         max_item: ArrayLike,
         colormap: str):
     '''
+
     Returns color value for integer p.
 
     If max_array contains floating values, make 
@@ -95,6 +119,8 @@ def get_colors(
     Outputs:
         color
     '''
+    random.seed(42)
+
     # find ceiling of color scale
     if type(max_item) == int:
         # max_item is requested number of colors
@@ -105,6 +131,8 @@ def get_colors(
     cmap = plt.get_cmap(colormap)
     colors = [cmap(i) for i in np.linspace(0, 1, scale_max)]
 
+    # shuffle so that
+    random.shuffle(colors)
     return colors
 
 
@@ -147,8 +175,8 @@ def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
 
 
 def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
-                grid: tuple[int], save: str, idx: int, compare: bool,
-                dpi: int):
+                grid: tuple[int], save: str, idx: int = None, compare: bool = False,
+                dpi: int = None):
     utils.make_dir(save)
 
     if compare:
@@ -168,7 +196,8 @@ def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
             plt.xlabel(x_dim)
             plt.ylabel(y_dim)
 
-        plt.suptitle(f'Prediction for image #{idx}', fontsize=25)
+        plt.suptitle(
+            f'Prediction for image {idx if idx else None}', fontsize=25)
         plt.tight_layout()
         utils.imsave(save, figure)
         plt.close()
