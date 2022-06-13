@@ -90,7 +90,17 @@ def save_figures(centroids, save):
     frames = centroids.groupby('frame')
     for j, (_, frame) in enumerate(frames):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-        X, Y, Z, I, P, cmap = prepare_3d(frame)
+        ax.invert_yaxis()
+
+        ax.set_xlim3d(0, 1025)
+        ax.set_ylim3d(0, 50)
+        ax.set_zlim3d(1025, 0)
+        ax.set_xlabel('X dimension')
+        ax.set_ylabel('Z dimension')
+        ax.set_zlabel('Y dimension')
+        ax.set_title(f'File: {file}\nTimepoint: {j}')
+
+        X, Y, Z, I, P, _ = prepare_3d(frame)
 
         # TODO: normalize I for frames in `centroids`
 
@@ -101,16 +111,10 @@ def save_figures(centroids, save):
                 marker = 'o'
 
             # switch Z and Y because we want Z to be depth
-            ax.scatter(x, z, y, cmap=colors[p], marker=marker)
-            # ax.text(x, z, y, p)
+            ax.scatter(x, z, y, color=colors[p], marker=marker)
+            ax.text(x, z, y, s=int(z), color=colors[p])
 
-        ax.set_xlim3d(0, 1025)
-        ax.set_ylim3d(0, 50)
-        ax.set_zlim3d(0, 1025)
-        ax.set_xlabel('X dimension')
-        ax.set_ylabel('Z dimension')
-        ax.set_zlabel('Y dimension')
-        ax.set_title(f'File: {file}\nTimepoint: {j}')
+        
 
         plt.savefig(join(save, f'{j:05d}.png'),
                     dpi=300, bbox_inches='tight')
