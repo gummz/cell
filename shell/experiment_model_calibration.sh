@@ -25,7 +25,7 @@
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_calib
 
 module load python3/3.8.11
 module load cuda/11.1
@@ -47,4 +47,4 @@ source ../venv_1/bin/activate
 ###python3 -m pip --disable-pip-version-check install pycocotools
 
 # Run file
-python3 ../src/experiments/calibration/model_calibration.py > pyout
+python3 ../src/experiments/calibration/model_calibration.py > pyout_calib
