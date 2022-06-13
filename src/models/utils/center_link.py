@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 
 class CenterLink():
@@ -255,8 +256,8 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
     # Total bounding boxes and masks (each element is for each slice)
     # Each element is also a list; but is now all elements inside the slice;
     # bounding boxes in bbox_tot, and masks in masks_tot.
-    bboxes_tot = [pred['boxes'] for pred in preds]
-    masks_tot = [pred['masks'] for pred in preds]
+    bboxes_tot = (pred['boxes'] for pred in preds)
+    masks_tot = (pred['masks'] for pred in preds)
     centers_tot = []
 
     image_iter = zip(timepoint, masks_tot, bboxes_tot)
@@ -266,7 +267,7 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
         for mask, bbox in zip(masks, bboxes):  # each box in slice
             center = get_bbox_center(bbox, z)
 
-            # Coordinates in original slice
+            # Mask coordinates in original slice
             mask_nonzero = np.argwhere(mask.detach().cpu())
 
             # Get cell coordinates in original image (z_slice)
@@ -276,6 +277,13 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
             # TODO: average intensity: take only pixels above
             # a certain threshold
             intensity = np.mean(region.numpy())
+            if intensity == np.nan or math.isnan(intensity):
+                print('\n\n\nintensity nan')
+                print('region shape', region.shape)
+                print('unique region', np.unique(region, return_counts=True))
+                print('masknonzero shape', mask_nonzero.shape)
+                print('masknonzero unique', np.unique(
+                    mask_nonzero.cpu(), return_counts=True))
 
             center_link = CenterLink(center, intensity)
             centers.append(center_link)
@@ -308,7 +316,7 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
         CenterChain(link).get_state()
         for links in centers_tot
         for link in links
-        if link.get_prev() is None and 
+        if link.get_prev() is None and
         link.get_center() is not None
     ]
     # Get chains (= whole cells)
