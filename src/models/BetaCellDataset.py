@@ -289,6 +289,53 @@ def get_dataloaders(root=c.DATA_DIR, batch_size=4,
     return data_tr, data_val
 
 
+def get_dataloader(root=c.DATA_DIR, mode='train', batch_size=4,
+                   num_workers=4, resize=1024, n_img_select=1,
+                   manual_select=1, img_filter='bilateral', shuffle=True):
+    '''Get dataloader, i.e. single instance of a dataloader.
+        resize: resize image in __getitem__ method of dataset class.
+
+        manual_ratio: how many manually (i.e., fully) annotated
+        images to include. Default: None (0)
+    '''
+    # use our dataset and defined transformations
+    train = True if mode == 'train' else False
+    dataset = BetaCellDataset(
+        root, get_transform(train=train),
+        resize=resize, mode=mode, n_img_select=n_img_select,
+        manual_select=manual_select, img_filter=img_filter)
+
+    # split the dataset in train and test set
+    # torch.manual_seed(1)
+
+    # indices = torch.randperm(len(dataset)).tolist()
+
+    # val_idx = int(0.1 * len(dataset))
+    # indices = range(len(dataset))
+    # val_tp = c.TIMEPOINTS[-1]
+    # dataset = torch.utils.data.Subset(dataset, indices[:-val_tp])
+    # dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_tp:])
+
+    # define training and validation data loaders
+    data = DataLoader(
+        dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
+        collate_fn=collate_fn)
+
+    return data
+
+
+def get_dataset(root=c.DATA_DIR, mode='train',
+                resize=1024, n_img_select=1,
+                manual_select=1, img_filter='bilateral'):
+    train = True if mode == 'train' else False
+    dataset = BetaCellDataset(
+        root, get_transform(train=train),
+        resize=resize, mode=mode, n_img_select=n_img_select,
+        manual_select=manual_select, img_filter=img_filter)
+
+    return dataset
+
+
 def get_transform(train):
     '''Gets transforms based on if train=True or train=False.'''
     transforms = []
