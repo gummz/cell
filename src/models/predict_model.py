@@ -19,10 +19,15 @@ from src.visualization import plot
 
 def get_predictions(model,
                     device: torch.device,
-                    inputs: list[torch.Tensor]) -> list(dict(torch.Tensor)):
+                    inputs: list[torch.Tensor],
+                    accept_range: tuple = (0.5, 1)) -> list(dict(torch.Tensor)):
     '''
     Input:
-        inputs: A tensor or list of inputs.
+        model: the model with which to perform the predictions.
+        device: the device in which the model resides.
+        inputs: list of tensors. Inputs to the model.
+        reject_threshold: the threshold at which to reject
+            uncertain predictions.
 
     Output:
         preds: The raw output of the model.
@@ -56,7 +61,8 @@ def get_predictions(model,
 
     for pred in preds:
         # perform modified NMS algorithm
-        idx = remove_boxes(pred['boxes'], pred['scores'])
+        idx = remove_boxes(pred['boxes'], pred['scores'],
+                           accept_range)
         # select boxes by idx
         pred['boxes'] = pred['boxes'][idx]
         # select masks by idx
@@ -67,7 +73,7 @@ def get_predictions(model,
     return preds
 
 
-def get_prediction(model, device, input):
+def get_prediction(model, device, input, accept_range=(0.5, 1)):
 
     model.eval()
 
@@ -80,11 +86,21 @@ def get_prediction(model, device, input):
     scores = pred['scores']
 
     # perform modified NMS algorithm
-    idx = remove_boxes(bboxes, scores)
+    idx = remove_boxes(bboxes, scores, accept_range)
     # select boxes by idx
+    # print('len of boxes before rejection', len(pred['boxes']))
     pred['boxes'] = pred['boxes'][idx]
+    # print('len of boxes after rejection', len(pred['boxes']))
+
     # select masks by idx
     pred['masks'] = pred['masks'][idx]
+    # select scores by idx
+    print('accept range', accept_range)
+    print(pred['scores'])
+    print('avg score before rejection', np.mean(pred['scores'].cpu().numpy()))
+    pred['scores'] = pred['scores'][idx]
+    print('avg score after rejection', np.mean(
+        pred['scores'].cpu().numpy()), '\n')
 
     pred['masks'] = threshold_masks(pred['masks'])
 
@@ -105,16 +121,29 @@ def threshold_masks(masks, threshold=0.5):
     return torch.where(masks > threshold, masks, zero)
 
 
-def remove_boxes(bboxes, scores, nms_threshold=0.3):
+def remove_boxes(bboxes, scores,
+                 accept_range=(0.5, 1), nms_threshold=0.3):
     if len(bboxes) == 0:
         return torch.tensor([], dtype=torch.int64)
 
     # reject uncertain predictions
-    select = scores > 0.1
-    bboxes = bboxes[select]
-    scores = scores[select]
+    lower, upper = accept_range
+    select = torch.logical_and(lower < scores, scores < upper)
+    # bboxes = bboxes[select]
+    # scores = scores[select]
 
-    idx = torchvision.ops.nms(bboxes, scores, iou_threshold=nms_threshold)
+    idx = torchvision.ops.nms(
+        bboxes, scores, iou_threshold=nms_threshold)
+
+    # make idx and select index tensors comparable
+    indices = torch.zeros(len(bboxes), dtype=torch.bool, device=bboxes.device)
+    indices[idx] = True
+
+    # remove bboxes both using idx and select
+    idx = torch.logical_and(indices, select)
+    # print(scores)
+    # print(indices, select)
+    # exit()
 
     # #TODO: better: find clusters of bounding boxes, and run
     # NMS on them separately
@@ -158,20 +187,16 @@ def remove_boxes(bboxes, scores, nms_threshold=0.3):
             # is box inside box2?
             if bbox_contained(box, box2):
                 # delete box
-                idx[i] = -1
+                idx[i] = False
                 continue
 
-    after_contain_idx = idx[idx != -1]
-
-    for i, box in enumerate(bboxes[after_contain_idx]):
+    for i, box in enumerate(bboxes[idx]):
         area = calc_bbox_area(box)
         # reject small bounding boxes
         if area <= 4:
-            after_contain_idx[i] = -1
+            idx[i] = False
 
-    final_idx = after_contain_idx[after_contain_idx != -1]
-
-    return final_idx
+    return idx
 
 
 def calc_bbox_area(box):
@@ -206,7 +231,8 @@ def predict(path: str,
         # BetaCellDataset class
         timepoint = prepare_model_input(timepoint_raw, device)
 
-        preds = get_predictions(model, device, timepoint)
+        preds = get_predictions(
+            model, device, timepoint, accept_range=(0.5, 1))
 
         # draw bounding boxes on slice for debugging
         viz.output_sample(join(save, 'debug'), t,
@@ -271,15 +297,15 @@ def prepare_model_input(timepoint, device):
     timepoint = torch.stack(timepoint)
     timepoint = timepoint.to(device)
 
-    dim_inputs = len(timepoint.shape)
-    dim_squeeze = len(timepoint.squeeze().shape)
-    if dim_inputs != dim_squeeze:
-        timepoint = torch.unsqueeze(timepoint, -3)
+    # dim_inputs = len(timepoint.shape)
+    # dim_squeeze = len(timepoint.squeeze().shape)
+    # if dim_inputs != dim_squeeze:
+    #     timepoint = torch.unsqueeze(timepoint, -3)
 
     # turn 4d tensor into list of 3d tensors
     # (format which is required by model)
-    if len(timepoint.shape) == 4:
-        timepoint = [item for item in timepoint]
+    # if len(timepoint.shape) == 4:
+    #     timepoint = [item for item in timepoint]
 
     return timepoint
 
@@ -299,21 +325,19 @@ if __name__ == '__main__':
     # 1. Choose raw data file
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    name = c.PRED_FILE
+    files = tuple(c.RAW_FILES['test'].keys())
+    files = utils.add_ext(files)
+    name = files[0]  # c.PRED_FILE
     # # Make directory for this raw data file
     # # i.e. mode/pred/name
     save = join(c.PROJECT_DATA_DIR, mode, name)
     utils.make_dir(save)
 
-    # either ssh with full data:
     path = join(c.RAW_DATA_DIR, c.PRED_FILE)
 
-    # ... or local with small debug file:
-    # path = np.load(c.SAMPLE_PATH)
-
     # # Choose time range
-    time_start = 0
-    time_end = 50
+    time_start = 100
+    time_end = 110
 
     time_range = range(time_start, time_end)
     path = join(c.RAW_DATA_DIR, c.PRED_FILE)
@@ -324,7 +348,7 @@ if __name__ == '__main__':
 
     centroids_np = [(t, centroid[0], centroid[1],
                      centroid[2], centroid[3])
-                    for t, timepoint in enumerate(centroids)
+                    for t, timepoint in zip(time_range, centroids)
                     for centroid in timepoint]
     np.savetxt(
         join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
