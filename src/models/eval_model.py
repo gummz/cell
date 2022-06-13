@@ -11,37 +11,40 @@ from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 import src.models.train_model as train
 import torchmetrics.functional as F
+import src.models.BetaCellDataset as bcd
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 import src.data.constants as c
 from os.path import join
 import src.visualization.utils as viz
 
 
-def eval_model(model, dataloader, mode, device, save=None):
+def eval_model(model, dataset, mode, device, save=None,
+               accept_range=(0.5, 1), match_threshold=0.2):
     '''Calculates IOU for chosen set for the input model.
     TODO: Use with TensorBoard (add_scalar)
             (With Optuna in grid search, not in here)
     '''
-
-    scores_mask = np.zeros(len(dataloader))
-    scores_bbox = np.zeros(len(dataloader))
+    len_dataset = len(dataset)
+    scores_mask = np.zeros(len_dataset)
+    scores_bbox = np.zeros(len_dataset)
     cm_mask_tot = np.zeros((2, 2))
     cm_bbox_tot = np.zeros((2, 2))
+    certainty = np.zeros(len_dataset)
 
     model.eval()
-    for i, (images, targets) in enumerate(dataloader):
-        # batch size of 1
-        image = images[0]
+    for i, (image, target) in enumerate(dataset):
+        # image = images
         image = image.to(device)
-        target = targets[0]
+        # target = targets
 
         # move target to device
         target['masks'] = target['masks'].to(device)
         target['boxes'] = target['boxes'].to(device)
-        with autocast():
-            pred = get_prediction(model, device, image)
 
-        if True:  # i % 40 == 0:
+        with autocast():
+            pred = get_prediction(model, device, image, accept_range)
+
+        if i % 40 == 0:
             save_path = join(save, f'{i:05d}')
             target_mask = utils.get_mask(target['masks']) * 255
             inputs = (image.cpu(), pred, target_mask.cpu())
@@ -50,22 +53,33 @@ def eval_model(model, dataloader, mode, device, save=None):
             viz.output_pred(mode, i, inputs, titles,
                             grid, save_path, True, 300)
 
-        cm_mask, score_mask = performance_mask(pred, target)
+        cm_mask, score_mask = performance_mask(pred, target, match_threshold)
         scores_mask[i] = np.mean(score_mask)
         cm_mask_tot += cm_mask
 
-        cm_bbox, score_bbox = performance_bbox(pred, target)
+        cm_bbox, score_bbox = performance_bbox(pred, target, match_threshold)
         scores_bbox[i] = np.mean(score_bbox)
         cm_bbox_tot += cm_bbox
+
+        if len(pred['scores'] > 0):
+            certainty[i] = np.mean(pred['scores'].cpu().numpy())
+            print('avg certainty', certainty[i], '\n')
+        elif len(target['boxes'] > 0):
+            # set certainty as 0 when there are predictions
+            # but objects in the ground truth
+            certainty[i] = 0.
 
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
 
+    avg_certainty = np.round(np.mean(certainty), 2)
+
     return (cm_bbox_tot, avg_score_bbox,
-            cm_mask_tot, avg_score_mask)
+            cm_mask_tot, avg_score_mask,
+            avg_certainty)
 
 
-def performance_bbox(pred, target):
+def performance_bbox(pred, target, match_threshold=0.2):
     '''
     Returns mean IOU score of all bounding box detections
     in a slice.
@@ -76,16 +90,16 @@ def performance_bbox(pred, target):
 
     # edge cases
     if len(pred_bboxes) == 0 and len(target_bboxes) == 0:
-        confusion_matrix = np.array([[0, 0], [0, np.nan]])
-        return confusion_matrix, np.array([1])
+        confusion_matrix = create_cm(tp=0, fn=0, fp=0)
+        return confusion_matrix, (1,)
     elif len(pred_bboxes) != 0 and len(target_bboxes) == 0:
         fp = len(pred_bboxes)
-        confusion_matrix = np.array([[0, 0], [fp, np.nan]])
-        return confusion_matrix, np.array([0])
+        confusion_matrix = create_cm(tp=0, fn=0, fp=fp)
+        return confusion_matrix, (0,)
     elif len(pred_bboxes) == 0 and len(target_bboxes) != 0:
         fn = len(target_bboxes)
-        confusion_matrix = np.array([[0, fn], [0, np.nan]])
-        return confusion_matrix, np.array([0])
+        confusion_matrix = create_cm(tp=0, fn=fn, fp=0)
+        return confusion_matrix, (0,)
 
     scores = np.zeros(len(target_bboxes))
     tp = 0  # true postives
@@ -98,24 +112,24 @@ def performance_bbox(pred, target):
             iou_scores[j] = calc_iou_bbox(pred_bbox, target_bbox)
 
         max_arg = np.argmax(iou_scores)
-        if iou_scores[max_arg] < 0.2:
+        if iou_scores[max_arg] < match_threshold:
             fn += 1
         elif max_arg not in taken:
             taken.append(max_arg)
             tp += 1
             scores[i] = iou_scores[max_arg]
 
-    # didn't yield a true positive
-    fp = len_pred - tp
-    confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
-
     # no matches; all predictions are false positives,
     # and all targets are false negatives
-    if len(scores) == 0:
+    if sum(scores) == 0:
         fp = len(pred_bboxes)
         fn = len(target_bboxes)
-        confusion_matrix = np.array([[0, fn], [fp, np.nan]])
-        return confusion_matrix, np.array([0])
+        confusion_matrix = create_cm(tp=0, fn=fn, fp=fp)
+        return confusion_matrix, (0,)
+
+    # didn't yield a true positive
+    fp = len_pred - tp
+    confusion_matrix = create_cm(tp=tp, fn=fn, fp=fp)
 
     # count remaining false positives as score 0
     fps = tuple(0 for item in range(fp))
@@ -129,7 +143,7 @@ def calc_iou_bbox(pred_bbox, target_bbox):
         pred_bbox.unsqueeze(0), target_bbox.unsqueeze(0))
 
 
-def performance_mask(pred, target):
+def performance_mask(pred, target, match_threshold=0.2):
     # match instance masks between prediction and target:
     # pred_mask == target_mask, sum, the one with the highest
     # sum value is deemed to be matched with this instance
@@ -139,16 +153,16 @@ def performance_mask(pred, target):
 
     # edge cases
     if len(pred_masks) == 0 and len(target_masks) == 0:
-        confusion_matrix = np.array([[0, 0], [0, np.nan]])
-        return confusion_matrix, np.array([1])
+        confusion_matrix = create_cm(tp=0, fn=0, fp=0)
+        return confusion_matrix, (1,)
     elif len(pred_masks) != 0 and len(target_masks) == 0:
         fp = len(pred_masks)
-        confusion_matrix = np.array([[0, 0], [fp, np.nan]])
-        return confusion_matrix, np.array([0])
+        confusion_matrix = create_cm(tp=0, fn=0, fp=fp)
+        return confusion_matrix, (0,)
     elif len(pred_masks) == 0 and len(target_masks) != 0:
         fn = len(target_masks)
-        confusion_matrix = np.array([[0, fn], [0, np.nan]])
-        return confusion_matrix, np.array([0])
+        confusion_matrix = create_cm(tp=0, fn=fn, fp=0)
+        return confusion_matrix, (0,)
 
     scores = np.zeros(len(target_masks))
     tp = 0  # true positives
@@ -168,7 +182,7 @@ def performance_mask(pred, target):
                 max_iou = iou
                 idx = j
 
-        if max_iou < 0.2:  # 25**2 out of 255**2
+        if max_iou < match_threshold:  # 25**2 out of 255**2
             # we don't bother with marking this as a match
             fn += 1
         elif idx not in taken:
@@ -181,18 +195,18 @@ def performance_mask(pred, target):
             tp += 1
             scores[i] = max_iou
 
+    # no matches; all predictions are false positives,
+    # and all targets are false negatives
+    if sum(scores) == 0:
+        fp = len(pred_masks)
+        fn = len(target_masks)
+        confusion_matrix = create_cm(tp=0, fn=fn, fp=fp)
+        return confusion_matrix, (0,)
+
     # false positives are all the predictions which
     # didn't yield a true positive
     fp = len(pred_masks) - tp
-    confusion_matrix = np.array([[tp, fn], [fp, np.nan]])
-
-    # no matches; all predictions are false positives,
-    # and all targets are false negatives
-    if len(scores) == 0:
-        fp = len(pred_masks)
-        fn = len(target_masks)
-        confusion_matrix = np.array([[0, fn], [fp, np.nan]])
-        return confusion_matrix, np.array([0])
+    confusion_matrix = create_cm(tp=tp, fn=fn, fp=fp)
 
     # count remaining false positives as score 0
     fps = tuple(0 for item in range(fp))
@@ -213,25 +227,39 @@ def calc_iou_mask(pred_mask, target_mask):
     return iou
 
 
+def create_cm(tp: int, fn: int, fp: int):
+    confusion_matrix = np.array([[tp, fn], [fp, 0]],
+                                dtype=np.int32)
+    return confusion_matrix
+
+
+def score_report(metrics):
+    (tp, fn), (fp, _) = metrics[0]
+    n_pred = int(tp + fp)
+    print('\nNumber of bbox predictions:', n_pred)
+    print('Bbox CM\n', metrics[0], '\n')
+    print('Bbox IOU\n', metrics[1], '\n')
+    print('Mask CM\n', metrics[2], '\n')
+    print('Mask IOU\n', metrics[3], '\n')
+    print('Average certainty\n', metrics[4], '\n')
+
+
 if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
     mode = 'val'
     device = utils.set_device()
-    save = join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval', 'seg_2d', f'model_{c.MODEL_STR}', mode)
+    save = join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
+                'seg_2d', f'model_{c.MODEL_STR}', mode)
 
     model = utils.get_model(c.MODEL_STR, device)
+    model = model.to(device)
 
-    dataset = BetaCellDataset(
-        transforms=get_transform(train=False), mode=mode,
-        n_img_select=1, manual_select=1, img_filter='bilateral')
-    dataloader = DataLoader(dataset, batch_size=1,
-                            shuffle=False, num_workers=4, collate_fn=collate_fn)
+    dataset = bcd.get_dataset(mode='val')
+    # dataloader = DataLoader(dataset, batch_size=1,
+    #                         shuffle=False, num_workers=4, collate_fn=collate_fn)
 
-    ious = eval_model(model, dataloader, 'val', device, save)
-    print('\Bbox CM\n', ious[0], '\n')
-    print('Bbox IOU\n', ious[1], '\n')
-    print('Mask CM\n', ious[2], '\n')
-    print('Mask IOU\n', ious[3], '\n')
+    ious = eval_model(model, dataset, 'val', device, save)
+    score_report(ious)
 
     print(f'Evaluation complete after {utils.time_report(tic, time())}.')
