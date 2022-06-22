@@ -1,3 +1,7 @@
+- Train new model on adaptive histogram equalized training images, try predicting with old model too
+
+- New validation set
+
 - In report.py: one function that loads and returns necessary objects, like data
 
 - Model calibration
