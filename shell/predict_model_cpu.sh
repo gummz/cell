@@ -1,20 +1,20 @@
-#!/bin/sh
-### General options
-### –- specify queue --
-#BSUB -q gpuv100
-### -- set the job Name --
-#BSUB -J predict
-### -- ask for number of cores (default: 1) --
-#BSUB -n 4
-#BSUB -R "select[gpu32gb]"
+#!/bin/sh 
+### General options 
+### -- specify queue -- 
+#BSUB -q hpc
+### -- set the job Name -- 
+#BSUB -J predict_cpu
+### -- ask for number of cores (default: 1) -- 
+#BSUB -n 4 
+### -- specify that the cores must be on the same host -- 
 #BSUB -R "span[hosts=1]"
-
-### -- Select the resources: 1 gpu in exclusive process mode --
-#BSUB -gpu "num=1:mode=exclusive_process"
-### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 23:00
-# request 5GB of system-memory
+### -- specify that we need 1GB of memory per core/slot -- 
 #BSUB -R "rusage[mem=6GB]"
+### -- specify that we want the job to get killed if it exceeds 3 GB per core/slot -- 
+#BSUB -M 7GB
+### -- set walltime limit: hh:mm -- 
+#BSUB -W 24:00 
+
 ### -- set the email address --
 # please uncomment the following line and put in your e-mail address,
 # if you want to receive e-mail notifications on a non-default address
@@ -29,8 +29,6 @@
 #BSUB -eo err_predict
 
 module load python3/3.8.11
-module load cuda/11.1
-module load opencv/3.4.16-python-3.8.11-cuda-11.1
 # module load ffmpeg/5.0.1
 ###python3 -m venv venv_1
 source ../venv_1/bin/activate
