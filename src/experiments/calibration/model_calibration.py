@@ -28,7 +28,7 @@ def perform_study(device, save, model, dataset, accept_ranges, match_thresholds)
     confusion_matrices, avg_certainty = (subframe[c].values
                                          for c in columns)
 
-    positive_ratio = (matrix[0][0] / (matrix[0][0] + matrix[1][0])
+    positive_ratio = (matrix[0][0] / (matrix[0][0] + matrix[0][1])
                       for matrix in confusion_matrices)
     return avg_certainty, positive_ratio
 
@@ -36,7 +36,7 @@ def perform_study(device, save, model, dataset, accept_ranges, match_thresholds)
 if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
-    mode = 'train'
+    mode = 'val'
     device = utils.set_device()
 
     save = osp.join('..', c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # grid search variables
     int_lower = np.round(np.linspace(0, 0.9, 10), 2)
     int_upper = np.round(np.linspace(0.1, 1, 10), 2)
-    accept_ranges = tuple((0, upper)
+    accept_ranges = tuple((lower, upper)
                           for lower, upper in zip(int_lower, int_upper))
     match_thresholds = (0.1,)
 
