@@ -12,15 +12,17 @@ def draw_cells(files, file_paths, consecutive, operation):
     for i, (file, file_path) in enumerate(zip(files, file_paths)):
         if 'LI_2020-12-10_emb3_pos2' in file:
             continue
-        
+
         print('Now:', file)
 
         data = AICSImage(file_path)
+
         if '.czi' not in file_path:
             T = data.dims['T'][0]
         else:
-            dims = utils.get_czi_dims(data.metadata)
-            T = dims['T']
+            continue
+            # dims = utils.get_czi_dims(data.metadata)
+            # T = dims['T']
 
         # Create sample indexes
         if consecutive:  # sample timepoints in a row
@@ -43,6 +45,11 @@ def draw_cells(files, file_paths, consecutive, operation):
         plt.suptitle(title, fontsize=10)
         save = join(c.FIG_DIR, operation, f'{file}.{c.IMG_EXT}')
         plt.savefig(save)
+        plt.close()
+        try:
+            data.close()
+        except AttributeError:
+            pass
 
 
 def get_MIP(timepoints: np.array):
@@ -56,7 +63,6 @@ if __name__ == '__main__':
     # Set working directory to file location
     print('draw_cells.py start')
     utils.setcwd(__file__)
-    print(os.getcwd())
 
     files = listdir(c.RAW_DATA_DIR)
 
