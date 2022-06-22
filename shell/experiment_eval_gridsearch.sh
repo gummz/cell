@@ -3,10 +3,9 @@
 ### –- specify queue --
 #BSUB -q gpuv100
 ### -- set the job Name --
-#BSUB -J predict
+#BSUB -J eval_gridsearch
 ### -- ask for number of cores (default: 1) --
 #BSUB -n 4
-#BSUB -R "select[gpu32gb]"
 #BSUB -R "span[hosts=1]"
 
 ### -- Select the resources: 1 gpu in exclusive process mode --
@@ -26,7 +25,7 @@
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
 #BSUB -oo out
-#BSUB -eo err_predict
+#BSUB -eo err
 
 module load python3/3.8.11
 module load cuda/11.1
@@ -48,4 +47,4 @@ source ../venv_1/bin/activate
 ###python3 -m pip --disable-pip-version-check install pycocotools
 
 # Run file
-python3 -m cProfile -s tottime ../src/models/predict_model.py > pyout_predict
+python3 ../src/experiments/eval_gridsearch/eval_gridsearch.py > pyout

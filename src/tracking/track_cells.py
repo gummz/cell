@@ -1,32 +1,43 @@
 import numpy as np
 import pandas as pd
-import src.data.utils.utils as utils
 import src.data.constants as c
 import trackpy
-from os.path import join
-import pickle
 
 
-def track(chains: list):
+def track(chains: list, track_radius: int = c.TRACK_RADIUS,
+          memory: int = 5,
+          threshold: int = 3,
+          adaptive_step: float = 0.8) -> pd.DataFrame:
     columns = ['frame', 'x', 'y', 'z', 'intensity']
     df_chains = pd.DataFrame(
         chains, columns=columns, dtype=float
     )
-    tr = trackpy.link(df_chains[columns], c.TRACK_RADIUS)
 
-    # tr_filter = list(tr.groupby('particle'))
-    # # filter out short tracks
-    # particles_after = [item[1].particle for item in tr_filter
-    #                    if len(item[1]) > 5]
+    tr = trackpy.link(df_chains[columns], track_radius,
+                      memory=memory, adaptive_step=adaptive_step,
+                      adaptive_stop=10)
+    filtered = trackpy.filtering.filter_stubs(tr, threshold=threshold)
+    filtered.reset_index(drop=True, inplace=True)
 
-    # tr_final = tr[tr.particle.isin(particles_after)]
-    # print(type(tr), type(tr_final))
-    return tr
-    # list(tr_final.groupby('frame'))
+    return filtered
     """
     Need to find the constant velocity of the tissue first,
     by looking at the embryo in question over timepoints.
     """
+
+
+def calc_turnon(tracked_centroids: pd.DataFrame) -> dict:
+    '''
+    For each cell in the dataframe, returns the timepoint 
+    at which the cell is considered to have "turned on."
+    '''
+    particles = tracked_centroids.groupby('particle')
+    for _, particle in particles:
+        I = particle['intensity']
+        # calculation needs to be proportional to
+        # maximum and minimum intensity
+        max_val, min_val = np.max(I), np.min(I)
+        diff = max_val - min_val
 
 
 if __name__ == "__main__":

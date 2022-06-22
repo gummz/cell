@@ -9,6 +9,7 @@ import torch
 from PIL import Image
 import src.data.constants as c
 from src.models.utils import transforms as T
+import skimage
 from src.models.utils.utils import collate_fn
 import src.data.utils.utils as utils
 from torch.utils.data import DataLoader
@@ -100,7 +101,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # is manual_select a ratio or a hard number?
         # user can request either a fraction of the images
         # or the actual number of the images
-        if manual_select <= 1:
+        if manual_select < 1:
             # NB: if manual_select == available, we can leave
             # `masks_full` as-is
             if manual_select < available:
@@ -116,7 +117,7 @@ class BetaCellDataset(torch.utils.data.Dataset):
             elif manual_select > available:
                 print(
                     f'WARNING: Requested more full annotations than available for {mode}. Returning all available annotations ({len_masks_full}).')
-        else:
+        elif manual_select > 1:
             if manual_select <= len_masks_full:
                 k = manual_select
                 masks_full = list(
@@ -128,20 +129,14 @@ class BetaCellDataset(torch.utils.data.Dataset):
         self.imgs = list(sorted(imgs))
         self.masks = list(sorted(masks))
         self.masks_full = list(sorted(masks_full))
-        self.img_filter = img_filter
+        self.img_filter = c.FILTERS[img_filter] if img_filter else None
 
     def __getitem__(self, idx):
         # load images and mask
         img_path = join(self.root, self.mode,
                         c.IMG_DIR, self.imgs[idx])
-        # if self.mode == 'train':
-        #     print('chosen index', self.masks[idx], idx)
-        #     print('masks_full', self.masks_full)
-        #     print('len masks', len(self.masks))
 
         if self.masks[idx] in self.masks_full:
-            # if self.mode == 'train':
-            #     print(f'Selected full annotation for index {idx} and mode {self.mode}.')
             mask_dir = c.MASK_DIR_FULL
         else:
             mask_dir = c.MASK_DIR
@@ -149,14 +144,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
                          mask_dir, self.masks[idx])
 
         img = np.int16(np.load(img_path))
-
-        # PREPROCESSING
-        img = cv2.normalize(img, None, alpha=0, beta=255,
-                            dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-        if self.img_filter:
-            img_filter, args = self.img_filter
-            img = img_filter(img, *args)
-        # END PREPROCESSING
 
         mask = np.load(mask_path)
         mask = np.array(mask)
@@ -226,10 +213,22 @@ class BetaCellDataset(torch.utils.data.Dataset):
         target["centroids"] = centroids
 
         if self.transforms is not None:
+            # PREPROCESSING
+            img = cv2.normalize(img, None, alpha=0, beta=255,
+                                dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+
             # img, target = self.transforms(img, target)
+            if self.img_filter:
+                # in constants.py
+                img_filter, args = self.img_filter
+                img = img_filter(img, *args)
+
             img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
-            img = F.pil_to_tensor(Image.fromarray(img))
+
+            # img = skimage.exposure.equalize_adapthist(
+            #     img, kernel_size=20, clip_limit=1)
+            img = torch.tensor(img).unsqueeze(0)
             # img = img.unsqueeze(0)
 
         # TODO:
@@ -246,8 +245,8 @@ class BetaCellDataset(torch.utils.data.Dataset):
 
 
 def get_dataloaders(root=c.DATA_DIR, batch_size=4,
-                    num_workers=1, resize=1024, n_img_select=1,
-                    manual_select=0, img_filter=None):
+                    num_workers=1, resize=1024, n_img_select=(1, 1),
+                    manual_select=(0, 1), img_filter=None, shuffle=True):
     '''Get dataloaders.
         resize: resize image in __getitem__ method of dataset class.
 
@@ -257,11 +256,12 @@ def get_dataloaders(root=c.DATA_DIR, batch_size=4,
     # use our dataset and defined transformations
     dataset = BetaCellDataset(
         root, get_transform(train=True), resize=resize,
-        mode='train', n_img_select=n_img_select,
-        manual_select=manual_select, img_filter=img_filter)
+        mode='train', n_img_select=n_img_select[0],
+        manual_select=manual_select[0], img_filter=img_filter)
     dataset_val = BetaCellDataset(
         root, get_transform(train=False), resize=resize,
-        mode='val', n_img_select=1, manual_select=1, img_filter=img_filter)
+        mode='val', n_img_select=n_img_select[1],
+        manual_select=manual_select[1], img_filter=img_filter)
 
     # split the dataset in train and test set
     # torch.manual_seed(1)
@@ -276,14 +276,61 @@ def get_dataloaders(root=c.DATA_DIR, batch_size=4,
 
     # define training and validation data loaders
     data_tr = DataLoader(
-        dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+        dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
         collate_fn=collate_fn)
 
     data_val = DataLoader(
-        dataset_val, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+        dataset_val, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
         collate_fn=collate_fn)
 
     return data_tr, data_val
+
+
+def get_dataloader(root=c.DATA_DIR, mode='train', batch_size=4,
+                   num_workers=4, resize=1024, n_img_select=1,
+                   manual_select=1, img_filter='bilateral', shuffle=True):
+    '''Get dataloader, i.e. single instance of a dataloader.
+        resize: resize image in __getitem__ method of dataset class.
+
+        manual_ratio: how many manually (i.e., fully) annotated
+        images to include. Default: None (0)
+    '''
+    # use our dataset and defined transformations
+    train = True if mode == 'train' else False
+    dataset = BetaCellDataset(
+        root, get_transform(train=train),
+        resize=resize, mode=mode, n_img_select=n_img_select,
+        manual_select=manual_select, img_filter=img_filter)
+
+    # split the dataset in train and test set
+    # torch.manual_seed(1)
+
+    # indices = torch.randperm(len(dataset)).tolist()
+
+    # val_idx = int(0.1 * len(dataset))
+    # indices = range(len(dataset))
+    # val_tp = c.TIMEPOINTS[-1]
+    # dataset = torch.utils.data.Subset(dataset, indices[:-val_tp])
+    # dataset_val = torch.utils.data.Subset(dataset_val, indices[-val_tp:])
+
+    # define training and validation data loaders
+    data = DataLoader(
+        dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers,
+        collate_fn=collate_fn)
+
+    return data
+
+
+def get_dataset(root=c.DATA_DIR, mode='train',
+                resize=1024, n_img_select=1,
+                manual_select=1, img_filter='bilateral'):
+    train = True if mode == 'train' else False
+    dataset = BetaCellDataset(
+        root, get_transform(train=train),
+        resize=resize, mode=mode, n_img_select=n_img_select,
+        manual_select=manual_select, img_filter=img_filter)
+
+    return dataset
 
 
 def get_transform(train):

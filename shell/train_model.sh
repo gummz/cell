@@ -9,7 +9,7 @@
 #BSUB -J train
 
 ### -- ask for number of cores (default: 1) --
-#BSUB -n 1
+#BSUB -n 4
 #BSUB -R "select[gpu32gb]"
 
 ### -- Select the resources: 1 gpu in exclusive process mode --

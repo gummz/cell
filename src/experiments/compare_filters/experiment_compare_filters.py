@@ -8,15 +8,30 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 from time import time
-from skimage.filters import threshold_yen, frangi
+from skimage import filters  # threshold_yen, frangi
 from skimage.exposure import rescale_intensity
-from skimage.io import imread, imsave
-# from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
 
+
+def subselect_img(image):
+    '''
+    Returns a subregion of the image.
+    '''
+    return image[300:600, 300:600]
+
+
+def imsave_preproc(path, image):
+    '''
+    Preprocesses the image before saving it.
+    '''
+    image = subselect_img(image)
+    utils.imsave(path, image, resize=False)
+
+
 mode = 'train'
-img_idx = 1000
+img_idx = 1500
 
 tic = time()
 utils.setcwd(__file__)
@@ -55,46 +70,20 @@ for i in range(1, 21, 2):
     # img_blur = np.array(img_blur)
     # img_blur = np.where(img_blur > 5, img_blur, 0)
     name = f'{operation}_{i}'
-    utils.imsave(join(save, operation, name), img_blur)
+    imsave_preproc(join(save, operation, name),
+                   img_blur)
 
 # Operation
 # Median Blur
 operation = 'medianblur'
 utils.make_dir(join(save, operation))
 for i in range(1, 21, 2):
-    img_blur = cv2.medianBlur(img, i)
-    # img_blur = np.array(img_blur)
-    # img_blur = np.where(img_blur > 5, img_blur, 0)
     name = f'{operation}_{i}'
-    utils.imsave(join(save, operation, name), img_blur)
-
-# Operation: Gaussian blur
-operation = 'gaussianblur'
-utils.make_dir(join(save, operation))
-for kernel_size in [1, 5, 9, 15]:
-    for sigma_x in [1, 5, 9]:
-        for sigma_y in [1, 5, 9]:
-            name = f'{operation}_{kernel_size}_{sigma_x}_{sigma_y}'
-            if os.path.exists(join(save, name)):
-                break
-
-            img_gauss = cv2.GaussianBlur(
-                img, (kernel_size, kernel_size),
-                sigma_x, sigmaY=sigma_y)
-
-            utils.imsave(join(save, operation, name), img_gauss)
-
-
-# Operation: Bilateral filter
-operation = 'bilateral'
-utils.make_dir(join(save, operation))
-for filter_size in [50, 150]:
-    for sigma_color in [50, 150]:
-        for sigma_space in [5, 9]:
-            img_bilateral = cv2.bilateralFilter(
-                img, filter_size, sigma_color, sigma_space)
-            name = f'{operation}_{filter_size}_{sigma_color}_{sigma_space}'
-            utils.imsave(join(save, operation, name), img_bilateral)
+    if os.path.exists(join(save, operation, name)):
+        break
+    img_blur = cv2.medianBlur(img, i)
+    imsave_preproc(join(save, operation, name),
+                   img_blur)
 
 
 # Operation
@@ -105,27 +94,55 @@ for i in range(1, 21, 2):
     for j in range(1, 10, 2):
         for k in range(1, 30, 4):
             name = f'{operation}_{i}_{j}_{k}'
+            if os.path.exists(join(save, operation, name)):
+                break
             img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
-            utils.imsave(join(save, operation, name),
-                         img_denoise)
+            imsave_preproc(join(save, operation, name),
+                           img_denoise)
 
-operation = 'frangi'
+
+# Operation: Gaussian blur
+operation = 'gaussianblur'
 utils.make_dir(join(save, operation))
-for alpha in np.linspace(0.1, 1, 10):
-    for beta in np.linspace(0.1, 1, 10):
-        for gamma in np.linspace(1, 30, 5):
-            img_frangi = frangi(img, alpha=alpha, beta=beta,
-                                gamma=gamma, black_ridges=False)
-            name = f'{operation}_plt_{img_name}_{alpha:.2f}_{beta}_{gamma}'
-            utils.imsave(join(save, operation, name), img_frangi)
+for kernel_size in [1, 5, 9, 15]:
+    for sigma_x in [1, 5, 9]:
+        for sigma_y in [1, 5, 9]:
+            name = f'{operation}_{kernel_size}_{sigma_x}_{sigma_y}'
+            if os.path.exists(join(save, operation, name)):
+                break
+
+            img_gauss = cv2.GaussianBlur(
+                img, (kernel_size, kernel_size),
+                sigma_x, sigmaY=sigma_y)
+
+            imsave_preproc(join(save, operation, name),
+                           img_gauss)
+
+
+# Operation: Bilateral filter
+operation = 'bilateral'
+utils.make_dir(join(save, operation))
+for filter_size in [50, 150]:
+    for sigma_color in [50, 150]:
+        for sigma_space in [5, 9]:
+            name = f'{operation}_{filter_size}_{sigma_color}_{sigma_space}'
+            if os.path.exists(join(save, operation, name)):
+                break
+            img_bilateral = cv2.bilateralFilter(
+                img, filter_size, sigma_color, sigma_space)
+
+            imsave_preproc(join(save, operation, name),
+                           img_bilateral)
 
 
 operation = 'canny'
 utils.make_dir(join(save, operation))
-for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:
-    for thresh2 in [20, 50, 80, 100, 150, 200][-2:]:
+for thresh1 in [20, 50, 80, 100, 150, 200]:
+    for thresh2 in [20, 50, 80, 100, 150, 200]:
         for aperture_size in [3, 5, 7]:
             for L2_gradient in [True, False]:
+                if os.path.exists(join(save, operation, name)):
+                    break
                 img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
                 # img = cv2.normalize(img, None, alpha=0,
                 #                     beta=1, dtype=cv2.CV_32FC1,
@@ -139,7 +156,7 @@ for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:
                     apertureSize=aperture_size, L2gradient=L2_gradient)
                 name = (f'canny_{thresh1}_{thresh2}'
                         f'_{aperture_size}_{L2_gradient}')
-                utils.imsave(join(save, operation, name), img_canny, 512)
+                imsave_preproc(join(save, operation, name), img_canny)
 
 # Operation
 # Simple Threshold
@@ -147,15 +164,27 @@ for thresh1 in [20, 50, 80, 100, 150, 200][-2:]:
 # _, thresh = cv2.threshold(img_blur, SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
 # cv2.imwrite(f'{save}/{operation}_{img_name}.png', thresh)
 
-# # Operation
-# # Rescale intensity
-# operation = 'rescale_intensity'
-# yen_threshold = threshold_yen(img_blur)
-# bright = rescale_intensity(img_blur, (0, yen_threshold), (0, 255))
-# # bright = Image.fromarray(bright)
+# Operation
+# Rescale intensity
+operation = 'rescale_intensity'
+yen_threshold = filters.threshold_yen(img_blur)
+for thresh in range(80, 220, 20):
+    bright = rescale_intensity(
+        img_blur, (0, yen_threshold), (220, 255))
+    imsave_preproc(join(save, operation, str(thresh)),
+                   bright)
 
-# cv2.imwrite(f'{save}/{img_name}_{operation}.jpg', bright)
+# Operation
+# Adaptive Histogram Equalization
+operation = 'adaptive_hist_eq'
+for kernel_size in range(10, 500, 100):
+    for clip_limit in np.linspace(0, 1, 11, endpoint=True):
+        bright = skimage.exposure.equalize_adapthist(
+            img, kernel_size, clip_limit)
+        imsave_preproc(
+            join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright)
 
+# bright = Image.fromarray(bright)
 
 # # Operation
 # # Generate and save histogram of intensified image

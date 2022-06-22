@@ -1,48 +1,34 @@
 from __future__ import annotations
 
-import os
 import pickle
-from multiprocessing.spawn import prepare
-from os import listdir
 from os.path import join
-from pprint import pp
-
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
+from torchvision.transforms import functional as F
 import src.visualization.utils as viz
 import torch
 import torchvision
-from aicsimageio import AICSImage
-from matplotlib.image import BboxImage
 from PIL import Image
-from src.models.BetaCellDataset import (BetaCellDataset, get_dataloaders,
-                                        get_transform)
-from src.models.utils.model import get_instance_segmentation_model
-from src.models.utils.utils import collate_fn
-from src.tracking.track_cells import track
+from aicsimageio import AICSImage
+import src.tracking.track_cells as tracker
 from src.visualization import plot
-from torch.utils.data import DataLoader, Subset
-from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
-
-
-def get_masks(outputs):
-    masks = [get_mask(output) for output in outputs]
-    masks = torch.stack(masks, dim=0)
-
-    return masks
 
 
 def get_predictions(model,
                     device: torch.device,
-                    inputs: list[torch.Tensor]) -> list(dict(torch.Tensor)):
+                    inputs: list[torch.Tensor],
+                    accept_range: tuple = (0.5, 1)) -> list(dict(torch.Tensor)):
     '''
     Input:
-        inputs: A tensor or list of inputs.
+        model: the model with which to perform the predictions.
+        device: the device in which the model resides.
+        inputs: list of tensors. Inputs to the model.
+        reject_threshold: the threshold at which to reject
+            uncertain predictions.
 
     Output:
         preds: The raw output of the model.
@@ -73,53 +59,92 @@ def get_predictions(model,
             for input in inputs:
                 pred = model([input])[0]
                 preds.append(pred)
-            # preds = [model([input]) for input in inputs]
 
     for pred in preds:
-        bboxes = pred['boxes']
-        scores = pred['scores']
-
         # perform modified NMS algorithm
-        idx = remove_boxes(bboxes, scores)
+        idx = remove_boxes(pred['boxes'], pred['scores'],
+                           accept_range)
         # select boxes by idx
         pred['boxes'] = pred['boxes'][idx]
         # select masks by idx
         pred['masks'] = pred['masks'][idx]
 
+        pred['masks'] = threshold_masks(pred['masks'])
+
     return preds
 
 
-def get_prediction(model, device, input):
+def get_prediction(model, device, input, accept_range=(0.5, 1)):
 
     model.eval()
 
     # Predict the image with batch index `img_idx`
     # with the model
     with torch.no_grad():
-        pred = model([input])
+        pred = model([input])[0]
 
-    bboxes = pred[0]['boxes']
-    scores = pred[0]['scores']
+    bboxes = pred['boxes']
+    scores = pred['scores']
 
-    # # perform modified NMS algorithm
-    idx = remove_boxes(bboxes, scores)
+    # perform modified NMS algorithm
+    idx = remove_boxes(bboxes, scores, accept_range)
     # select boxes by idx
-    pred[0]['boxes'] = pred[0]['boxes'][idx]
+    # print('len of boxes before rejection', len(pred['boxes']))
+    pred['boxes'] = pred['boxes'][idx]
+    # print('len of boxes after rejection', len(pred['boxes']))
+
     # select masks by idx
-    pred[0]['masks'] = pred[0]['masks'][idx]
+    pred['masks'] = pred['masks'][idx]
+    # select scores by idx
+    # print('accept range', accept_range)
+    # print(pred['scores'])
+    # print('avg score before rejection', np.mean(pred['scores'].cpu().numpy()))
+    pred['scores'] = pred['scores'][idx]
+    # print('avg score after rejection', np.mean(
+    # pred['scores'].cpu().numpy()), '\n')
 
-    return pred[0]
+    pred['masks'] = threshold_masks(pred['masks'])
+
+    return pred
 
 
-def remove_boxes(bboxes, scores, threshold=0.3):
+def threshold_masks(masks, threshold=0.5):
+    '''
+    Thresholds masks to make more concise
+    segmentations (i.e., model has to be more certain
+    in its predictions).
+    '''
+    dtype, device = masks.dtype, masks.device
+    threshold = torch.tensor(threshold, dtype=dtype,
+                             device=device)
+    zero = torch.tensor(0, dtype=dtype,
+                        device=device)
+    return torch.where(masks > threshold, masks, zero)
+
+
+def remove_boxes(bboxes, scores,
+                 accept_range=(0.5, 1), nms_threshold=0.3):
     if len(bboxes) == 0:
         return torch.tensor([], dtype=torch.int64)
 
-    select = scores > 0.2
-    bboxes = bboxes[select]
-    scores = scores[select]
+    # reject uncertain predictions
+    lower, upper = accept_range
+    select = torch.logical_and(lower < scores, scores < upper)
+    # bboxes = bboxes[select]
+    # scores = scores[select]
 
-    idx = torchvision.ops.nms(bboxes, scores, iou_threshold=threshold)
+    idx = torchvision.ops.nms(
+        bboxes, scores, iou_threshold=nms_threshold)
+
+    # make idx and select index tensors comparable
+    indices = torch.zeros(len(bboxes), dtype=torch.bool, device=bboxes.device)
+    indices[idx] = True
+
+    # remove bboxes both using idx and select
+    idx = torch.logical_and(indices, select)
+    # print(scores)
+    # print(indices, select)
+    # exit()
 
     # #TODO: better: find clusters of bounding boxes, and run
     # NMS on them separately
@@ -163,20 +188,16 @@ def remove_boxes(bboxes, scores, threshold=0.3):
             # is box inside box2?
             if bbox_contained(box, box2):
                 # delete box
-                idx[i] = -1
+                idx[i] = False
                 continue
 
-    after_contain_idx = idx[idx != -1]
-
-    for i, box in enumerate(bboxes[after_contain_idx]):
+    for i, box in enumerate(bboxes[idx]):
         area = calc_bbox_area(box)
         # reject small bounding boxes
         if area <= 4:
-            after_contain_idx[i] = -1
+            idx[i] = False
 
-    final_idx = after_contain_idx[after_contain_idx != -1]
-
-    return final_idx
+    return idx
 
 
 def calc_bbox_area(box):
@@ -197,23 +218,24 @@ def bbox_contained(box1, box2):
     return box1_inside_box2
 
 
-def predict(path: str,
-            time_idx: range,
+def predict(data: AICSImage,
+            time_range: range,
             device: torch.device,
             model, save: str) -> list(tuple):
-    chains_tot = []
 
-    for t in time_idx:
+    chains_tot = []
+    for t in time_range:
         timepoint_raw = utils.get_raw_array(
-            path, t=t).compute()
+            data, t=t).compute()
 
         # prepare data for model, since we're not using
         # BetaCellDataset class
         timepoint = prepare_model_input(timepoint_raw, device)
-        # pred = get_predictions(model, device, timepoint)
-        preds = get_predictions(model, device, timepoint)
 
-        # Draw bounding boxes on slice for debugging
+        preds = get_predictions(
+            model, device, timepoint, accept_range=(0.5, 1))
+
+        # draw bounding boxes on slice for debugging
         viz.output_sample(join(save, 'debug'), t,
                           timepoint_raw, preds, 1024, device)
 
@@ -224,10 +246,12 @@ def predict(path: str,
         chains = CL.get_chains(timepoint, preds, c.SEARCHRANGE)
         chains_tot.append(chains)
 
+        del timepoint_raw
+
     return chains_tot
 
 
-def prepare_model_input(array, device):
+def prepare_model_input(timepoint, device):
     ''''
     Prepares data for input to model if BetaCellDataset
     class is not being used.
@@ -238,36 +262,30 @@ def prepare_model_input(array, device):
         timepoint, or multiple timepoints.
     '''
 
-    # timepoint = np.int16(timepoint)
-    # timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
-    #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-    # z_slices = []
-    # for z_slice in timepoint:
-    #     # z_slice = cv2.fastNlMeansDenoising(
-    #     #     z_slice, z_slice, 11, 7, 21)
-    #     z_slices.append(z_slice)
-    # timepoint = np.array(z_slices)
+    timepoint = utils.normalize(np.int16(timepoint), 0, 1, cv2.CV_32F, device)
 
-    array = utils.normalize(array, 0, 1, cv2.CV_32F, device)
-    array = torch.tensor(array, device=device)
+    # timepoint = [skimage.exposure.equalize_adapthist(
+    #     z_slice, clip_limit=0.8)
+    #     for z_slice in timepoint]
+    timepoint = [F.pil_to_tensor(
+        Image.fromarray(z_slice)).to(device)
+        for z_slice in timepoint]
+    timepoint = torch.stack(timepoint)
 
-    dim_inputs = len(array.shape)
-    dim_squeeze = len(array.squeeze())
-    if dim_inputs != dim_squeeze:
-        array = torch.unsqueeze(array, -3)
+    # apply filter
+    img_filter, args = c.FILTERS['bilateral']
+    timepoint = [img_filter(z_slice.cpu().numpy().squeeze(), *args)
+                 for z_slice in timepoint]
+    timepoint = torch.tensor(timepoint, device=device)
 
-    # turn 4d tensor into list of 3d tensors
-    # (format which is required by model)
-    if len(array.shape) == 4:
-        array = [item for item in array]
-
-    return array
+    return timepoint.unsqueeze(1)
 
 
 if __name__ == '__main__':
 
     utils.setcwd(__file__)
     mode = 'pred'
+    load = False
 
     # Running on CUDA?
     device = utils.set_device()
@@ -276,50 +294,62 @@ if __name__ == '__main__':
     model = utils.get_model(c.MODEL_STR, device)
     model.to(device)
 
+    # Choose time range
+    # time_start = 80
+    # time_end = 130  # endpoint included
+    # time_range = range(time_start, time_end)
+
     # 1. Choose raw data file
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    name = c.PRED_FILE
-    # # Make directory for this raw data file
-    # # i.e. mode/pred/name
-    save = join(c.DATA_DIR, mode, name)
-    utils.make_dir(save)
+    files = tuple(c.RAW_FILES['test'].keys())
+    files = utils.add_ext(files)
+    # files = ('LI_2019-08-30_emb2_pos1.lsm',)
+    len_files = len(files)
+    for i, name in enumerate(files):
+        print('Predicting file', name, f'(file {i + 1}/{len_files})')
+        # # Make directory for this raw data file
+        # # i.e. mode/pred/name
+        save = join(c.PROJECT_DATA_DIR, mode, name)
+        utils.make_dir(save)
 
-    # either ssh with full data:
-    path = join(c.RAW_DATA_DIR, c.PRED_FILE)
+        if load:  # use old (saved) predictions
+            centroids = pickle.load(
+                open(join(save, 'centroids_save.pkl'), 'rb'))
+        else:  # predict
+            path = join(c.RAW_DATA_DIR, name)
+            data = AICSImage(path)
+            time_start, time_end = 0, data.dims['T'][0]
+            time_range = range(time_start, time_end)
+            centroids = predict(data, time_range,
+                                device, model, save)
+            try:
+                data.close()
+                print(f'File {name} closed successfully.')
+            except AttributeError as e:
+                print(f'File {name} raised error upon closing:\n{e}')
 
-    # ... or local with small debug file:
-    # path = np.load(c.SAMPLE_PATH)
+            pickle.dump(centroids, open(
+                join(save, 'centroids_save.pkl'), 'wb'))
 
-    # # Choose time range
-    time_start = 0
-    time_end = 10
+        centroids_np = [(t, centroid[0], centroid[1],
+                        centroid[2], centroid[3])
+                        for t, timepoint in zip(time_range, centroids)
+                        for centroid in timepoint]
+        np.savetxt(
+            join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
-    time_range = range(time_start, time_end)
-    # path = join(c.RAW_DATA_DIR, c.PRED_FILE)
-    # centroids = predict(path, time_range,
-    #                         device, model, save)
-    # pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
-    centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
+        tracked_centroids = tracker.track(centroids_np, threshold=20)
 
-    centroids_np = [(t, centroid[0], centroid[1],
-                     centroid[2], centroid[3])
-                    for t, timepoint in enumerate(centroids)
-                    for centroid in timepoint]
-    np.savetxt(
-        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+        pickle.dump(tracked_centroids,
+                    open(join(save, 'tracked_centroids.pkl'), 'wb'))
+        tracked_centroids.to_csv(join(save, 'tracked_centroids.csv'))
 
-    tracked_centroids = track(centroids_np)
+        location = join(save, 'timepoints')
+        plot.save_figures(tracked_centroids, location)
+        # plot.create_movie(location, time_range)
 
-    pickle.dump(tracked_centroids,
-                open(join(save, 'tracked_centroids.pkl'), 'wb'))
-
-    location = join(save, 'timepoints')
-    frames = tuple(tracked_centroids.groupby('frame'))
-    plot.save_figures(frames, location)
-    plot.create_movie(location, time_range)
-
-    # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
-    # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
+        # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
+        # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
 
     print('predict_model.py complete')

@@ -53,7 +53,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # 2 gb used
 
     scheduler = ReduceLROnPlateau(opt, threshold=0.01, verbose=True)
-    log_every = 5  # How often to print out losses
+    log_every = 1  # How often to print out losses
     save_every = 10  # How often to save model
     scaler = GradScaler()
     loss_list = hparam_dict['losses'].split(';')
@@ -74,14 +74,12 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # writer.add_graph(model, [x_val[0].to(device)])
 
     for i, epoch in enumerate(range(epochs)):
+        model.train()  # train mode
         tic = time()
         print(f'\n* Epoch {epoch+1}/{epochs}')
 
-        train_loss = 0
-
         x_val, y_val = next(iter(data_val))
-
-        model.train()  # train mode
+        train_loss = 0
         for j, (x_batch, y_batch) in enumerate(data_tr):
 
             with autocast():
@@ -118,11 +116,6 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
                 losses = sum(losses)
 
-                if j % 100 == 0 and write:
-                    writer.add_scalar('training loss',
-                                      float(scaler.scale(losses)) / 100,
-                                      epoch * len(data_tr) + j)
-
                 # End of training loop for mini-batch
 
             scaler.scale(losses).backward()
@@ -135,18 +128,10 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
             # End training loop for epoch
 
         tot_train_losses.append(train_loss)
-
-        if i % log_every == 0:
-            # loss is nan; cancel training
-            if torch.isnan(torch.tensor(train_loss)) or math.isnan(train_loss):
-                print('training loss is nan\n')
-                return train_loss, np.nan
-            elapsed = utils.time_report(tic, time())
-            time_print = f'''Training loss: {train_loss: .3f};
-                        Time: {elapsed}'''
-            print(time_print)
+        writer.add_scalar('Training Loss', train_loss, epoch)
 
         # Validation
+        val_losses = 0
         for x_val, y_val in data_val:
             with torch.no_grad(), autocast():
                 model.train()
@@ -155,14 +140,11 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
                 y_val = [{k: v.to(device) for k, v in t.items()}
                          for t in y_val]
 
-                val_losses = get_loss(model, loss_list, x_val, y_val)
+                val_losses += get_loss(model, loss_list, x_val, y_val)
 
                 # TODO: make sure scheduler works
                 # by printing out the learning rate each epoch
                 # if write:
-                writer.add_scalar('validation loss', float(val_losses), epoch)
-
-                tot_val_losses.append(val_losses.item())
 
                 # if i == save_every:
                 #     debug_opencv_mask()
@@ -185,6 +167,13 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
             # y_hat = torch.cat(y_hat, dim=0)  # .detach().cpu()
             x_val = [x.squeeze() for x in x_val]
 
+            # end validation loop
+
+        val_loss = float(val_losses) / len(data_val)
+        tot_val_losses.append(val_loss)
+        writer.add_scalar('Validation Loss',
+                          val_loss, epoch)
+
         if write:
             image_grid = create_grid(x_val, y_val, y_hat,
                                      batch_size)
@@ -198,12 +187,32 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
         scheduler.step(val_losses)
 
         if i % log_every == 0:
-            # print(f'Current learning rate: {scheduler}')
-            print(f'Validation loss: {val_losses.item():.3f}')
+            # loss is nan; cancel training
+            if math.isnan(float(train_loss)):
+                print('training loss is nan\n')
+                return train_loss, np.nan
+
+            print(f'Training loss: {train_loss:.3f}')
+            print(f'Validation loss: {val_loss:.3f}')
+
+            elapsed = utils.time_report(tic, time())
+            print('Time:', elapsed)
 
         # Save progress every `save_every` epochs
         if (i + 1) % save_every == 0 and save:
             dump_model(model, time_str)
+
+        # early stopping
+        patience = 15  # number of epochs to wait for validation loss to improve
+        if i > patience:
+            early_thresh = 0.95  # ratio threshold at which to stop at
+            val_prev = tot_val_losses[i-patience:i]
+            val_now = val_loss
+            if val_now / np.mean(val_prev) > early_thresh:
+                print('Early stopping activated; stopping training.')
+                break
+
+        # end epoch
 
     # select random images and their target indices
     # images, labels = select_n_random()
@@ -216,7 +225,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
 
-    return losses.item(), val_losses.item()
+    return tot_train_losses, tot_val_losses
 
 
 def create_grid(x_val, y_val, y_hat, batch_size):
@@ -316,6 +325,7 @@ def bce_loss(y_real, y_pred):
 
 
 if __name__ == '__main__':
+    tic = time()
 
     # Environment variable for memory management
     alloc_conf = 'PYTORCH_CUDA_ALLOC_CONF'
@@ -339,16 +349,20 @@ if __name__ == '__main__':
 
     # hyperparameters
     size = 1024
-    batch_size = 3  # 2
+    batch_size = 8  # 2
     pretrained = True
-    num_epochs = 200  # 500
-    lr = 6.02006e-5  # 0.00001
-    wd = 0.0007618  # 0.001
-    beta1 = 0.51929
-    beta2 = 0.61231
+    num_epochs = 30  # 500
+    lr = 3.418507038460298e-06
+    wd = 1.2957404400334042e-08
+    beta1 = 0.2438598958001344
+    beta2 = 0.9849760264270886
+    n_img_select = 1101
+    manual_select = 1
+    img_filter = 'bilateral'
 
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=1, resize=size, n_img_select=0.1, manual_select=1)
+        batch_size=batch_size, num_workers=4, resize=size,
+        n_img_select=(n_img_select, 1), manual_select=(manual_select, 1), img_filter=img_filter)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
@@ -360,8 +374,7 @@ if __name__ == '__main__':
     save = f'interim/run_{time_str}'
 
     params = [p for p in model.parameters() if p.requires_grad]
-
-    opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[0.6459, 0.9595])
+    opt = optim.Adam(params, lr=lr, weight_decay=wd, betas=[beta1, beta2])
 
     loss_list = ['loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
                  'loss_classifier', 'loss_objectness']
@@ -391,38 +404,13 @@ if __name__ == '__main__':
 
     with SummaryWriter(f'runs/{time_str}') as w:
         losses = train(model, device, opt, num_epochs,
-                       data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
+                       data_tr, data_val, time_str, hparam_dict, w, save=True, write=False)
         w.add_text('description', description)
 
     losses = np.array(losses).T
 
-    pickle.dump(model, open(join('interim', f'run_{time_str}')))
+    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
-    # Special note that is saved as the name of a file with
-    # a name which is the value of the string `special_mark`
-    # special_mark = 'all_losses'
-    # if special_mark:
-    #     np.savetxt(join(save, f'{special_mark}_{time_str}'), special_mark)
-
-    # np.savetxt(join(save, f'losses_{time_str}.csv'), losses)
-    # pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
-
-    # plt.subplot(121)
-    # plt.plot(losses[0])
-    # title_train = f'Training loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-    # plt.title(title_train)
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Total loss')
-
-    # plt.subplot(122)
-    # plt.plot(losses[1])
-    # title_val = f'Validation loss\nLearning rate: {lr}, weight decay: {wd}, optimizer: Adam'
-    # plt.title(title_val)
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Total loss')
-
-    # plt.savefig(join(save, f'loss_plot_{time_str}.jpg'))
-
-    # TODO: optuna
-    # compare with and without autocast for training of final model
-    # optuna: what losses to include?
+    elapsed = utils.time_report(tic, time())
+    print('train_model finished after', elapsed)
+    

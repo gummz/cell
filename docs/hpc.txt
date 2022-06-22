@@ -1,4 +1,11 @@
+JOBID 13722393: no_reject 7:
+JOBID 13722382: reject 0: (in "reject" folder)
+-------------------------------------
+
 ssh -Y s203004@login.gbar.dtu.dk
+
+To check storage space in current folder:
+du -h -d 1 .
 
 for opencv .imshow function to work properly:
 https://github.com/opencv/opencv/issues/18461
@@ -10,9 +17,11 @@ scp -r s203004@transfer.gbar.dtu.dk:/dtu-compute/tubes/test /home/gummz/dtu/cell
 
 scp s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/sample.npy /home/gummz/dtu/cell/cell/data/interim/
 
-scp -r /home/gummz/dtu/cell_data/masks_test/ s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/
+scp -r /home/gummz/dtu/cell/cell/data/interim/train/masks/masks s203004@transfer.gbar.dtu.dk:/work3/s203004/data/interim/train/
 
-scp -r s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/test/imgs /home/gummz/dtu/cell/cell/data/interim/test/
+scp -r s203004@transfer.gbar.dtu.dk:/work3/s203004/data/interim/train/masks /home/gummz/dtu/cell/cell/data/interim/train/
+
+scp -r s203004@transfer.gbar.dtu.dk:/zhome/e2/e/154260/cell/data/interim/pred/eval/track_2D/LI_2019-02-05_emb5_pos3.lsm/with_tracking /home/gummz/dtu/cell/cell/data/interim/pred/eval/track_2D/LI_2019-02-05_emb5_pos3.lsm/with_tracking
 
 
 
@@ -36,6 +45,11 @@ https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generati
 
 Add password token:
 git remote add origin https://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@github.com/gummz/cell.git
+
+I deleted 
+kiwisolver.cpython-38-x86_64-linux-gnu.so 
+_aicspylibczi.cpython-38-x86_64-linux-gnu.so
+to make up storage space
 
 
 

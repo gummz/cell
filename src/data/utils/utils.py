@@ -62,13 +62,10 @@ def del_multiple(list_object, indices):
             list_object.pop(idx)
 
 
-def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
-    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
-    img_canny = cv2.Canny(
-        img, threshold1, threshold2,
-        apertureSize=aperture_size, L2gradient=L2_gradient)
-
-    return img_canny
+def calc_sensitivity(confusion_matrix):
+    tp, fn = confusion_matrix[0][0], confusion_matrix[0][1]
+    sensitivity = tp / (fn + tp)
+    return sensitivity
 
 
 def get_czi_dims(metadata):
@@ -97,7 +94,6 @@ def get_mask(output):
         mask = output['masks']
     else:
         mask = output  # target is a tensor of masks (from one image)
-
     mask = torch.squeeze(mask, dim=1)
 
     if mask.shape[0] != 0:
@@ -112,15 +108,17 @@ def get_mask(output):
     # mask = np.array(mask)
     # mask = np.where(mask > 255, 255, mask)
     # mask = np.where(mask > 200, 255, 0)
+    mask *= 255
     mask = mask.clone().detach().type(torch.uint8)
     # torch.tensor(mask, dtype=torch.uint8)
 
     return mask
 
 
-def get_model(time_str: str, device: torch.device):
+def get_model(time_str: str, device: torch.device, ):
 
-    folder = f'../models/interim/run_{time_str}'
+    folder = join(c.PROJECT_DIR, 'src', 'models',
+                  'interim', f'run_{time_str}')
 
     # Load model
     load_path = join(folder, f'model_{time_str}.pkl')
@@ -137,38 +135,48 @@ def get_model(time_str: str, device: torch.device):
     return model
 
 
-def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
+def get_raw_array(data, t=None, z=None,
+                  ch=c.CELL_CHANNEL):
     '''
     Returns an array of the raw data, i.e.,
     without Maximal Intensity Projection.
     Output is 4D (timepoints and xyz spatial dimensions)
+
+    If get_raw_array needs to be used multiple times in the same script,
+    drawing from the same raw data file, it's better to pass an AICSImage
+    as `input`.
     '''
+
     if t is None and z is None:
-        return None
+        raise ValueError(
+            'Either time, slice dimension, or both must be specified.')
 
-    if os.path.exists(file_path):
-        raw_data = AICSImage(file_path)
+    if isinstance(data, str):  # `data` is path to file, not file itself
+        if os.path.exists(data):
+            raw_data = AICSImage(data)
+        else:
+            raw_data = AICSImage(c.SAMPLE_PATH)
+            print((
+                f'WARNING: Could not access {data}.\n'
+                f'Using sample dataset from {c.SAMPLE_PATH}.'
+            ))
+    elif isinstance(data, AICSImage):  # `data` is file itself
+        raw_data = data
     else:
-        raw_data = AICSImage(c.SAMPLE_PATH)
-        print((
-            f'WARNING: Could not access {file_path}.\n'
-            f'Using sample dataset from {c.SAMPLE_PATH}.'
-        ))
+        raise ValueError('Unknown data type for `data`.')
 
-    t_tuple = 'T' if type(t) != int or t is None else ''
-    z_tuple = 'Z' if type(z) != int or z is None else ''
+    t_tuple = 'T' if has_len(t) or t is None else ''
+    z_tuple = 'Z' if has_len(z) != int or z is None else ''
     channel_tuple = 'C' if type(ch) != int or ch is None else ''
     order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
 
     data = None
 
     if t is not None and z is None:
-        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
         data = raw_data.get_image_dask_data(
             order, T=t, C=ch)
 
     elif t is None and z is not None:
-        # order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
         data = raw_data.get_image_dask_data(
             order, Z=z, C=ch)
 
@@ -178,54 +186,43 @@ def get_raw_array(file_path, t=None, z=None, ch=c.CELL_CHANNEL):
 
     return data
 
-    # if train:
-    #     timepoints = c.TIMEPOINTS[index]
-    #     # z-dimension
-    #     D = c.RAW_FILE_DIMENSIONS[index]
-    #     file = c.RAW_FILES[index]
-    # else:
-    #     timepoints = c.TIMEPOINTS_TEST[index]
-    #     D = c.RAW_FILE_DIMENSIONS_TEST[index]
-    #     file = c.RAW_FILES_GENERALIZE[index]
 
-    # file_path = join(c.RAW_DATA_DIR, file)
-    # num_samples = int(timepoints * sample)
-
-    # with TiffFile(file_path) as f:
-    #     # If only every second image contains beta cells
-    #     if every_second:
-    #         pages = f.pages[::2]
-    #     else:
-    #         pages = f.pages
-
-    #     images = [page.asarray()[0, :, :] for page in pages]
-    #     images = torch.tensor(images, dtype=torch.uint8)
-    #     images = images.view((timepoints, D))
-    #     idx = torch.multinomial(num_samples=num_samples,
-    #                             replacement=False)
-    #     images = images[idx]
-
-    #     return images
+def has_len(obj):
+    obj_method = getattr(obj, 'len', None)
+    return callable(obj_method)
 
 
-def imsave(path, img, resize=512):
+def is_int(number):
+    types = [np.int32, np.int16, np.int64, int]
+    return type(number) in types
+
+
+def imsave(path, img, resize=512, cmap=None):
     dirs = os.path.dirname(path)
     make_dir(dirs)
+
     if path[-4:] not in ['.png', '.jpg']:
         path += '.jpg'
 
     if type(img) == mplt.figure.Figure:
         img.savefig(path)
+        plt.close()
         return
     else:
-        if type(img) != np.ndarray:
+        if type(img) == torch.Tensor:
+            img = np.array(img.cpu())
+        elif type(img) == list:
             img = np.array(img)
+
         if len(img.shape) > 2:
-            img = img[0]
+            print('Unintended: image has shape', img.shape)
         if resize:
             img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
-    plt.imsave(path, img)
+    if cmap:
+        plt.imsave(path, img, cmap=cmap)
+    else:
+        plt.imsave(path, img)
 
 
 def make_dir(path):
@@ -246,7 +243,8 @@ def normalize(image, alpha, beta, out, device=None):
                                    beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
         return torch.tensor(normalized,
                             device=device
-                            if device else set_device())
+                            if device else torch.device('cpu'))
+
     return cv2.normalize(image, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
 
 

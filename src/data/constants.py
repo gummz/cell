@@ -1,6 +1,6 @@
 # from aicsimageio import AICSImage
 from os.path import join
-
+import cv2
 
 # ACTIVE SLICES RATIO
 ACTIVE_SLICES_RATIO = 0.025
@@ -10,11 +10,11 @@ ACTIVE_THRESHOLD = 1e-2
 
 # NEXT CENTER SEARCH RADIUS (pixels)
 # (stitching cells together between slices)
-SEARCHRANGE = 20
+SEARCHRANGE = 50
 
 # TRACKING RADIUS (pixels)
 # (tracking cells in 3D space)
-TRACK_RADIUS = 10
+TRACK_RADIUS = 100
 
 # LOGGING IMAGE SIZE
 LOGGING_IMG_SIZE = 512
@@ -96,7 +96,8 @@ TIMEPOINTS_TEST = [280, 289]
 PROJECT_DIR = '/zhome/e2/e/154260/cell/'
 
 # To be used within the src/[subfolder] directories
-DATA_DIR = '../../data/interim/'
+DATA_DIR = '/work3/s203004/data/interim/'
+PROJECT_DATA_DIR = '../../data/interim/'
 EXPERIMENT_DIR = '../experiments/'
 
 IMG_DIR = 'imgs'
@@ -133,10 +134,33 @@ IMG_EXT = 'png'
 CELL_CHANNEL = 0
 TUBE_CHANNEL = 1
 
-MODEL_STR = '29_04_21H_43M_43S'
-
+MODEL_STR = '25_05_16H_51M_45S'
+# 29_04_21H_43M_43S
+# :::::
+#
+# '28_05_12H_38M_47S'
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
 SAMPLE_PATH = join(DATA_DIR, 'sample.npy')
+
+
+def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
+    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
+    img_canny = cv2.Canny(
+        img, threshold1, threshold2,
+        apertureSize=aperture_size, L2gradient=L2_gradient)
+
+    return img_canny
+
+
+FILTERS = {
+    'none': None,
+    'mean': (cv2.blur, [(5, 5)]),
+    'gaussian': (cv2.GaussianBlur, [(5, 5), 0]),
+    'median': (cv2.medianBlur, [5]),
+    'bilateral': (cv2.bilateralFilter, [9, 50, 50]),
+    'nlmeans': (cv2.fastNlMeansDenoising, [None, 11, 7, 21]),
+    'canny': (canny_filter, [20, 20, 3, False])
+}
 
 # EXCEL_SHEET = pd.read_csv(join(DATA_DIR, EXCEL_FILENAME))
 
