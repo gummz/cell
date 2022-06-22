@@ -81,14 +81,19 @@ def get_cmap():
 
 
 def save_figures(centroids, save):
+    cmap = 'tab20'
     utils.make_dir(save)
     file = save.split('/')[-2]
-    max_item = len(tuple(pd.unique(centroids['particle'])))
 
-    colors = viz.get_colors(max_item, 'tab20')
+    particles = pd.unique(centroids['particle'])
+    # get unique colors for each detected cell
+    colors = viz.get_colors(len(particles), cmap)
+    colors_dict = dict(zip(particles, colors))
 
+    unique_frames = tuple(pd.unique(centroids['frame']))
+    time_range = range(min(unique_frames), max(unique_frames))
     frames = centroids.groupby('frame')
-    for j, (_, frame) in enumerate(frames):
+    for j, (_, frame) in zip(time_range, frames):
         fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
         ax.invert_yaxis()
 
@@ -101,20 +106,17 @@ def save_figures(centroids, save):
         ax.set_title(f'File: {file}\nTimepoint: {j}')
 
         X, Y, Z, I, P, _ = prepare_3d(frame)
-
-        # TODO: normalize I for frames in `centroids`
-
+        marker = 'x'
         for x, y, z, i, p in zip(X, Y, Z, I, P):
-            if i < c.ACTIVE_THRESHOLD:
-                marker = 'x'
-            else:
-                marker = 'o'
+            # if i < c.ACTIVE_THRESHOLD:
+            #     marker = 'x'
+            # else:
+            #     marker = 'o'
 
             # switch Z and Y because we want Z to be depth
-            ax.scatter(x, z, y, color=colors[p], marker=marker)
-            ax.text(x, z, y, s=int(z), color=colors[p])
-
-        
+            ax.scatter(x, z, y, color=colors_dict[p], marker=marker)
+            # s = f'{int(x)},{int(y)},{int(z)}'
+            ax.text(x, z, y, s=p, color=colors_dict[p])
 
         plt.savefig(join(save, f'{j:05d}.png'),
                     dpi=300, bbox_inches='tight')
