@@ -13,8 +13,8 @@ import cv2
 import numpy as np
 
 
-def output_sample(save: str, t: int, timepoint_raw, pred,
-                  size: int = 512, device='cpu'):
+def output_sample(save: str, t: int, timepoint_raw, preds,
+                  size: int = 256, device='cpu'):
     utils.make_dir(save)
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
@@ -22,15 +22,15 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
     # Randomly sample 2 slices to debug (per timepoint)
     Z = timepoint_raw.shape[0]
     # debug_idx = np.random.randint(0, Z, 2)
-    debug_idx = [Z - int(Z / 2), Z - int(Z / 3), Z - int(Z / 4)]
+    debug_idx = [Z - int(Z / 2), 61, Z - int(Z / 4)]
     debug_idx = range(Z)
 
-    iterable = zip(debug_idx, timepoint_raw[debug_idx])
-    for i, (idx, z_slice) in enumerate(iterable):
+    iterable = zip(debug_idx, timepoint_raw[debug_idx], preds)
+    for idx, z_slice, pred in iterable:
         z_slice = np.int16(z_slice)
 
-        boxes = pred[i]['boxes']
-        masks = pred[i]['masks']  # [mask > 0.5 for mask in pred[i]['masks']]
+        boxes = pred['boxes']
+        masks = pred['masks']
 
         if len(masks) == 0:
             figure = plt.figure()
@@ -40,17 +40,14 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
                               f't-{t}_{idx}.jpg'), figure, size)
             continue
 
-        # masks = torch.stack(masks)
-        # masks = masks.squeeze(1).to(device)
         # consolidate masks into one array
         mask = utils.get_mask(masks).unsqueeze(0)
         # overlay masks onto slice
 
-        # z_slice = torch.tensor(z_slice, device=device).repeat(3, 1, 1)
         z_slice = utils.normalize(z_slice, 0, 1, cv2.CV_32FC1, device)
         # temporarily
         z_slice = torch.tensor(z_slice, device=mask.device,
-                               dtype=mask.dtype)
+                               dtype=mask.dtype).unsqueeze(0)
         zero = torch.tensor(0, device=mask.device, dtype=mask.dtype)
 
         assert z_slice.shape == mask.shape, \
@@ -58,22 +55,13 @@ def output_sample(save: str, t: int, timepoint_raw, pred,
         assert z_slice.dtype == mask.dtype, \
             'Dtypes of slice and mask must match'
 
-        masked_img = torch.where(mask > zero, mask, z_slice.unsqueeze(0))
+        masked_img = torch.where(mask > zero, mask, z_slice)
 
         bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())[0]
 
-        assert bboxed_img.shape == z_slice.shape, \
+        assert bboxed_img.shape == z_slice.squeeze().shape, \
             'Bounding box image and slice image shapes must match'
 
-        # plt.subplot(121)
-        # plt.imshow(bboxed_img[0])
-        # plt.title(f'Number of detections: {len(boxes)}')
-        # plt.subplot(122)
-        # plt.imshow(z_slice)
-        # plt.title('Ground Truth')
-
-        # utils.imsave(join(save,
-        #                   f't-{t}_{idx}.jpg'), figure, 512)
         images = (bboxed_img, z_slice.squeeze().cpu())
         titles = ('Prediction', 'Ground Truth')
         grid = (1, 2)
