@@ -32,46 +32,61 @@ def statistics():
     To be used in Statistics section of thesis.
     Histograms of mean pixel intensity of raw files.
     '''
-    save_path = osp.join(c.FIG_DIR, 'report', 'statistics')
-    utils.make_dir(save_path)
-    files = tuple(c.RAW_FILES_TRAIN.keys())
+    mode = 'train'
+    files = tuple(c.RAW_FILES[mode].keys())
     files = utils.add_ext(files)
-    # hists = []
+
+    bar = []  # np.zeros((T, Z))
+    hist = []  # np.zeros(T)
     for file in files:
+        print('Now on file', file)
+        save_path = osp.join(c.FIG_DIR, 'report', 'statistics', file)
+        utils.make_dir(save_path)
+
         path = osp.join(c.RAW_DATA_DIR, file)
-        datafile = AICSImage(path)
-        T = datafile.dims['T'][0]
-        Z = datafile.dims['Z'][0]
-        bar = np.zeros((T, Z))
-        # hist = np.zeros(T)
-        del datafile
-        for t in range(T):
-            array = utils.get_raw_array(path, t).compute()
-            bar[t] = np.mean(array, axis=(1, 2))
-            # hist[t] = np.histogram(array)
-        # hists.append(hist)
-        print(bar)
-        plt.bar(bar)
+        raw_file = AICSImage(path)
+        for t in range(400):
+            try:
+                array = utils.get_raw_array(raw_file, t).compute()
+            except Exception as e:
+                print(e)
+                break
+            finally:
+                bar.append(np.mean(array, axis=0))
+                hist.append(np.histogram(array))
+
+        plt.bar(range(t - 1), bar)
         plt.title(f'File: {file}')
-        plt.xlabel('Slice index')
+        plt.xlabel('Time index')
         plt.ylabel('Mean pixel value')
-        plt.savefig(osp.join(save_path, f'{file}_bar'))
+        plt.savefig(osp.join(save_path, f'{file}_bar.jpg'))
         plt.close()
 
         plt.hist(array.flatten())
         plt.title(f'Histogram for: {file}')
-        plt.savefig(osp.join(save_path, f'{file}_hist'))
+        plt.savefig(osp.join(save_path, f'{file}_hist.jpg'))
         plt.close()
 
 
+def calculate_histogram(raw_file):
+    '''
+    Returns histogram of one raw data file.
+    '''
+    T = raw_file.dims['T'][0]
+    hist = np.empty(T)
+    for timepoint in raw_file:
+        hist[timepoint] = np.histogram(timepoint)
+
+
 if __name__ == '__main__':
+    print('report.py start')
     tic = time()
     utils.setcwd(__file__)
     file_path = osp.join(c.RAW_DATA_DIR, c.PRED_FILE)
     array = utils.get_raw_array(file_path, t=100)
     args = (file_path, array)
 
-    to_output = [building_dataset, statistics]
+    to_output = [statistics, building_dataset]
     for output in to_output:
         output()
 

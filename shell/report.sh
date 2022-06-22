@@ -22,7 +22,7 @@
 ### -- Specify the output and error file. %J is the job-id -- 
 ### -- -o and -e mean append, -oo and -eo mean overwrite -- 
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_report
 
 module load python3/3.8.11
 ###module load cuda/11.1
@@ -31,4 +31,4 @@ module load python3/3.8.11
 source ../venv_1/bin/activate
 
 # Run file
-python3 ../src/visualization/report.py > pyout
+python3 ../src/visualization/report.py > pyout_report
