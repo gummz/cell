@@ -4,6 +4,7 @@ import pickle
 from os.path import join
 import cv2
 import numpy as np
+import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
@@ -95,12 +96,12 @@ def get_prediction(model, device, input, accept_range=(0.5, 1)):
     # select masks by idx
     pred['masks'] = pred['masks'][idx]
     # select scores by idx
-    print('accept range', accept_range)
-    print(pred['scores'])
-    print('avg score before rejection', np.mean(pred['scores'].cpu().numpy()))
+    # print('accept range', accept_range)
+    # print(pred['scores'])
+    # print('avg score before rejection', np.mean(pred['scores'].cpu().numpy()))
     pred['scores'] = pred['scores'][idx]
-    print('avg score after rejection', np.mean(
-        pred['scores'].cpu().numpy()), '\n')
+    # print('avg score after rejection', np.mean(
+    # pred['scores'].cpu().numpy()), '\n')
 
     pred['masks'] = threshold_masks(pred['masks'])
 
@@ -217,13 +218,13 @@ def bbox_contained(box1, box2):
     return box1_inside_box2
 
 
-def predict(path: str,
-            time_idx: range,
+def predict(data: AICSImage,
+            time_range: range,
             device: torch.device,
             model, save: str) -> list(tuple):
+
     chains_tot = []
-    data = AICSImage(path)
-    for t in time_idx:
+    for t in time_range:
         timepoint_raw = utils.get_raw_array(
             data, t=t).compute()
 
@@ -261,59 +262,30 @@ def prepare_model_input(timepoint, device):
         timepoint, or multiple timepoints.
     '''
 
-    # timepoint = np.int16(timepoint)
-    # timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
-    #                           dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
-    # z_slices = []
-    # for z_slice in timepoint:
-    #     # z_slice = cv2.fastNlMeansDenoising(
-    #     #     z_slice, z_slice, 11, 7, 21)
-    #     z_slices.append(z_slice)
-    # timepoint = np.array(z_slices)
-
     timepoint = utils.normalize(np.int16(timepoint), 0, 1, cv2.CV_32F, device)
-    # array = [skimage.exposure.rescale_intensity(
-    #     z_slice, in_range=(0, 1), out_range=(220 / 255, 1))
-    #     for z_slice in array]
+
+    # timepoint = [skimage.exposure.equalize_adapthist(
+    #     z_slice, clip_limit=0.8)
+    #     for z_slice in timepoint]
+    timepoint = [F.pil_to_tensor(
+        Image.fromarray(z_slice)).to(device)
+        for z_slice in timepoint]
+    timepoint = torch.stack(timepoint)
 
     # apply filter
-    # img_filter, args = c.FILTERS['bilateral']
-    # array = [img_filter(z_slice, *args) for z_slice in array]
-    # array = torch.tensor(array, device=device)
-
-    timepoint = cv2.normalize(timepoint, None, alpha=0, beta=255,
-                              dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     img_filter, args = c.FILTERS['bilateral']
-
-    timepoint = [img_filter(z_slice, *args)
+    timepoint = [img_filter(z_slice.cpu().numpy().squeeze(), *args)
                  for z_slice in timepoint]
     timepoint = torch.tensor(timepoint, device=device)
 
-    timepoint = cv2.normalize(timepoint.cpu().numpy(), None, alpha=0, beta=1,
-                              dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
-
-    timepoint = [F.pil_to_tensor(Image.fromarray(z_slice))
-                 for z_slice in timepoint]
-    timepoint = torch.stack(timepoint)
-    timepoint = timepoint.to(device)
-
-    # dim_inputs = len(timepoint.shape)
-    # dim_squeeze = len(timepoint.squeeze().shape)
-    # if dim_inputs != dim_squeeze:
-    #     timepoint = torch.unsqueeze(timepoint, -3)
-
-    # turn 4d tensor into list of 3d tensors
-    # (format which is required by model)
-    # if len(timepoint.shape) == 4:
-    #     timepoint = [item for item in timepoint]
-
-    return timepoint
+    return timepoint.unsqueeze(1)
 
 
 if __name__ == '__main__':
 
     utils.setcwd(__file__)
     mode = 'pred'
+    load = False
 
     # Running on CUDA?
     device = utils.set_device()
@@ -322,48 +294,62 @@ if __name__ == '__main__':
     model = utils.get_model(c.MODEL_STR, device)
     model.to(device)
 
+    # Choose time range
+    # time_start = 80
+    # time_end = 130  # endpoint included
+    # time_range = range(time_start, time_end)
+
     # 1. Choose raw data file
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
     files = tuple(c.RAW_FILES['test'].keys())
     files = utils.add_ext(files)
-    name = files[0]  # c.PRED_FILE
-    # # Make directory for this raw data file
-    # # i.e. mode/pred/name
-    save = join(c.PROJECT_DATA_DIR, mode, name)
-    utils.make_dir(save)
+    # files = ('LI_2019-08-30_emb2_pos1.lsm',)
+    len_files = len(files)
+    for i, name in enumerate(files):
+        print('Predicting file', name, f'(file {i + 1}/{len_files})')
+        # # Make directory for this raw data file
+        # # i.e. mode/pred/name
+        save = join(c.PROJECT_DATA_DIR, mode, name)
+        utils.make_dir(save)
 
-    path = join(c.RAW_DATA_DIR, c.PRED_FILE)
+        if load:  # use old (saved) predictions
+            centroids = pickle.load(
+                open(join(save, 'centroids_save.pkl'), 'rb'))
+        else:  # predict
+            path = join(c.RAW_DATA_DIR, name)
+            data = AICSImage(path)
+            time_start, time_end = 0, data.dims['T'][0]
+            time_range = range(time_start, time_end)
+            centroids = predict(data, time_range,
+                                device, model, save)
+            try:
+                data.close()
+                print(f'File {name} closed successfully.')
+            except AttributeError as e:
+                print(f'File {name} raised error upon closing:\n{e}')
 
-    # # Choose time range
-    time_start = 100
-    time_end = 110
+            pickle.dump(centroids, open(
+                join(save, 'centroids_save.pkl'), 'wb'))
 
-    time_range = range(time_start, time_end)
-    path = join(c.RAW_DATA_DIR, c.PRED_FILE)
-    centroids = predict(path, time_range,
-                        device, model, save)
-    pickle.dump(centroids, open(join(save, 'centroids_save.pkl'), 'wb'))
-    # centroids = pickle.load(open(join(save, 'centroids_save.pkl'), 'rb'))
+        centroids_np = [(t, centroid[0], centroid[1],
+                        centroid[2], centroid[3])
+                        for t, timepoint in zip(time_range, centroids)
+                        for centroid in timepoint]
+        np.savetxt(
+            join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
-    centroids_np = [(t, centroid[0], centroid[1],
-                     centroid[2], centroid[3])
-                    for t, timepoint in zip(time_range, centroids)
-                    for centroid in timepoint]
-    np.savetxt(
-        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+        tracked_centroids = tracker.track(centroids_np, threshold=20)
 
-    tracked_centroids = tracker.track(centroids_np, 100)
+        pickle.dump(tracked_centroids,
+                    open(join(save, 'tracked_centroids.pkl'), 'wb'))
+        tracked_centroids.to_csv(join(save, 'tracked_centroids.csv'))
 
-    pickle.dump(tracked_centroids,
-                open(join(save, 'tracked_centroids.pkl'), 'wb'))
-    tracked_centroids.to_csv(join(save, 'tracked_centroids.csv'))
+        location = join(save, 'timepoints')
+        plot.save_figures(tracked_centroids, location)
+        # plot.create_movie(location, time_range)
 
-    location = join(save, 'timepoints')
-    plot.save_figures(tracked_centroids, location)
-    plot.create_movie(location, time_range)
-
-    # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
-    # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
+        # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
+        # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
 
     print('predict_model.py complete')
