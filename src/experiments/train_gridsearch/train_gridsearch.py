@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     # save study
     df = study.trials_dataframe()
-    df.to_csv('train_study.csv')
+    df.to_csv('train_study.csv', sep=';')
     pickle.dump(study, open('train_study.pkl', 'wb'))
 
     # print elapsed time of script
