@@ -68,8 +68,11 @@ if __name__ == '__main__':
     dataset = bcd.get_dataset(mode='val')
 
     # grid search variables
-    accept_ranges = tuple((lower, 1) for lower, upper in range(0, 1, 0.1))
-    match_thresholds = np.linspace(0, 1, 21)
+    int_lower = np.round(np.linspace(0, 0.9, 10), 2)
+    int_upper = np.round(np.linspace(0.1, 1, 10), 2)
+    accept_ranges = tuple((lower, 1)
+                          for lower, upper in zip(int_lower, int_upper))
+    match_thresholds = np.linspace(0, 1, 11)
 
     metrics_tot = perform_study(device, save, model, dataset,
                                 accept_ranges, match_thresholds)
