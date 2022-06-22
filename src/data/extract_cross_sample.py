@@ -1,4 +1,5 @@
 from os.path import join
+import numpy as np
 
 import pandas as pd
 import src.data.constants as c
@@ -25,7 +26,7 @@ if __name__ == '__main__':
     # which:
     # Should the extract be one timepoint across slices,
     # or one slice across timepoints?
-    which = 'slice'  # which = timepoint or which = slice
+    which = 'timepoint'  # which = timepoint or which = slice
 
     utils.setcwd(__file__)
 
@@ -39,13 +40,16 @@ if __name__ == '__main__':
 
     idx = int(t) if which == 'timepoint' else int(z)
     folder = f'{which}_{idx}'
-    output_path = join(c.DATA_DIR, c.EXTRACT_DIR, file, folder)
+    output_path = join(c.PROJECT_DATA_DIR, c.EXTRACT_DIR, file, folder)
     utils.make_dir(output_path)
 
     raw_file_path = join(c.RAW_DATA_DIR, file)
-    data = utils.get_raw_array(raw_file_path, t, z)
+    data = utils.get_raw_array(raw_file_path, t, z).compute()
 
-    for i, array in enumerate(data):
+    if which == 'timepoint':  # output MIP
+        name_str = 'mip.jpg'
+        utils.imsave(join(output_path, name_str), np.max(data, axis=0))
+    for i, array in enumerate(data):  # output timepoint or slice
         name_str = f'{t:02d}_{i:02d}.jpg' if which == 'timepoint' \
             else f'{i:02d}_{z:02d}.jpg'
         utils.imsave(join(output_path, name_str), array, resize=resize)

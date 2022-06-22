@@ -244,6 +244,7 @@ def normalize(image, alpha, beta, out, device=None):
         return torch.tensor(normalized,
                             device=device
                             if device else torch.device('cpu'))
+
     return cv2.normalize(image, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
 
 
