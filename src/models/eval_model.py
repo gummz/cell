@@ -1,4 +1,6 @@
 from time import time
+from typing import Union
+from matplotlib import pyplot as plt
 
 import numpy as np
 import src.data.utils.utils as utils
@@ -9,6 +11,8 @@ from src.models.predict_model import get_prediction
 from src.models.utils.utils import collate_fn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
+import os.path as osp
+import seaborn as sns
 import src.models.train_model as train
 import torchmetrics.functional as F
 import src.models.BetaCellDataset as bcd
@@ -33,19 +37,15 @@ def eval_model(model, dataset, mode, device, save=None,
 
     model.eval()
     for i, (image, target) in enumerate(dataset):
-        # image = images
         image = image.to(device)
-        # target = targets
-
-        # move target to device
         target['masks'] = target['masks'].to(device)
         target['boxes'] = target['boxes'].to(device)
 
         with autocast():
             pred = get_prediction(model, device, image, accept_range)
 
-        if i % 40 == 0:
-            save_path = join(save, f'{i:05d}')
+        if i % 10 == 0:
+            save_path = osp.join(save, f'{i:05d}')
             target_mask = utils.get_mask(target['masks']) * 255
             inputs = (image.cpu(), pred, target_mask.cpu())
             titles = ('Original', 'Prediction', 'Ground Truth')
@@ -61,13 +61,9 @@ def eval_model(model, dataset, mode, device, save=None,
         scores_bbox[i] = np.mean(score_bbox)
         cm_bbox_tot += cm_bbox
 
-        if len(pred['scores'] > 0):
+        if any(pred['scores']):
             certainty[i] = np.mean(pred['scores'].cpu().numpy())
-            print('avg certainty', certainty[i], '\n')
-        elif len(target['boxes'] > 0):
-            # set certainty as 0 when there are predictions
-            # but objects in the ground truth
-            certainty[i] = 0.
+            # print('avg certainty', certainty[i], '\n')
 
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
@@ -233,6 +229,13 @@ def create_cm(tp: int, fn: int, fp: int):
     return confusion_matrix
 
 
+def save_cm(confusion_matrix: tuple, save: str):
+    cm_plot = sns.heatmap(confusion_matrix)
+    fig = cm_plot.get_figure()
+    fig.savefig(osp.join(save, 'confusion_matrix.jpg'))
+    plt.close()
+
+
 def score_report(metrics):
     (tp, fn), (fp, _) = metrics[0]
     n_pred = int(tp + fp)
@@ -247,19 +250,17 @@ def score_report(metrics):
 if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
-    mode = 'val'
+    mode = 'test'
     device = utils.set_device()
-    save = join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
-                'seg_2d', f'model_{c.MODEL_STR}', mode)
+    save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
+                    'seg_2d', f'model_{c.MODEL_STR}', mode)
+    print('Outputting images to', save)
 
     model = utils.get_model(c.MODEL_STR, device)
     model = model.to(device)
+    dataset = bcd.get_dataset(mode=mode)
 
-    dataset = bcd.get_dataset(mode='val')
-    # dataloader = DataLoader(dataset, batch_size=1,
-    #                         shuffle=False, num_workers=4, collate_fn=collate_fn)
-
-    ious = eval_model(model, dataset, 'val', device, save)
-    score_report(ious)
-
+    metrics = eval_model(model, dataset, mode, device, save)
+    score_report(metrics)
+    save_cm(metrics[0], save)
     print(f'Evaluation complete after {utils.time_report(tic, time())}.')
