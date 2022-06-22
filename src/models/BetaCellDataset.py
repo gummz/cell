@@ -218,11 +218,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
                                 dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 
             # img, target = self.transforms(img, target)
-            # img = skimage.exposure.rescale_intensity(
-            #     img, in_range=(0, 255), out_range=(200, 255))
-            # img = img.astype(np.uint8)
-            # img_filter, args = c.FILTERS['nlmeans']
-            # img = img_filter(img, *args)
             if self.img_filter:
                 # in constants.py
                 img_filter, args = self.img_filter
@@ -231,6 +226,8 @@ class BetaCellDataset(torch.utils.data.Dataset):
             img = cv2.normalize(img, None, alpha=0, beta=1,
                                 dtype=cv2.CV_32F, norm_type=cv2.NORM_MINMAX)
 
+            # img = skimage.exposure.equalize_adapthist(
+            #     img, kernel_size=20, clip_limit=1)
             img = torch.tensor(img).unsqueeze(0)
             # img = img.unsqueeze(0)
 
