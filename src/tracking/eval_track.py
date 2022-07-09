@@ -65,10 +65,8 @@ def eval_track(tracked_centroids, time_range, filename, location):
 
         X, Y, P, I = (frame[c] for c in columns)
 
-        plt.figure(figsize=(20, 12))
+        plt.figure(figsize=(20, 14))
 
-        # plot markers on beta cell channel and combined
-        # image
         for i in range(2):
             plt.subplot(1, 3, i + 1)
             plot_markers(marker_size, colors_dict, X, Y, P, I)
@@ -88,29 +86,29 @@ def output_raw_images(location, raw_file, channels, t, name):
         raw_file, t, ch=channels).compute()
 
     cells_mip = np.max(data[:, :, :, channels[0]], axis=0)
+    cells_mip_xz = np.max(data[:, :, :, channels[0]], axis=2)
+    cells_mip_yz = np.max(data[:, :, :, channels[0]], axis=1)
     tubes_mip = np.max(data[:, :, :, channels[1]], axis=0)
 
     cells_mip = utils.normalize(cells_mip, 0, 1, out=cv2.CV_32FC1)
-    # cells_scale = skimage.exposure.rescale_intensity(
-    #     cells_mip, in_range=(0, 255), out_range=(220, 255))
+    cells_mip_xz = utils.normalize(cells_mip_xz, 0, 1, out=cv2.CV_32FC1)
+    cells_mip_yz = utils.normalize(cells_mip_yz, 0, 1, out=cv2.CV_32FC1)
+
     cells_scale = skimage.exposure.equalize_adapthist(
         cells_mip, clip_limit=0.8)
+    cells_mip_xz = skimage.exposure.equalize_adapthist(
+        cells_mip_xz, clip_limit=0.8)
+    cells_mip_yz = skimage.exposure.equalize_adapthist(
+        cells_mip_yz, clip_limit=0.8)
 
-    # print('after rescale >=0', np.sum(cells_scale >= 0))
-    # print('after rescale', np.sum(cells_scale >= 220))
-    # cells_nl = utils.normalize(cells_scale, 220, 255, cv2.CV_8UC1)
-    # cells_nl = cv2.fastNlMeansDenoising(cells_nl, None, 11, 7, 21)
-    # cells_mip = utils.normalize(cells_mip, 0, 1, cv2.CV_32FC1)
-    # tubes_mip = utils.normalize(tubes_mip, 0, 255, cv2.CV_8UC1)
     tubes_mip = utils.normalize(tubes_mip, 0, 1, cv2.CV_32FC1)
-    # cells_scale = utils.normalize(cells_scale, 0, 1, cv2.CV_32FC1)
-    # print('after normalize', np.sum(cells_scale >= 220/255))
-    # exit()
-    # cells_nl = utils.normalize(cells_nl, 0, 1, cv2.CV_32FC1)
-    # cells_nl = np.where(cells_nl > 1, 1, cells_nl)
 
     cells_scale = np.where(cells_scale > 1, 1, cells_scale)
     cells_scale = np.where(cells_scale < 0, 0, cells_scale)
+    cells_mip_xz = np.where(cells_mip_xz > 1, 1, cells_mip_xz)
+    cells_mip_xz = np.where(cells_mip_xz < 0, 0, cells_mip_xz)
+    cells_mip_yz = np.where(cells_mip_yz > 1, 1, cells_mip_yz)
+    cells_mip_yz = np.where(cells_mip_yz < 0, 0, cells_mip_yz)
 
     tubes_mip = np.where(tubes_mip > 1, 1, tubes_mip)
     tubes_mip = np.where(tubes_mip < 0, 0, tubes_mip)
@@ -124,27 +122,6 @@ def output_raw_images(location, raw_file, channels, t, name):
     tubes_rgb = np.zeros((1024, 1024, 4), dtype=np.float32)
     tubes_rgb[:, :, 1] = tubes_mip
     tubes_rgb[:, :, 3] = 1.
-    # normalize ...
-    # cells_scale = utils.normalize(cells_scale, 200, 255, cv2.CV_8UC1)
-    # cells_rgb = np.zeros((*cells_scale.shape, 3))
-    # cells_rgb[:, :, 1] = cells_scale
-    # cv2.cvtColor(cells_scale.astype(np.float32),
-    #                         cv2.COLOR_GRAY2RGB)
-
-    # tubes_rgb = np.zeros((*tubes_mip.shape, 3))
-    # tubes_rgb[:, :, 2] = tubes_mip
-    # cv2.cvtColor(tubes_mip.astype(np.float32),
-    #                         cv2.COLOR_GRAY2RGB)
-
-    # linear blend between cells and tubes
-    # alpha = 0.90
-    # blended = cv2.addWeighted(cells_nl.astype(np.float32), alpha,
-    #                           tubes_mip.astype(np.float32), 1 - alpha,
-    #                           0, None, dtype=-1)
-    # print(np.unique(combined))
-    # print(np.unique(cells_scale))
-    # print(np.unique(cells_mip))
-    # print(np.unique(tubes_mip))
 
     utils.imsave(join(location, f'{name}.png'),
                  combined, False)
@@ -152,12 +129,17 @@ def output_raw_images(location, raw_file, channels, t, name):
     # output cells and tubes
     utils.imsave(join(location, f'{name}_cells.png'),
                  cells_scale, False, 'Reds')
+    utils.imsave(join(location, f'{name}_cells_xz.png'),
+                 cells_mip_xz, False, 'Reds')
+    utils.imsave(join(location, f'{name}_cells_yz.png'),
+                 cells_mip_yz, False, 'Reds')
     utils.imsave(join(location, f'{name}_cells_raw.png'),
                  cells_mip, False, 'viridis')
     utils.imsave(join(location, f'{name}_tubes.png'),
                  tubes_rgb, False)
 
-    return combined, cells_scale, tubes_mip
+    return (combined, cells_scale, cells_mip_xz,
+            cells_mip_yz, tubes_mip)
 
 
 def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mip, combined, save, time_range):
