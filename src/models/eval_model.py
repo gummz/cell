@@ -33,7 +33,7 @@ def eval_model(model, dataset, mode, device, save=None,
     scores_bbox = np.zeros(len_dataset)
     cm_mask_tot = np.zeros((2, 2))
     cm_bbox_tot = np.zeros((2, 2))
-    certainty = np.zeros(len_dataset)
+    certainty = []  # np.zeros(len_dataset)
 
     model.eval()
     for i, (image, target) in enumerate(dataset):
@@ -62,8 +62,7 @@ def eval_model(model, dataset, mode, device, save=None,
         cm_bbox_tot += cm_bbox
 
         if any(pred['scores']):
-            certainty[i] = np.mean(pred['scores'].cpu().numpy())
-            # print('avg certainty', certainty[i], '\n')
+            certainty.append(np.mean(pred['scores'].cpu().numpy()))
 
     avg_score_mask = np.round(np.mean(scores_mask), 2)
     avg_score_bbox = np.round(np.mean(scores_bbox), 2)
