@@ -234,7 +234,8 @@ def test():
                     cv2.THRESH_BINARY, block_size, C)
 
                 save = f'{img_name}_thresh_{block_size}_{C}_{name}.jpg'
-                cv2.imwrite(os.path.join(figures_dir, save), thresh)
+                cv2.imwrite(os.path.join(
+                    figures_dir, folder, img_name, save), thresh)
 
     thresholds = range(0, 240, 5)
     for threshold in thresholds:
