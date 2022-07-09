@@ -10,7 +10,7 @@ import src.data.utils.utils as utils
 from pprint import pprint
 from torch.utils.data import DataLoader
 import pickle
-from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders, get_transform
+import src.models.BetaCellDataset as bcd
 from src.models.eval_model import eval_model
 from src.models.train_model import train
 from src.models.utils.model import get_instance_segmentation_model
@@ -46,7 +46,7 @@ def objective(n_img_select, manual_select, n_epochs, device):
 
     num_workers = 4
     root = join('..', c.DATA_DIR)
-    data_tr, data_val = get_dataloaders(
+    data_tr, data_val = bcd.get_dataloaders(
         root=root, batch_size=batch_size, num_workers=num_workers,
         resize=image_size, n_img_select=(n_img_select, 1),
         manual_select=(manual_select, 1))
@@ -76,15 +76,8 @@ def objective(n_img_select, manual_select, n_epochs, device):
         train_loss, val_loss = train(
             model, device, opt, n_epochs, data_tr, data_val, time_str, hparam_dict, w, save=False, write=True)
 
-    # reload validation dataloaders with batch size of 1
-    _, data_val = get_dataloaders(
-        root=root, batch_size=1, num_workers=num_workers,
-        resize=image_size, n_img_select=(1, 1),
-        manual_select=(1, 1), shuffle=False)
-    _, data_val_no_manual = get_dataloaders(
-        root=root, batch_size=1, num_workers=num_workers,
-        resize=image_size, n_img_select=(1, 1), manual_select=(1, 0),
-        shuffle=False)
+    data_val = bcd.get_dataset(
+        root=root, mode='val', resize=image_size,
 
     # need to eval model twice for every trial
     # once where validation set has no manual labels,
