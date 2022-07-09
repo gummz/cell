@@ -77,6 +77,10 @@ def eval_track(tracked_centroids, time_range, filename, location):
 
         save = join(location, tracking_folder, f'{t:05d}.png')
 
+        output_tracks(filename, t, cells, cells_xz, cells_yz,
+                      tubes, combined, save, time_range)
+
+
 def load_existing(location, name):
     combined = plt.imread(join(location, f'{name}.png'))
     cells = plt.imread(join(location, f'{name}_cells.png'))
