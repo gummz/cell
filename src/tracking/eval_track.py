@@ -186,15 +186,28 @@ def output_figure(filename, t, cells_scale, tubes_mip, combined, save):
     plt.close()
 
 
-def plot_markers(marker_size, colors, X, Y, P, I):
+def plot_markers(marker_size, colors, X, Y, P, I,
+                 t, time_range, p_track):
     marker = 'x'
+    marker_size_plt = marker_size
     for x, y, p, i in zip(X, Y, P, I):
-        # if i < c.ACTIVE_THRESHOLD:
-        #     marker = 'x'
-        # else:
-        #     marker = 'o'
-        plt.plot(x, y, c=colors[p], marker=marker,
-                 markersize=marker_size, markeredgewidth=3)
+        if p == p_track:
+            marker = 'o'
+            if t == min(time_range):
+                marker_size_plt = marker_size * 3
+            else:
+                marker_size_plt = marker_size
+
+        plt.plot(x, y, marker=marker,
+                 markersize=marker_size_plt,
+                 markeredgewidth=2,
+                 markerfacecolor=(0, 0, 0, 0),
+                 markeredgecolor=colors[p])
+
+        # reset markers to default size for next timepoint
+        if p == p_track:
+            marker = 'x'
+            marker_size_plt = marker_size
 
 
 if __name__ == '__main__':
