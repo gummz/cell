@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # Should the extract be one timepoint across slices,
     # or one slice across timepoints?
     which = 'timepoint'  # or which = 'slice'
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
 
     output_path = slice_to_mip(mode, resize, which)
 

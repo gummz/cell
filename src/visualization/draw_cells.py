@@ -62,7 +62,7 @@ def get_MIP(timepoints: np.array):
 if __name__ == '__main__':
     # Set working directory to file location
     print('draw_cells.py start')
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
 
     files = listdir(c.RAW_DATA_DIR)
 

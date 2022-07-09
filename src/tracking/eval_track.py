@@ -199,11 +199,8 @@ if __name__ == '__main__':
     n_frames = 30
     tic = time()
     mode = 'test'
-    utils.setcwd(__file__)
-    files = tuple(c.RAW_FILES[mode].items())[-4]
-    files = utils.add_ext((file for file, range_ok in files.items()))  # add extensions (.lsm etc.)
-    files = [files]
-    print(files)
+    utils.set_cwd(__file__)
+
     # name = files[3]  # c.PRED_FILE
     for i, (name, range_ok) in enumerate(files):
         print('Outputting tracks for file', name, '...', end='')

@@ -10,7 +10,7 @@ import src.data.constants as c
 
 mode = 'test'
 
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 kernel = c.MEDIAN_FILTER_KERNEL
 threshold = c.SIMPLE_THRESHOLD

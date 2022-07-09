@@ -81,8 +81,8 @@ def calculate_histogram(raw_file):
 if __name__ == '__main__':
     print('report.py start')
     tic = time()
-    utils.setcwd(__file__)
-    file_path = osp.join(c.RAW_DATA_DIR, c.PRED_FILE)
+    utils.set_cwd(__file__)
+    name = c.PRED_FILE
     array = utils.get_raw_array(file_path, t=100)
     args = (file_path, array)
 

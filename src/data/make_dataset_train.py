@@ -12,7 +12,7 @@ from aicsimageio import AICSImage
 
 mode = 'train'
 random.seed(40)
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
 files = c.RAW_FILES[mode].keys()

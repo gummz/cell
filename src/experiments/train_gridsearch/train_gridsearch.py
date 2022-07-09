@@ -100,7 +100,7 @@ def objective(trial):
 if __name__ == '__main__':
     tic = time()
     optuna.logging.set_verbosity(optuna.logging.DEBUG)
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
 
     # create study
     study = optuna.create_study(direction='minimize')

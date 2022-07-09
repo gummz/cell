@@ -251,6 +251,7 @@ if __name__ == '__main__':
     tic = time()
     utils.setcwd(__file__)
     mode = 'test'
+    utils.set_cwd(__file__)
     device = utils.set_device()
     save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
                     'seg_2d', f'model_{c.MODEL_STR}', mode)
