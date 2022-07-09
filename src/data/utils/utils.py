@@ -38,21 +38,28 @@ def active_slices(timepoint: np.array, ratio=None):
 def add_ext(files):
     raw_files = listdir(c.RAW_DATA_DIR)
     temp_files = []
-    for file in files:
-        if f'{file}.lsm' in raw_files:
-            tmp = f'{file}.lsm'
-        elif f'{file}.czi' in raw_files:
-            tmp = f'{file}.czi'
-        elif f'{file}.ims' in raw_files:
-            tmp = f'{file}.ims'
-        else:
-            raise RuntimeError(f'File not found with extension: {file}')
-        temp_files.append(tmp)
-
-    if len(temp_files) == 1:
-        return temp_files[0]
+    if not isinstance(files, str):
+        for file in files:  # `files` is ArrayLike
+            file_with_ext = add_ext_single(file, raw_files)
+            temp_files.append(file_with_ext)
+        if len(temp_files) == 1:
+            return temp_files[0]
+    else:  # `files` is a string
+        file = os.path.basename(files)
+        return add_ext_single(file, raw_files)
 
     return temp_files
+
+
+def add_ext_single(file, raw_files):
+    if f'{file}.lsm' in raw_files:
+        return f'{file}.lsm'
+    elif f'{file}.czi' in raw_files:
+        return f'{file}.czi'
+    elif f'{file}.ims' in raw_files:
+        return f'{file}.ims'
+    else:
+        raise FileNotFoundError(f'File not found with extension: {file}')
 
 
 def del_multiple(list_object, indices):
