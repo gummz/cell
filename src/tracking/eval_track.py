@@ -49,7 +49,9 @@ def eval_track(tracked_centroids, time_range, filename, location):
     frames = tracked_centroids.groupby('frame')
     # filter according to time range (frames could contain more
     # than necessary)
-    frames = (frame for frame in frames if frame[0] in time_range)
+    # get unique particles from first frame
+    p_tracks = get_p_tracks(frames)
+    p_track = p_tracks[batch_idx - 1]
     for t, (_, frame) in zip(time_range, frames):
         exists = True  # assume image exists until proven otherwise
         name = f'{t:05d}'
@@ -158,64 +160,29 @@ def output_raw_images(location, raw_file, channels, t, name):
     return combined, cells_scale, tubes_mip
 
 
-def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mip, combined, save, time_range):
-
-    fontsize = 25
-    plt.subplot(231)
-    plt.title('Beta cell channel (0)\n with amplified signal', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
-    plt.xticks(fontsize=fontsize, rotation=20)
-    plt.yticks(fontsize=fontsize)
+def output_figure(filename, t, cells_scale, tubes_mip, combined, save):
+    plt.subplot(131)
+    plt.title('Beta cell channel (0) with amplified signal')
     plt.imshow(cells_scale, cmap='Reds')
 
-    plt.subplot(232)
+    plt.subplot(132)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
-    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.xlabel('X dimension')
     plt.xlim(left=0, right=1024)
-    plt.xticks(fontsize=fontsize, rotation=20)
-    plt.yticks(fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
-    plt.ylim(top=0, bottom=1024)
-    plt.title('Tracked cells with \ntubes overlay', fontsize=fontsize)
-
-    plt.subplot(233)
-    plt.title('Tubes channel (1)', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
-    plt.xticks(fontsize=fontsize, rotation=20)
-    plt.yticks(fontsize=fontsize)
-    plt.imshow(tubes_mip, cmap='viridis')
-    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.ylabel('Y dimension')
     plt.ylim(bottom=1024, top=0)
-    plt.title('Tubes channel (1)', fontsize=fontsize)
+    plt.title('Tracked cells with tubes overlay')
 
-    plt.subplot(234)
-    plt.title('MIP, XZ', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Z dimension', fontsize=fontsize)
-    plt.xticks(fontsize=fontsize, rotation=20)
-    plt.yticks(fontsize=fontsize)
-    plt.imshow(cells_mip_xz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
-    plt.ylim(bottom=40, top=0)
+    plt.subplot(133)
+    plt.title('Tubes channel (1)')
+    plt.imshow(tubes_mip)
 
-    plt.subplot(236)
-    plt.title('MIP, YZ', fontsize=fontsize)
-    plt.xlabel('Y dimension', fontsize=fontsize)
-    plt.ylabel('Z dimension', fontsize=fontsize)
-    plt.xticks(fontsize=fontsize, rotation=20)
-    plt.yticks(fontsize=fontsize)
-    plt.imshow(cells_mip_yz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
-    plt.ylim(bottom=40, top=0)
-
-    start, end = min(time_range), max(time_range)
     plt.suptitle(
-        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}, \ntotal timepoints: ({start}-{end})',
+        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}',
         fontsize=30)
 
     plt.tight_layout()
-    plt.subplots_adjust(top=0.85)
-    plt.savefig(save, dpi=200)
+    plt.savefig(save, dpi=300)
     plt.close()
 
 
