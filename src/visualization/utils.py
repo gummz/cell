@@ -27,6 +27,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
 
     iterable = zip(debug_idx, timepoint_raw[debug_idx], preds)
     for idx, z_slice, pred in iterable:
+        save_location = osp.join(save, f't-{t}_{idx}.jpg')
         z_slice = np.int16(z_slice)
 
         boxes = pred['boxes']
@@ -36,8 +37,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
             figure = plt.figure()
             plt.imshow(z_slice)
             plt.title(f'Number of detections: {len(boxes)}')
-            utils.imsave(join(save,
-                              f't-{t}_{idx}.jpg'), figure, size)
+            utils.imsave(save_location, figure, size)
             continue
 
         # consolidate masks into one array
@@ -65,7 +65,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
         images = (bboxed_img, z_slice.squeeze().cpu())
         titles = ('Prediction', 'Ground Truth')
         grid = (1, 2)
-        draw_output(images, titles, grid, save, compare=True)
+                    save_location, compare=True)
 
 
 def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
