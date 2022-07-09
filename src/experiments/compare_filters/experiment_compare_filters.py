@@ -19,7 +19,7 @@ def subselect_img(image):
     '''
     Returns a subregion of the image.
     '''
-    return image[300:600, 300:600]
+    return image[600:950, 450:800]
 
 
 def imsave_preproc(path, image):
