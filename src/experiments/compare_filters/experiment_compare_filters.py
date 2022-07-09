@@ -90,13 +90,14 @@ for i in range(1, 21, 2):
 # Denoise
 operation = 'denoise'
 utils.make_dir(join(save, operation))
-for i in range(1, 21, 2):
-    for j in range(1, 10, 2):
-        for k in range(1, 30, 4):
-            name = f'{operation}_{i}_{j}_{k}'
+for h in range(1, 21, 2):
+    for template in range(1, 10, 2):
+        for search in range(1, 30, 4):
+            name = f'{operation}_{h}_{template}_{search}'
             if os.path.exists(join(save, operation, name)):
                 break
-            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
+            img_denoise = cv2.fastNlMeansDenoising(
+                img, None, h, template, search)
             imsave_preproc(join(save, operation, name),
                            img_denoise)
 
