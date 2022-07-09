@@ -244,6 +244,14 @@ def plot_markers(marker_size, colors, X, Y, P, I,
             marker_size_plt = marker_size
 
 
+def get_time_range(n_frames, range_ok, load_location):
+    T = len(os.listdir(join(load_location, 'timepoints')))
+    T = range_ok[1] if range_ok else T
+    time_start = np.random.randint(0, T - n_frames)
+    time_range = range(time_start, time_start + n_frames)
+    return time_range
+
+
 if __name__ == '__main__':
     n_frames = 30
     tic = time()
@@ -266,10 +274,7 @@ if __name__ == '__main__':
 
         # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
         # time_range = range(min(unique_frames), max(unique_frames) + 1)
-        T = len(os.listdir(join(load_location, 'timepoints')))
-        time_start = np.random.randint(0, T - n_frames)
-        time_range = range(time_start, time_start + n_frames)
-        eval_track(tracked_centroids, time_range, name, save_location)
+            time_range = get_time_range(n_frames, range_ok, load_location)
 
         print('Done', end='')
 
