@@ -10,6 +10,7 @@ from src.models.BetaCellDataset import BetaCellDataset, get_transform
 from src.models.predict_model import get_prediction
 from src.models.utils.utils import collate_fn
 from torch.cuda.amp import autocast
+import scipy.optimize as sciopt
 from torch.utils.data import DataLoader
 import os.path as osp
 import seaborn as sns
@@ -23,10 +24,10 @@ import src.visualization.utils as viz
 
 
 def eval_model(model, dataset, mode, device, save=None,
-               accept_range=(0.5, 1), match_threshold=0.2):
-    '''Calculates IOU for chosen set for the input model.
-    TODO: Use with TensorBoard (add_scalar)
-            (With Optuna in grid search, not in here)
+               accept_range=c.ACCEPT_RANGE,
+               match_threshold=c.MATCH_THRESHOLD):
+    '''
+    Calculates IOU for chosen set for the input model.
     '''
     len_dataset = len(dataset)
     scores_mask = np.zeros(len_dataset)
@@ -74,7 +75,7 @@ def eval_model(model, dataset, mode, device, save=None,
             avg_certainty)
 
 
-def performance_bbox(pred, target, match_threshold=0.2):
+def performance_bbox(pred, target, match_threshold=0.3):
     '''
     Returns mean IOU score of all bounding box detections
     in a slice.
@@ -113,6 +114,22 @@ def performance_bbox(pred, target, match_threshold=0.2):
             taken.append(max_arg)
             tp += 1
             scores[i] = iou_scores[max_arg]
+    # cost_matrix = torchvision.ops.boxes.box_iou(pred_bboxes,
+    #                                             target_bboxes)
+    # col_select = torch.argwhere(torch.max(cost_matrix, dim=1) > match_threshold)
+    # cost_matrix = cost_matrix[:, col_select]
+    # cost_rows, cost_cols = sciopt.linear_sum_assignment(cost_matrix, maximize=True)
+    # cost_matrix_opt = cost_matrix[cost_rows, cost_cols]
+    # opt_rows, opt_cols = cost_matrix_opt.shape
+    # print(opt_rows, opt_cols)
+    # if cost_rows == cost_cols:
+    #     pass  # no false positives, no false negatives
+    # elif cost_rows > cost_cols:
+    #     fp = cost_rows - cost_cols
+    #     fp += torch.sum(cost_matrix_opt < 0.3)
+    # elif cost_rows < cost_cols:
+    #     fn = cost_cols - cost_rows
+    # tp = torch.sum(cost_matrix_opt > 0.3)
 
     # no matches; all predictions are false positives,
     # and all targets are false negatives
@@ -228,13 +245,6 @@ def create_cm(tp: int, fn: int, fp: int):
     return confusion_matrix
 
 
-def save_cm(confusion_matrix: tuple, save: str):
-    cm_plot = sns.heatmap(confusion_matrix)
-    fig = cm_plot.get_figure()
-    fig.savefig(osp.join(save, 'confusion_matrix.jpg'))
-    plt.close()
-
-
 def score_report(metrics):
     (tp, fn), (fp, _) = metrics[0]
     n_pred = int(tp + fp)
@@ -247,9 +257,9 @@ def score_report(metrics):
 
 
 if __name__ == '__main__':
-    tic = time()
-    utils.setcwd(__file__)
     mode = 'test'
+
+    tic = time()
     utils.set_cwd(__file__)
     device = utils.set_device()
     save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
@@ -260,7 +270,8 @@ if __name__ == '__main__':
     model = model.to(device)
     dataset = bcd.get_dataset(mode=mode)
 
-    metrics = eval_model(model, dataset, mode, device, save)
+    metrics = eval_model(model, dataset, mode, device, save,
+                         accept_range=(0.91, 1), match_threshold=0.3)
     score_report(metrics)
-    save_cm(metrics[0], save)
+    viz.save_cm(metrics[0], save)
     print(f'Evaluation complete after {utils.time_report(tic, time())}.')
