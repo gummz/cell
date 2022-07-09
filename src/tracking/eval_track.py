@@ -68,8 +68,8 @@ def eval_track(tracked_centroids, time_range, filename, location):
         plt.figure(figsize=(20, 14))
 
         for i in range(2):
-            plt.subplot(1, 3, i + 1)
-            plot_markers(marker_size, colors_dict, X, Y, P, I)
+            plot_markers(marker_size, colors_dict, X, Y,
+                         P, I, t, time_range, p_track)
 
         if exists:
             combined, cells, cells_xz, cells_yz, tubes = load_existing(
