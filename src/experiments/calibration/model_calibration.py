@@ -35,13 +35,15 @@ def perform_study(device, save, model, dataset, accept_ranges, match_thresholds)
 
 if __name__ == '__main__':
     tic = time()
+    utils.setcwd(__file__)
+    mode = 'val'
     utils.set_cwd(__file__)
     device = utils.set_device()
     save = osp.join('..', c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
                     'seg_2d', f'model_{c.MODEL_STR}',
                     mode, 'model_calibration')
 
-    model = utils.get_model(c.MODEL_STR, device)
+    model = utils.get_model(model_id, device)
     model = model.to(device)
     dataset = bcd.get_dataset(mode=mode)
 
