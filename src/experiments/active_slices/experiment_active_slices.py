@@ -148,7 +148,8 @@ def predict_ssh(raw_data_file, time_idx, device, model):
             # debug
             save_dir = join('..', c.EXPERIMENT_DIR, 'active_slices')
             for idx, slice in zip(slice_idx, timepoint_sliced):
-                utils.imsave(join(save_dir, f't-{t}_active_{idx:02d}_{ratio*255}.jpg'), slice, 512)
+                utils.imsave(
+                    join(save_dir, f't-{t}_active_{idx:02d}_{ratio*255}.jpg'), slice, 512)
         for i, slice in enumerate(timepoint):
             utils.imsave(join(save_dir, f't-{t}_orig_{i:02d}.jpg'), slice, 512)
         print('done')
@@ -189,7 +190,7 @@ def predict_local(timepoints, device, model):
 
 
 if __name__ == '__main__':
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     mode = 'test'
     # Running on CUDA?
     device = torch.device(
