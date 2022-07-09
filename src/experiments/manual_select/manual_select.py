@@ -23,9 +23,9 @@ def objective(n_img_select, manual_select, n_epochs, device):
     # hyperparameters
     # pretrained = trial.suggest_categorical('pretrained', [True, False])
     amsgrad = 0
-    batch_size = 4
-    beta1 = 0.51929
-    beta2 = 0.61231
+    batch_size = 8
+    beta1 = 0.244
+    beta2 = 0.985
     image_size = 512
     loss_list = [
         'loss_mask', 'loss_rpn_box_reg', 'loss_box_reg',
@@ -38,10 +38,10 @@ def objective(n_img_select, manual_select, n_epochs, device):
     #     [loss_list[1:3]]
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
-    lr = 6.02006e-5
+    lr = 3.419e-6
     # 1100  # = manual_select later
     # n_img_select = 1100  # manual_select if manual_select > 0 else 200
-    weight_decay = 0.0007618
+    weight_decay = 1.296e-8
     # end hyperparameters
 
     num_workers = 4
