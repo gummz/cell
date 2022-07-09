@@ -204,12 +204,15 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
         # early stopping
         patience = 15  # number of epochs to wait for validation loss to improve
-        if i > patience:
-            early_thresh = 0.95  # ratio threshold at which to stop at
-            val_prev = tot_val_losses[i-patience:i]
+        if i >= 5 and i % 5 == 0:
+            worsen_ratio = 1.2
+            val_prev = tot_val_losses[i-patience]
             val_now = val_loss
-            if val_now / np.mean(val_prev) > early_thresh:
+            # if validation loss has worsened this much
+            # in the last 5 iterations, then stop
+            if val_now / val_prev > worsen_ratio:
                 print('Early stopping activated; stopping training.')
+                model = model_prev
                 break
 
         # end epoch
@@ -225,7 +228,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
     # writer.add_embedding(images,
     #                         label_img=images.unsqueeze(1))
 
-    return tot_train_losses, tot_val_losses
+    return tot_train_losses, tot_val_losses, model
 
 
 def create_grid(x_val, y_val, y_hat, batch_size):
@@ -403,8 +406,8 @@ if __name__ == '__main__':
                         '''
 
     with SummaryWriter(f'runs/{time_str}') as w:
-        losses = train(model, device, opt, num_epochs,
-                       data_tr, data_val, time_str, hparam_dict, w, save=True, write=False)
+        train_loss, val_loss, model = train(model, device, opt, num_epochs,
+                                            data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
         w.add_text('description', description)
 
     losses = np.array(losses).T
