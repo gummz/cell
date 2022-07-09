@@ -162,9 +162,9 @@ def get_raw_array(data, t=None, z=None,
         if os.path.exists(data):
             raw_data = AICSImage(data)
         else:
-            raw_data = AICSImage(c.SAMPLE_PATH)
+            raw_data = np.load(c.SAMPLE_PATH)
             print((
-                f'WARNING: Could not access {data}.\n'
+                f'WARNING: Could not locate {data}.\n'
                 f'Using sample dataset from {c.SAMPLE_PATH}.'
             ))
     elif isinstance(data, AICSImage):  # `data` is file itself
@@ -224,8 +224,8 @@ def imsave(path, img, resize=512, cmap=None):
         elif type(img) == list:
             img = np.array(img)
 
-        if len(img.shape) > 2:
-            print('Unintended: image has shape', img.shape)
+        # if len(img.shape) > 2:
+        #     print('Unintended: image has shape', img.shape)
         if resize:
             img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
@@ -275,7 +275,7 @@ def set_device(device_str: str = None):
     return device
 
 
-def setcwd(file_path):
+def set_cwd(file_path):
     '''Set working directory to script location'''
     abspath = os.path.abspath(file_path)
     dname = os.path.dirname(abspath)
