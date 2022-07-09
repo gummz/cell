@@ -59,8 +59,8 @@ img = cv2.normalize(img, None, alpha=0, beta=255,
                     dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
 
-cv2.imwrite(join(save, f'img_cv.{ext}'), img)
-plt.imsave(join(save, f'img_plt.{ext}'), img)
+imsave_preproc(join(save, f'img_plt.{ext}'), img)
+utils.imsave(join(save, f'img_plt_fullsize.{ext}'), img)
 
 # Operation: mean blur
 operation = 'meanblur'
@@ -90,14 +90,13 @@ for i in range(1, 21, 2):
 # Denoise
 operation = 'denoise'
 utils.make_dir(join(save, operation))
-for h in range(1, 21, 2):
-    for template in range(1, 10, 2):
-        for search in range(1, 30, 4):
-            name = f'{operation}_{h}_{template}_{search}'
+for i in range(1, 21, 2):
+    for j in range(1, 10, 2):
+        for k in range(1, 30, 4):
+            name = f'{operation}_{i}_{j}_{k}'
             if os.path.exists(join(save, operation, name)):
                 break
-            img_denoise = cv2.fastNlMeansDenoising(
-                img, None, h, template, search)
+            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
             imsave_preproc(join(save, operation, name),
                            img_denoise)
 
