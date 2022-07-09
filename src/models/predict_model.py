@@ -108,7 +108,7 @@ def get_prediction(model, device, input, accept_range=(0.5, 1)):
     return pred
 
 
-def threshold_masks(masks, threshold=0.5):
+def threshold_masks(masks, threshold=0.8):
     '''
     Thresholds masks to make more concise
     segmentations (i.e., model has to be more certain
@@ -233,7 +233,7 @@ def predict(data: AICSImage,
         timepoint = prepare_model_input(timepoint_raw, device)
 
         preds = get_predictions(
-            model, device, timepoint, accept_range=(0.5, 1))
+            model, device, timepoint, accept_range=(0.85, 1))
 
         # draw bounding boxes on slice for debugging
         viz.output_sample(join(save, 'debug'), t,
