@@ -195,8 +195,11 @@ def get_raw_array(data, t=None, z=None,
 
 
 def has_len(obj):
-    obj_method = getattr(obj, 'len', None)
-    return callable(obj_method)
+    try:
+        len(obj)
+        return True
+    except TypeError:
+        return False
 
 
 def is_int(number):
