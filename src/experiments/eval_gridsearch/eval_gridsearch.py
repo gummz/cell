@@ -37,8 +37,8 @@ def perform_study(device, save, model, dataset,
             matrices = metrics[0], metrics[2]
             avg_certainty = metrics[4]
 
-            metrics_tot.iloc[i + j] = (accept_range,
-                                       match_threshold,
+            metrics_tot.append((accept_range,
+                                match_threshold,
                                        *matrices,
                                 precision,
                                 recall,
