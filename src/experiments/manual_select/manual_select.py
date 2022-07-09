@@ -96,8 +96,6 @@ def objective(n_img_select, manual_select, n_epochs, device):
                 'eval', 'manual_select', 'val',
                 f'man_{manual_select}_{time_str}')
     results = eval_model(model, data_val, 'val', device, save)
-    # model trained only with automatic labels
-    #  needs different accept range
     results_no_manual = eval_model(
         model, data_val_no_manual, 'val', device, join(save, 'sans'))
 
@@ -188,15 +186,21 @@ def perform_study(objective, device):
 
 
 if __name__ == '__main__':
+    debug = False
+
     tic = time()
     device = utils.set_device()
     utils.set_cwd(__file__)
     img_modes = ('auto', 'manual')
-    study = perform_study(objective, device)
+    for img_mode in img_modes:
+        # perform study
+        study = perform_study(device, img_mode, debug)
 
-    # save study
-    study.to_csv('manual_select_study.csv')
-    pickle.dump(study, open('manual_select_study.pkl', 'wb'))
+        # save study
+        name = f'manual_select_study_{img_mode}{"_debug" if debug else ""}'
+        study.to_csv(f'{name}.csv', sep=';')
+        pickle.dump(study, open(f'{name}.pkl', 'wb'))
 
-    # print elapsed time of script
-    print('manual_select.py complete after', utils.time_report(tic, time()))
+        # print elapsed time of script
+        print('manual_select.py complete after',
+              utils.time_report(tic, time()))
