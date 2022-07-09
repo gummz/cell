@@ -9,9 +9,9 @@
 ### -- specify that the cores must be on the same host -- 
 #BSUB -R "span[hosts=1]"
 ### -- specify that we need 1GB of memory per core/slot -- 
-#BSUB -R "rusage[mem=1GB]"
+#BSUB -R "rusage[mem=18GB]"
 ### -- specify that we want the job to get killed if it exceeds 3 GB per core/slot -- 
-#BSUB -M 3GB
+#BSUB -M 9GB
 ### -- set walltime limit: hh:mm -- 
 #BSUB -W 24:00 
 
@@ -25,6 +25,7 @@
 #BSUB -eo err_report
 
 module load python3/3.8.11
+openjdk/11
 ###module load cuda/11.1
 ###module load opencv/3.4.16-python-3.8.11-cuda-11.1
 ###python3 -m venv ../venv_1
