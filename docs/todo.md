@@ -1,34 +1,44 @@
-- Train new model on adaptive histogram equalized training images, try predicting with old model too
+- Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
 
-- New validation set
+- Use rejected! It's possible to filter out tracks with shorter than 20 frames, but this will make calculations of the centers in center_link very unreliable.
 
-- In report.py: one function that loads and returns necessary objects, like data
+- LabelMe already outputs segmentations that are colored by identity. So just use that to assign identities.
 
-- Model calibration
+- Rich visualizations for the tracked centroids. Temporal paths on one image, with a marker where the cell turned on.
 
-- From HOTA paper: find optimal map (not necessarily bijective) between targets and predictions via algorithm [link](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html)
+- Redo the manual label impact tables with the new runs
 
-- Experiment: what threshold to use for matching target with the best prediction, and how uncertain the model can be before rejection.
-    - Combined grid search
-    - Contour plot/grid of results since 2D
+- Fix Java out of memory: install conda on HPC
+    - https://allencellmodeling.github.io/aicsimageio/aicsimageio.readers.html?highlight=bioformat#aicsimageio.readers.bioformats_reader.BioformatsReader
 
-- Print out calculation of intensity in centroids script to see if numbers are accurate
-
-- Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
-
-- Graph to show validation loss as a function of a hyperparameter (since I have many)
-
-- Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot) (is it?)
-    - Investigate what should be considered a high intensity, so that I can determine when a cell activates
-    - Use histogram over all timepoints of all
-        - sequential processing, one at a time, save to disk
-
-- Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
+- Tracking grid search - metric is: average change in number of cells frame-by-frame. Fewer changes = better tracking result.
 
 - Exploratory analysis
     - Histograms
         - Before and after preprocessing
         - Of train, validation, and test set to compare distributions
+
+- Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot) (is it?)
+    - Investigate what should be considered a high intensity, so that I can determine when a cell activates
+    - Use histogram over all timepoints of all
+        - sequential processing, one at a time, save to disk
+    - Or Silja's method of gradients
+    - Investigate cell intensity, why is it so low?
+
+
+- 3D segmentations
+    - use for tracking (size, shape, etc.)
+    - could even use a custom algorithm for detecting cell based on object shape
+
+- Model calibration
+    - Train model without manual labels and investigate
+
+- From HOTA paper: find optimal map (not necessarily bijective) between targets and predictions via algorithm [link](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html)
+
+- Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
+
+- Graph to show validation loss as a function of a hyperparameter (since I have many)
+
 
 - Create `make` commands for json, train, test, etc.
 
@@ -45,6 +55,12 @@
 - - -
 
 *Done*
+
+- Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
+
+- Experiment: what threshold to use for matching target with the best prediction, and how uncertain the model can be before rejection.
+    - Combined grid search
+    - Contour plot/grid of results since 2D
 
 - manual search both where n_img_select is 1100, and where n_img_select == manual_select (compare in thesis to see which is better)
 
