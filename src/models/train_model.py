@@ -1,4 +1,5 @@
 # from skimage.io import imread
+import copy
 import datetime
 import os
 import pickle
@@ -40,7 +41,8 @@ from src.models.BetaCellDataset import BetaCellDataset, get_dataloaders
 # import torchvision
 
 
-def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, writer, save=False, write=False):
+def train(model, device, opt, epochs, data_tr, data_val,
+          time_str, hparam_dict, writer, save=False, write=False):
     '''Train'''
     torch.backends.cudnn.benchmark = True
     print(f'Training has begun for model: {time_str}')
@@ -205,7 +207,7 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
             dump_model(model, time_str)
 
         # early stopping
-        patience = 15  # number of epochs to wait for validation loss to improve
+        patience = 5  # number of epochs to wait for validation loss to improve
         if i >= 5 and i % 5 == 0:
             worsen_ratio = 1.2
             val_prev = tot_val_losses[i-patience]
@@ -295,6 +297,7 @@ def debug_opencv_mask():
 
 def dump_model(model, time_str):
     # Make folder unique to this run in order to save model and loss
+    save = join('interim', time_str)
     utils.make_dir(save)
 
     pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
@@ -349,20 +352,22 @@ if __name__ == '__main__':
 
     utils.set_cwd(__file__)
 
-    # our dataset has two classes only - background and person
+    # our dataset has two classes only - background and cell
     num_classes = 2
 
-    # hyperparameters
+    # hyperparameters (optimal from train_gridsearch experiment)
+    img_mode = 'auto'
     size = 1024
     batch_size = 8  # 2
     pretrained = True
-    num_epochs = 30  # 500
+    num_epochs = 20  # 500
     lr = 3.418507038460298e-06
     wd = 1.2957404400334042e-08
     beta1 = 0.2438598958001344
     beta2 = 0.9849760264270886
     n_img_select = 1101
-    manual_select = 1
+    manual_select = 0  # if img_mode == 'auto' else 1
+    # manual_select_val = 0 if img_mode == 'auto' else 1
     img_filter = 'bilateral'
 
     data_tr, data_val = get_dataloaders(
@@ -395,10 +400,6 @@ if __name__ == '__main__':
         'batch_size': batch_size,
         'pretrained': pretrained
     }
-    # TODO: add "how many weakly annotated"
-    # TODO: add /pred/ folder in addition to /runs/
-    # so make a writer in predict_model which saves images
-    # add_video í SummaryWriter
 
     description = f'''{time_str}\n
                         Learning rate: {lr}\n
@@ -411,11 +412,16 @@ if __name__ == '__main__':
         train_loss, val_loss, model = train(model, device, opt, num_epochs,
                                             data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
         w.add_text('description', description)
+    save = join('interim', f'run_{time_str}')
 
-    losses = np.array(losses).T
+    utils.make_dir(save)
+    pickle.dump(model, open(
+        join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
-    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
+    np.savetxt(join(save, 'train_loss.csv'), train_loss,
+               delimiter=';')
+    np.savetxt(join(save, 'val_loss.csv'), val_loss,
+               delimiter=';')
 
     elapsed = utils.time_report(tic, time())
     print('train_model finished after', elapsed)
-    
