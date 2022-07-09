@@ -293,6 +293,7 @@ def debug_opencv_mask():
 
 def dump_model(model, time_str):
     # Make folder unique to this run in order to save model and loss
+    save = join('interim', time_str)
     utils.make_dir(save)
 
     pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
@@ -409,16 +410,10 @@ if __name__ == '__main__':
         train_loss, val_loss, model = train(model, device, opt, num_epochs,
                                             data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
         w.add_text('description', description)
-    save = join('interim', f'run_{time_str}')
 
-    utils.make_dir(save)
-    pickle.dump(model, open(
-        join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
+    losses = np.array(losses).T
 
-    np.savetxt(join(save, 'train_loss.csv'), train_loss,
-               delimiter=';')
-    np.savetxt(join(save, 'val_loss.csv'), val_loss,
-               delimiter=';')
+    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
     elapsed = utils.time_report(tic, time())
     print('train_model finished after', elapsed)
