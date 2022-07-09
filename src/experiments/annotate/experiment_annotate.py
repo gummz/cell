@@ -175,7 +175,7 @@ def test():
     Cs = [2*i for i in range(10)]
 
     # Sample image
-    idx = 560
+    idx = 374
     img_name = images[idx].split('.')[0]
 
     try:
@@ -183,8 +183,9 @@ def test():
     except FileExistsError:
         pass
 
+    from PIL import Image
     path = image_paths[idx]
-    img = np.load(path)
+    img = np.array(Image.open('_00304.png').convert('L'))
     img = cv2.normalize(img, img, alpha=0, beta=255,
                         dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     # Define various preprocessing filters
