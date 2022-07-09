@@ -186,17 +186,8 @@ def perform_study(objective, device):
 if __name__ == '__main__':
     tic = time()
     device = utils.set_device()
-    utils.setcwd(__file__)
-
-    # print(len(tr_col), len(val_col))
-    
-
-    # shape of study array:
-    # 9: results from objective function
-    # n_epochs * 2: train and validation loss for all epochs
-    # 2: average train and val loss over epochs
-
-    # perform study
+    utils.set_cwd(__file__)
+    img_modes = ('auto', 'manual')
     study = perform_study(objective, device)
 
     # save study
