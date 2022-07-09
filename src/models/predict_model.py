@@ -35,22 +35,6 @@ def get_predictions(model,
     '''
     model.eval()
 
-    # if len(inputs.shape) == 3:
-    #     pass
-    #     # if type(inputs) == np.ndarray:
-    #     #     inputs = prepare_model_input(inputs, device)
-    #     # elif type(inputs) == list:
-    #     #     inputs = torch.stack(inputs)
-
-    #     # inputs = prepare_model_input(inputs, device)
-
-    # elif len(inputs.shape) == 2:
-    #     raise ValueError('get_predictions is for lists of \
-    #                         images. For a single image, use \
-    #                             get_prediction.')
-    # else:
-    #     inputs = torch.stack(inputs)
-
     with torch.no_grad():
         if device.type == 'cuda':
             preds = model(inputs)
@@ -103,7 +87,7 @@ def get_prediction(model, device, input, accept_range=(0.5, 1)):
     # print('avg score after rejection', np.mean(
     # pred['scores'].cpu().numpy()), '\n')
 
-    pred['masks'] = threshold_masks(pred['masks'])
+    # pred['masks'] = threshold_masks(pred['masks'])
 
     return pred
 
@@ -281,12 +265,64 @@ def prepare_model_input(timepoint, device):
     return timepoint.unsqueeze(1)
 
 
-if __name__ == '__main__':
+def predict_file(mode, load, device, model, save, name, time_range=None):
 
-    utils.setcwd(__file__)
+    if load:  # use old (saved) predictions
+        centroids = pickle.load(
+            open(join(save, 'centroids_save.pkl'), 'rb'))
+    else:  # predict
+        path = join(c.RAW_DATA_DIR, name)
+        data = AICSImage(path)
+        if time_range:
+            time_start, time_end = min(time_range), max(time_range)
+        else:
+            time_start, time_end = 0, data.dims['T'][0]
+            time_range = range(time_start, time_end)
+
+        centroids = predict(data, time_range,
+                            device, model, save)
+        try:
+            data.close()
+            print(f'File {name} closed successfully.')
+        except AttributeError as e:
+            print(f'File {name} raised error upon closing:\n{e}')
+
+    centroids_np = [(t, centroid[0], centroid[1],
+                     centroid[2], centroid[3])
+                    for t, timepoint in zip(time_range, centroids)
+                    for centroid in timepoint]
+
+    tracked_centroids = tracker.track(centroids_np, threshold=5)
+
+    save_tracks(name, save, time_start, time_end,
+                centroids, centroids_np, tracked_centroids)
+
+
+def save_tracks(name, save, time_start, time_end,
+                centroids, centroids_np, tracked_centroids):
+
+    pickle.dump(centroids, open(
+        join(save, 'centroids_save.pkl'), 'wb'))
+
+    np.savetxt(
+        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+
+    pickle.dump(tracked_centroids,
+                open(join(save, 'tracked_centroids.pkl'), 'wb'))
+
+    tracked_centroids.to_csv(join(save, 'tracked_centroids.csv', sep=';'))
+
+    location = join(save, 'timepoints')
+    plot.save_figures(tracked_centroids, location)
+    # plot.create_movie(location, time_range)
+
+
+if __name__ == '__main__':
     mode = 'pred'
     load = False
+    experiment_name = ''
 
+    utils.set_cwd(__file__)
     # Running on CUDA?
     device = utils.set_device()
     print(f'Running on {device}.')
@@ -295,61 +331,25 @@ if __name__ == '__main__':
     model.to(device)
 
     # Choose time range
-    # time_start = 80
-    # time_end = 130  # endpoint included
-    # time_range = range(time_start, time_end)
+    time_start = 150
+    time_end = 155  # endpoint excluded
+    time_range = range(time_start, time_end)
 
-    # 1. Choose raw data file
+    # 1. Choose raw data file(s)
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    files = tuple(c.RAW_FILES['test'].keys())
+    files = c.RAW_FILES['test'].keys()
     files = utils.add_ext(files)
-    # files = ('LI_2019-08-30_emb2_pos1.lsm',)
     len_files = len(files)
+
     for i, name in enumerate(files):
-        print('Predicting file', name, f'(file {i + 1}/{len_files})')
-        # # Make directory for this raw data file
-        # # i.e. mode/pred/name
-        save = join(c.PROJECT_DATA_DIR, mode, name)
+        print('Predicting file', name,
+              f'(file {i + 1}/{len_files})...', end='')
+        save = join(c.PROJECT_DATA_DIR, mode,
+                    experiment_name, name)
         utils.make_dir(save)
-
-        if load:  # use old (saved) predictions
-            centroids = pickle.load(
-                open(join(save, 'centroids_save.pkl'), 'rb'))
-        else:  # predict
-            path = join(c.RAW_DATA_DIR, name)
-            data = AICSImage(path)
-            time_start, time_end = 0, data.dims['T'][0]
-            time_range = range(time_start, time_end)
-            centroids = predict(data, time_range,
-                                device, model, save)
-            try:
-                data.close()
-                print(f'File {name} closed successfully.')
-            except AttributeError as e:
-                print(f'File {name} raised error upon closing:\n{e}')
-
-            pickle.dump(centroids, open(
-                join(save, 'centroids_save.pkl'), 'wb'))
-
-        centroids_np = [(t, centroid[0], centroid[1],
-                        centroid[2], centroid[3])
-                        for t, timepoint in zip(time_range, centroids)
-                        for centroid in timepoint]
-        np.savetxt(
-            join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
-
-        tracked_centroids = tracker.track(centroids_np, threshold=20)
-
-        pickle.dump(tracked_centroids,
-                    open(join(save, 'tracked_centroids.pkl'), 'wb'))
-        tracked_centroids.to_csv(join(save, 'tracked_centroids.csv'))
-
-        location = join(save, 'timepoints')
-        plot.save_figures(tracked_centroids, location)
-        # plot.create_movie(location, time_range)
-
-        # df = pd.DataFrame(centroids_save, columns=['x, y, z, i'])
-        # df.to_csv(join(save, f'{name}_{time_start}_{time_end}.csv'), sep=',')
+        predict_file(mode, load, device, model, save, name, time_range)
+        print('done.')
+        break
 
     print('predict_model.py complete')
