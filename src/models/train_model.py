@@ -75,6 +75,8 @@ def train(model, device, opt, epochs, data_tr, data_val, time_str, hparam_dict, 
 
     for i, epoch in enumerate(range(epochs)):
         model.train()  # train mode
+        if i % 10 == 0:
+            model_prev = copy.deepcopy(model)
         tic = time()
         print(f'\n* Epoch {epoch+1}/{epochs}')
 
@@ -293,7 +295,6 @@ def debug_opencv_mask():
 
 def dump_model(model, time_str):
     # Make folder unique to this run in order to save model and loss
-    save = join('interim', time_str)
     utils.make_dir(save)
 
     pickle.dump(model, open(join(save, f'model_{time_str}.pkl'), 'wb'))
