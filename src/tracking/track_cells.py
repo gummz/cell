@@ -6,7 +6,7 @@ import trackpy
 
 def track(chains: list, track_radius: int = c.TRACK_RADIUS,
           memory: int = 5,
-          threshold: int = 3,
+          threshold: int = 0,
           adaptive_step: float = 0.8) -> pd.DataFrame:
     columns = ['frame', 'x', 'y', 'z', 'intensity']
     df_chains = pd.DataFrame(
