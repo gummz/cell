@@ -409,10 +409,16 @@ if __name__ == '__main__':
         train_loss, val_loss, model = train(model, device, opt, num_epochs,
                                             data_tr, data_val, time_str, hparam_dict, w, save=True, write=True)
         w.add_text('description', description)
+    save = join('interim', f'run_{time_str}')
 
-    losses = np.array(losses).T
+    utils.make_dir(save)
+    pickle.dump(model, open(
+        join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
 
-    pickle.dump(model, open(join('interim', f'run_{time_str}', f'model_{time_str}.pkl'), 'wb'))
+    np.savetxt(join(save, 'train_loss.csv'), train_loss,
+               delimiter=';')
+    np.savetxt(join(save, 'val_loss.csv'), val_loss,
+               delimiter=';')
 
     elapsed = utils.time_report(tic, time())
     print('train_model finished after', elapsed)
