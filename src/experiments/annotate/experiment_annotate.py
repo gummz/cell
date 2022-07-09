@@ -11,8 +11,6 @@ import src.data.constants as c
 import src.data.utils.utils as utils
 
 
-
-
 BLOCK_SIZE = 5
 C = 14
 DIR = c.RAW_DATA_DIR
@@ -163,6 +161,15 @@ def test():
     For example: Gaussian/Mean preprocess filtering,
                  Gaussian Kernel and Variance, etc.
     '''
+    BLOCK_SIZE = 5
+
+    C = 14
+    DIR = c.RAW_DATA_DIR
+    files = c.RAW_FILES
+    KERNEL = c.MEDIAN_FILTER_KERNEL
+    mode = 'train'
+    imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
+
     figures_dir = c.FIG_DIR
     folder = 'annotate_gridsearch'
 
@@ -194,6 +201,7 @@ def test():
         img, (i, i), k) for i in range(9, 19, 2) for k in range(1, 15, 2)}
     filters_mean = {f'median_{i}': cv2.medianBlur(
         img, i) for i in range(9, 19, 2)}
+
     filters = {**filters_gaus, **filters_mean}
     # Add unprocessed image to dictionary
     filters['none'] = img
@@ -255,5 +263,5 @@ def test():
 
 
 if __name__ == '__main__':
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     test()
