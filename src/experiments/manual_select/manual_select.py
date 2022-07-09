@@ -1,5 +1,4 @@
 import datetime
-from os import listdir
 from time import time
 import pandas as pd
 import numpy as np
@@ -7,8 +6,6 @@ import numpy as np
 from os.path import join
 import src.data.constants as c
 import src.data.utils.utils as utils
-from pprint import pprint
-from torch.utils.data import DataLoader
 import pickle
 import src.models.BetaCellDataset as bcd
 from src.models.eval_model import eval_model
@@ -92,10 +89,9 @@ def objective(n_img_select, manual_select, n_epochs, device):
     # once where validation set has no manual labels,
     # and once where validation set has all manual labels
     # (to get a better feeling for how well it does)
-    save = join('..', c.PROJECT_DATA_DIR, c.PRED_DIR,
-                'eval', 'manual_select', 'val',
-                f'man_{manual_select}_{time_str}')
     results = eval_model(model, data_val, 'val', device, save)
+    # model trained only with automatic labels
+    #  needs different accept range
     results_no_manual = eval_model(
         model, data_val_no_manual, 'val', device, join(save, 'sans'))
 
@@ -128,12 +124,11 @@ def score_report(result: tuple):
     score_sans = f'bbox: {result[9]:.2f}, mask: {result[11]:.2f}'
     print(f'Average score: {score}')
     print(f'Average sans score: {score_sans}')
-    print()
+    print(f'Confusion matrix:\n{result[0]}\n')
 
 
-def perform_study(objective, device):
+def perform_study(device, img_mode, debug):
 
-    debug = False
     n_labels = 1100
     n_epochs = 1 if debug else 30
     increment = 1100 if debug else 200
@@ -145,8 +140,7 @@ def perform_study(objective, device):
                'sens_sans_mask', 'sans_mask_score',
                'mean_tr_loss', 'mean_val_loss']
 
-    study = pd.DataFrame(np.empty((n_trials, 16)),
-                         columns=columns, dtype=object)
+    study = []
 
     iterable = range(0, n_labels, increment)
     if n_labels not in iterable:
@@ -154,15 +148,14 @@ def perform_study(objective, device):
         n_trials += 1
 
     for i, manual_select in enumerate(iterable):
-        print('=' * 60, '\n' + '=' * 60)
+        print('=' * 60, '\n' + '=' * 60, '\n')
         print('Number of manually labeled images:', manual_select)
 
-        # n_img_select = 1100
-        #   if number of images should be constant
-        # n_img_select = manual_select
-        #   if number of images should be same as
-        #   no. manual labels
-        n_img_select = manual_select if manual_select != 0 else increment
+        if img_mode == 'auto':
+            n_img_select = manual_select if manual_select > 0 else 200
+        else:
+            n_img_select = 1100
+
         print('Number of images in training set:', n_img_select)
 
         result = objective(n_img_select, manual_select, n_epochs, device)
@@ -175,14 +168,13 @@ def perform_study(objective, device):
         #     pad = (0, n_epochs - len(train_loss))
         #     train_loss = np.pad(train_loss, pad)
         #     val_loss = np.pad(val_loss, pad)
-
-        study.iloc[i] = (n_img_select, manual_select, *result[:-2],
-                         mean_tr, mean_val)
+        study.append((n_img_select, manual_select, *result[:-2],
+                     mean_tr, mean_val))
 
         # output results of current iteration
         score_report(result)
 
-        return study
+    return pd.DataFrame(study, columns=columns, dtype=object)
 
 
 if __name__ == '__main__':
