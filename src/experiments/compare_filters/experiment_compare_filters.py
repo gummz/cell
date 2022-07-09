@@ -90,14 +90,13 @@ for i in range(1, 21, 2):
 # Denoise
 operation = 'denoise'
 utils.make_dir(join(save, operation))
-for h in range(1, 21, 2):
-    for template in range(1, 10, 2):
-        for search in range(1, 30, 4):
-            name = f'{operation}_{h}_{template}_{search}'
+for i in range(1, 21, 2):
+    for j in range(1, 10, 2):
+        for k in range(1, 30, 4):
+            name = f'{operation}_{i}_{j}_{k}'
             if os.path.exists(join(save, operation, name)):
                 break
-            img_denoise = cv2.fastNlMeansDenoising(
-                img, None, h, template, search)
+            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
             imsave_preproc(join(save, operation, name),
                            img_denoise)
 
@@ -123,9 +122,9 @@ for kernel_size in [1, 5, 9, 15]:
 # Operation: Bilateral filter
 operation = 'bilateral'
 utils.make_dir(join(save, operation))
-for filter_size in [50, 150]:
-    for sigma_color in [50, 150]:
-        for sigma_space in [5, 9]:
+for filter_size in [5, 9]:
+    for sigma_color in range(10, 150, 10):
+        for sigma_space in range(10, 150, 10):
             name = f'{operation}_{filter_size}_{sigma_color}_{sigma_space}'
             if os.path.exists(join(save, operation, name)):
                 break
