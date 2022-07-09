@@ -61,13 +61,14 @@ def eval_track(tracked_centroids, time_range, filename, location):
             exists = False
 
             images = output_raw_images(location, raw_file, channels, t, name)
-            combined, cells, cells_xz, cells_yz, tubes = images
+            combined, cells_scale, tubes_mip = images
 
         X, Y, P, I = (frame[c] for c in columns)
 
         plt.figure(figsize=(20, 14))
 
         for i in range(2):
+            plt.subplot(2, 3, i + 1)
             plot_markers(marker_size, colors_dict, X, Y,
                          P, I, t, time_range, p_track)
 
