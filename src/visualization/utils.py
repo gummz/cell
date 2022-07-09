@@ -192,3 +192,17 @@ def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
 
     else:
         utils.imsave(save, images[1], False)
+
+
+def save_cm(confusion_matrix: tuple, save: str):
+    confusion_matrix = np.array(tuple((int(row[0]), int(row[1]))
+                                      for row in confusion_matrix))
+
+    cm_plot = sns.heatmap(confusion_matrix, annot=True,
+                          fmt='d', cmap='Reds')
+    fig = cm_plot.get_figure()
+    plt.xlabel('Ground Truth')
+    plt.ylabel('Predicted')
+    plt.title('Confusion matrix\nfor evaluation')
+    fig.savefig(osp.join(save, 'confusion_matrix.jpg'))
+    plt.close()
