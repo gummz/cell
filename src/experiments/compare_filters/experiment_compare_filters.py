@@ -34,7 +34,7 @@ mode = 'train'
 img_idx = 1500
 
 tic = time()
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 DIR = c.RAW_DATA_DIR
 ext = c.IMG_EXT
