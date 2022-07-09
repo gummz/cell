@@ -54,13 +54,15 @@ if __name__ == '__main__':
                           for lower, upper in zip(int_lower, int_upper))
     match_thresholds = (0.1,)
 
-    avg_certainty, positive_ratio = perform_study(
-        device, save, model, dataset, accept_ranges, match_thresholds)
+    avg_certainty, positive_ratio, cm = perform_study(
+        device, save, mode, model, dataset,
+        accept_ranges, match_thresholds)
 
     study = pd.DataFrame(
         {'accept_ranges': accept_ranges,
          'positive_ratio': positive_ratio,
-         'avg_certainty': avg_certainty})
+         'avg_certainty': avg_certainty,
+         'confusion_matrix': cm})
     study.to_csv('model_calibration.csv', sep=';')
 
     study.plot()
