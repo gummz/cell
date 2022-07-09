@@ -72,13 +72,18 @@ def eval_track(tracked_centroids, time_range, filename, location):
             plot_markers(marker_size, colors_dict, X, Y, P, I)
 
         if exists:
-            combined = plt.imread(join(location, f'{name}.png'))
-            cells_scale = plt.imread(join(location, f'{name}_cells.png'))
-            tubes_mip = plt.imread(join(location, f'{name}_tubes.png'))
+            combined, cells, cells_xz, cells_yz, tubes = load_existing(
+                location, name)
 
         save = join(location, tracking_folder, f'{t:05d}.png')
 
-        output_figure(filename, t, cells_scale, tubes_mip, combined, save)
+def load_existing(location, name):
+    combined = plt.imread(join(location, f'{name}.png'))
+    cells = plt.imread(join(location, f'{name}_cells.png'))
+    cells_xz = plt.imread(join(location, f'{name}_cells_xz.png'))
+    cells_yz = plt.imread(join(location, f'{name}_cells_yz.png'))
+    tubes = plt.imread(join(location, f'{name}_tubes.png'))
+    return combined, cells, cells_xz, cells_yz, tubes
 
 
 def output_raw_images(location, raw_file, channels, t, name):
