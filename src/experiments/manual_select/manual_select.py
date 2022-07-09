@@ -73,11 +73,20 @@ def objective(n_img_select, manual_select, n_epochs, device):
     with SummaryWriter(f'runs/manual_{manual_select}') as w:
         print(batch_size, image_size,
               manual_select, '\n')
-        train_loss, val_loss = train(
-            model, device, opt, n_epochs, data_tr, data_val, time_str, hparam_dict, w, save=False, write=True)
+        train_loss, val_loss, _ = train(
+            model, device, opt, n_epochs, data_tr, data_val, time_str, hparam_dict, w, save=False, write=False)
 
+    # load validation datasets
     data_val = bcd.get_dataset(
         root=root, mode='val', resize=image_size,
+        n_img_select=1, manual_select=1)
+    data_val_no_manual = bcd.get_dataset(
+        root=root, mode='val', resize=image_size,
+        n_img_select=1, manual_select=0)
+
+    save = join('..', c.PROJECT_DATA_DIR, c.PRED_DIR,
+                'eval', 'manual_select', 'val',
+                f'man_{manual_select}_{time_str}')
 
     # need to eval model twice for every trial
     # once where validation set has no manual labels,
@@ -87,6 +96,8 @@ def objective(n_img_select, manual_select, n_epochs, device):
                 'eval', 'manual_select', 'val',
                 f'man_{manual_select}_{time_str}')
     results = eval_model(model, data_val, 'val', device, save)
+    # model trained only with automatic labels
+    #  needs different accept range
     results_no_manual = eval_model(
         model, data_val_no_manual, 'val', device, join(save, 'sans'))
 
