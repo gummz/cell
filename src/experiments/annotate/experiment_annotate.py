@@ -163,15 +163,6 @@ def test():
     For example: Gaussian/Mean preprocess filtering,
                  Gaussian Kernel and Variance, etc.
     '''
-    BLOCK_SIZE = 5
-
-    C = 14
-    DIR = c.RAW_DATA_DIR
-    files = c.RAW_FILES
-    KERNEL = c.MEDIAN_FILTER_KERNEL
-    mode = 'train'
-    imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
-
     figures_dir = c.FIG_DIR
     folder = 'annotate_gridsearch'
 
@@ -221,12 +212,12 @@ def test():
     plt.imshow(img)
     plt.axis('off')
     plt_save = join(figures_dir, folder, img_name,
-                    f'Original_plt_{img_name}.jpg')
-    plt.savefig(plt_save)
+                    f'__Original_plt_{img_name}.jpg')
+    utils.imsave(plt_save, img)
 
     # Draw original with opencv
     cv_save = join(figures_dir, folder, img_name,
-                   f'Original_cv_{img_name}.jpg')
+                   f'__Original_cv_{img_name}.jpg')
     cv2.imwrite(cv_save, img)
 
     for block_size in block_sizes:
