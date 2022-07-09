@@ -61,7 +61,7 @@ def eval_track(tracked_centroids, time_range, filename, location):
             exists = False
 
             images = output_raw_images(location, raw_file, channels, t, name)
-            combined, cells_scale, tubes_mip = images
+            combined, cells, cells_xz, cells_yz, tubes = images
 
         X, Y, P, I = (frame[c] for c in columns)
 
@@ -88,13 +88,6 @@ def load_existing(location, name):
     cells_yz = plt.imread(join(location, f'{name}_cells_yz.png'))
     tubes = plt.imread(join(location, f'{name}_tubes.png'))
     return combined, cells, cells_xz, cells_yz, tubes
-
-
-def get_p_tracks(frames):
-    first_frame_ptc = pd.unique(frames[0][1]['particle'])
-    n_tracks = min(len(first_frame_ptc), 5)
-    p_tracks = np.random.choice(first_frame_ptc, n_tracks, replace=False)
-    return sorted(p_tracks)
 
 
 def output_raw_images(location, raw_file, channels, t, name):
