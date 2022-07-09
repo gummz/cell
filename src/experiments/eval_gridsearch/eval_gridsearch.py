@@ -21,7 +21,7 @@ def perform_study(device, save, mode, model, dataset,
             save_experiment = osp.join(
                 save, f'{accept_range}_{match_threshold}')
             metrics = eval.eval_model(model, dataset,
-                                      'val', device,
+                                      mode, device,
                                       save_experiment, accept_range=accept_range,
                                       match_threshold=match_threshold)
 
@@ -46,6 +46,7 @@ def perform_study(device, save, mode, model, dataset,
                                 precision,
                                 recall,
                                 f1_score,
+                                round(avg_certainty, 3)))
 
             print('=' * 30 + '\n', '=' * 30, '\n')
             print(
@@ -57,7 +58,27 @@ def perform_study(device, save, mode, model, dataset,
     return metrics_tot
 
 
+def get_accept_ranges(broad_range):
+    if broad_range:
+        range_lower = (0, 0.9)
+        range_upper = (0.1, 1)
+    else:
+        range_lower = (0.9, 0.99)
+        range_upper = (0.91, 1)
+
+    int_lower = np.round(np.linspace(*range_lower, 10), 2)
+    int_upper = np.round(np.linspace(*range_upper, 10), 2)
+    accept_ranges = tuple((lower, 1)
+                          for lower, upper in zip(int_lower, int_upper))
+
+    return accept_ranges
+
+
 if __name__ == '__main__':
+    # broad_range = True: use 0.9 to 1 as accept ranges
+    # broad_range = False: use 0 to 1 as accept ranges
+    broad_range = False
+
     tic = time()
     utils.set_cwd(__file__)
     device = utils.set_device()
@@ -71,10 +92,7 @@ if __name__ == '__main__':
     dataset = bcd.get_dataset(mode='val')
 
     # grid search variables
-    int_lower = np.round(np.linspace(0, 0.9, 10), 2)
-    int_upper = np.round(np.linspace(0.1, 1, 10), 2)
-    accept_ranges = tuple((lower, 1)
-                          for lower, upper in zip(int_lower, int_upper))
+    accept_ranges = get_accept_ranges(broad_range)
     match_thresholds = np.linspace(0, 1, 11)
 
     metrics_tot = perform_study(device, save, model, dataset,
