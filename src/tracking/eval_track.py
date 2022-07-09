@@ -91,6 +91,13 @@ def load_existing(location, name):
     return combined, cells, cells_xz, cells_yz, tubes
 
 
+def get_p_tracks(frames):
+    first_frame_ptc = pd.unique(frames[0][1]['particle'])
+    n_tracks = min(len(first_frame_ptc), 5)
+    p_tracks = np.random.choice(first_frame_ptc, n_tracks, replace=False)
+    return sorted(p_tracks)
+
+
 def output_raw_images(location, raw_file, channels, t, name):
     data = utils.get_raw_array(
         raw_file, t, ch=channels).compute()
