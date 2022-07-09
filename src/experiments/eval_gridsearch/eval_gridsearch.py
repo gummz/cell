@@ -32,6 +32,9 @@ def perform_study(device, save, model, dataset,
                 f1_score = 2 * (precision * recall) / (precision + recall)
             else:
                 f1_score = np.nan
+            precision = round(precision, 3)
+            recall = round(recall, 3)
+            f1_score = round(f1_score, 3)
 
             # confusion matrices
             matrices = metrics[0], metrics[2]
