@@ -14,7 +14,7 @@ def perform_study(device, save, mode, model, dataset,
     n_items = 6
     ious_tot_len = len(accept_ranges) * len(match_thresholds)
     metrics_tot = np.empty((ious_tot_len, n_items), dtype=object)
-    metrics_tot = []
+    metrics_tot = pd.DataFrame(metrics_tot, dtype=object)
 
     for i, accept_range in enumerate(accept_ranges):
         for j, match_threshold in enumerate(match_thresholds):
@@ -32,6 +32,9 @@ def perform_study(device, save, mode, model, dataset,
                 f1_score = 2 * (precision * recall) / (precision + recall)
             else:
                 f1_score = np.nan
+            precision = round(precision, 3)
+            recall = round(recall, 3)
+            f1_score = round(f1_score, 3)
 
             # confusion matrices
             matrices = metrics[0], metrics[2]
