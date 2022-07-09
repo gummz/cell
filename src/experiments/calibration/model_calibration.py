@@ -35,8 +35,6 @@ def perform_study(device, save, model, dataset, accept_ranges, match_thresholds)
 
 if __name__ == '__main__':
     tic = time()
-    utils.setcwd(__file__)
-    mode = 'val'
     utils.set_cwd(__file__)
     device = utils.set_device()
     save = osp.join('..', c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
