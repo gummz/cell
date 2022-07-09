@@ -42,7 +42,7 @@ def perform_study(device, save, mode, model, dataset,
 
             metrics_tot.append((accept_range,
                                 match_threshold,
-                                       *matrices,
+                                *matrices,
                                 precision,
                                 recall,
                                 f1_score,
@@ -75,6 +75,7 @@ def get_accept_ranges(broad_range):
 
 
 if __name__ == '__main__':
+    mode = 'val'
     # broad_range = True: use 0.9 to 1 as accept ranges
     # broad_range = False: use 0 to 1 as accept ranges
     broad_range = False
@@ -95,13 +96,13 @@ if __name__ == '__main__':
     accept_ranges = get_accept_ranges(broad_range)
     match_thresholds = np.linspace(0, 1, 11)
 
-    metrics_tot = perform_study(device, save, model, dataset,
+    metrics_tot = perform_study(device, save, mode, model, dataset,
                                 accept_ranges, match_thresholds)
 
-    columns = ('accept_range', 'match_threshold', 'bbox_cm', 'bbox_iou',
+    columns = ('accept_range', 'match_threshold', 'bbox_cm', 'bbox_iou', 'precision', 'recall',
                'f1_score', 'avg_certainty')
-    study = metrics_tot
-    study.columns = columns
+    study = pd.DataFrame(metrics_tot, columns=columns,
+                         dtype=object)
     study.to_csv('eval_gridsearch_study.csv', sep=';')
 
     print(
