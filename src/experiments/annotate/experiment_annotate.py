@@ -163,6 +163,15 @@ def test():
     For example: Gaussian/Mean preprocess filtering,
                  Gaussian Kernel and Variance, etc.
     '''
+    BLOCK_SIZE = 5
+
+    C = 14
+    DIR = c.RAW_DATA_DIR
+    files = c.RAW_FILES
+    KERNEL = c.MEDIAN_FILTER_KERNEL
+    mode = 'train'
+    imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
+
     figures_dir = c.FIG_DIR
     folder = 'annotate_gridsearch'
 
