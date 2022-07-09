@@ -14,7 +14,7 @@ def perform_study(device, save, mode, model, dataset,
     n_items = 6
     ious_tot_len = len(accept_ranges) * len(match_thresholds)
     metrics_tot = np.empty((ious_tot_len, n_items), dtype=object)
-    metrics_tot = pd.DataFrame(metrics_tot, dtype=object)
+    metrics_tot = []
 
     for i, accept_range in enumerate(accept_ranges):
         for j, match_threshold in enumerate(match_thresholds):
