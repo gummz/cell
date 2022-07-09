@@ -17,7 +17,7 @@ import src.visualization.utils as viz
 from matplotlib import pyplot as plt
 
 
-def eval_track(tracked_centroids, time_range, filename, location):
+def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
     # use `tracked_centroids`'s frame, x, y, p
     # to overlay the points onto MIP of raw image
 
@@ -25,11 +25,11 @@ def eval_track(tracked_centroids, time_range, filename, location):
     cmap = 'tab20'
 
     # choose marker size
-    marker_size = 10
+    marker_size = 13
 
     # folder is: pred/eval/track/
     # create relevant directories
-    tracking_folder = 'with_tracking'
+    tracking_folder = join('with_tracking', f'batch_{batch_idx}')
     utils.make_dir(join(location, tracking_folder))
 
     # in order to make a color map that uniquely identifies
@@ -49,19 +49,21 @@ def eval_track(tracked_centroids, time_range, filename, location):
     frames = tracked_centroids.groupby('frame')
     # filter according to time range (frames could contain more
     # than necessary)
+    frames = [frame for frame in frames if frame[0] in time_range]
     # get unique particles from first frame
     p_tracks = get_p_tracks(frames)
     p_track = p_tracks[batch_idx - 1]
+
     for t, (_, frame) in zip(time_range, frames):
         exists = True  # assume image exists until proven otherwise
         name = f'{t:05d}'
 
-        # don't output if it's already there
-        if True:  # not os.path.exists(join(location, f'{name}.png')):
+        # don't output if images are already there
+        if not os.path.exists(join(location, f'{name}_xz.png')):
             exists = False
 
             images = output_raw_images(location, raw_file, channels, t, name)
-            combined, cells_scale, tubes_mip = images
+            combined, cells, cells_xz, cells_yz, tubes = images
 
         X, Y, P, I = (frame[c] for c in columns)
 
@@ -253,35 +255,66 @@ def get_time_range(n_frames, range_ok, load_location):
 
 
 if __name__ == '__main__':
-    n_frames = 30
-    tic = time()
+    n_frames = 10
     mode = 'test'
+    debug = False
+
+    np.random.seed(42)
+    tic = time()
     utils.set_cwd(__file__)
 
+    files = c.RAW_FILES[mode]
+    # add extensions (.lsm etc.)
+    files = utils.add_ext((file for file, _ in files.items()))
+    files = dict(zip(files, c.RAW_FILES[mode].values()))
     # name = files[3]  # c.PRED_FILE
-    for i, (name, range_ok) in enumerate(files):
-        print('Outputting tracks for file', name, '...', end='')
+    # files = (files[-4],)
 
-        load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                             name)
-        tracked_centroids = pickle.load(
-            open(join(load_location, 'tracked_centroids.pkl'),
-                 'rb'))
+    # each batch index marks a particle in the first frame
+    # batch_idx = 2: particle at index 2-1=1 is selected
+    # batch_idx = 3: particle at index 3-1=2 is selected
+    for batch_idx in (1, 2, 3):
+        for i, (name, range_ok) in enumerate(files.items()):
+            load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                 'reject_not', name)
+            tracked_centroids = pickle.load(
+                open(join(load_location, 'tracked_centroids.pkl'),
+                     'rb'))
 
-        save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                             'eval', 'track_2D', name)
-        utils.make_dir(save_location)
+            save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                 'eval', 'track_2D', name)
+            utils.make_dir(join(save_location, 'with_tracking'))
 
-        # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
-        # time_range = range(min(unique_frames), max(unique_frames) + 1)
+            # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
+            # time_range = range(min(unique_frames), max(unique_frames) + 1)
             time_range = get_time_range(n_frames, range_ok, load_location)
+            if batch_idx > 3:
+                # some frames did not have enough particles to track
+                # so we need to adjust the time range
+                if '2018-11-20_emb7_pos3' in name:
+                    time_range = range(152, 152 + n_frames)
+                if 'LI_2018-11-20_emb6_pos2' in name:
+                    time_range = range(160, 160 + n_frames)
+            print(
+                f'Outputting track range \n{tuple(time_range)} for file\n', name, f'batch {batch_idx}...\n')
 
-        print('Done', end='')
+            # debug: double check np.random.seed(42) works
+            # i.e. that the same random numbers are generated each time
+            present = sorted([int(file[:-4])
+                              for file in os.listdir(join(save_location, 'with_tracking', f'batch_{batch_idx}'))
+                              if 'png' in file])
+            print('Time range found in folder:\n', present)
 
-    # frames = tuple(tracked_centroids.groupby('frame'))
-    # time_range = range(len(frames))
-    # plot.create_movie(join(save_location, 'with_tracking'),
-    #                   time_range)
+            eval_track(tracked_centroids, time_range,
+                       name, save_location, batch_idx)
+
+            print('Done\n')
+            if debug:
+                print('Debugging mode, exiting.')
+                break
+
+            # plot.create_movie(join(save_location, 'with_tracking'),
+            #                   time_range)
 
     elapsed = utils.time_report(tic, time())
     print(f'eval_track finished in {elapsed}.')
