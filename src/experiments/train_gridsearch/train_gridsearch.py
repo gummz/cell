@@ -46,7 +46,8 @@ def objective(trial):
     #     [loss_list[1:3]]
     # ]
     # losses = trial.suggest_categorical('losses', loss_selection)
-    lr = trial.suggest_float('learning_rate', 1e-6, 9e-5, log=True)  # 1e-10, 1e-4
+    lr = trial.suggest_float('learning_rate', 1e-6,
+                             9e-5, log=True)  # 1e-10, 1e-4
     manual_select = 1  # trial.suggest_int('manual_ratio', 2, 27)
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2, log=True)
     # end hyperparameters
