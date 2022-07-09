@@ -1,7 +1,6 @@
 import os
-from os import listdir, makedirs
+from os import listdir
 from os.path import join
-import pickle
 import sys
 import cv2
 import matplotlib.pyplot as plt
@@ -19,7 +18,7 @@ def subselect_img(image):
     '''
     Returns a subregion of the image.
     '''
-    return image[300:600, 300:600]
+    return image[600:950, 450:800]
 
 
 def imsave_preproc(path, image):
@@ -31,7 +30,7 @@ def imsave_preproc(path, image):
 
 
 mode = 'train'
-img_idx = 1500
+img_idx = 0
 
 tic = time()
 utils.set_cwd(__file__)
