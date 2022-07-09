@@ -158,29 +158,64 @@ def output_raw_images(location, raw_file, channels, t, name):
     return combined, cells_scale, tubes_mip
 
 
-def output_figure(filename, t, cells_scale, tubes_mip, combined, save):
-    plt.subplot(131)
-    plt.title('Beta cell channel (0) with amplified signal')
+def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mip, combined, save, time_range):
+
+    fontsize = 25
+    plt.subplot(231)
+    plt.title('Beta cell channel (0)\n with amplified signal', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
     plt.imshow(cells_scale, cmap='Reds')
 
-    plt.subplot(132)
+    plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
-    plt.xlabel('X dimension')
+    plt.xlabel('X dimension', fontsize=fontsize)
     plt.xlim(left=0, right=1024)
-    plt.ylabel('Y dimension')
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.ylim(top=0, bottom=1024)
+    plt.title('Tracked cells with \ntubes overlay', fontsize=fontsize)
+
+    plt.subplot(233)
+    plt.title('Tubes channel (1)', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(tubes_mip, cmap='viridis')
+    plt.ylabel('Y dimension', fontsize=fontsize)
     plt.ylim(bottom=1024, top=0)
-    plt.title('Tracked cells with tubes overlay')
+    plt.title('Tubes channel (1)', fontsize=fontsize)
 
-    plt.subplot(133)
-    plt.title('Tubes channel (1)')
-    plt.imshow(tubes_mip)
+    plt.subplot(234)
+    plt.title('MIP, XZ', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(cells_mip_xz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
+    plt.ylim(bottom=40, top=0)
 
+    plt.subplot(236)
+    plt.title('MIP, YZ', fontsize=fontsize)
+    plt.xlabel('Y dimension', fontsize=fontsize)
+    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(cells_mip_yz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
+    plt.ylim(bottom=40, top=0)
+
+    start, end = min(time_range), max(time_range)
     plt.suptitle(
-        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}',
+        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}, \ntotal timepoints: ({start}-{end})',
         fontsize=30)
 
     plt.tight_layout()
-    plt.savefig(save, dpi=300)
+    plt.subplots_adjust(top=0.85)
+    plt.savefig(save, dpi=200)
     plt.close()
 
 
