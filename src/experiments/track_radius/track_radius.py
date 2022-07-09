@@ -21,13 +21,25 @@ if __name__ == '__main__':
                     for t, timepoint in enumerate(centroids)
                     for centroid in timepoint]
     
-    radius_track = np.empty((8, 2))
-    for i, track_radius in enumerate(range(5, 105, 5)):
-        tracked_centroids = tracker.track(centroids_np, track_radius)
-        n_particles = len(pd.unique(tracked_centroids['particle']))
-        radius_track[i] = (track_radius, n_particles)
+    iter_radius = enumerate(range(5, 105, 5))
+    len_radius = len(tuple(iter_radius))
+    iter_memory = enumerate(range(0, 6))
+    len_memory = len(tuple(iter_memory))
+    iter_step = enumerate(np.linspace(0.9, 1, 5, endpoint=True))
+    len_step = len(tuple(iter_step))
+    radius_track = []
 
-    np.savetxt('radius_track.csv', radius_track, delimiter=',', header='track_radius,n_particles')
+    for i, track_radius in enumerate(range(10, 110, 30)):
+        for j, memory in enumerate(range(0, 3)):
+            for k, thresh in enumerate(np.linspace(0, 19, 5, endpoint=True)):
+                tracked_centroids = tracker.track(centroids_np, track_radius,
+                                                  memory, thresh, 0.8)
+                frames = tracked_centroids.groupby('frame')
+                radius_track.append(to_append)
+
+                np.savetxt('track_radius.csv', radius_track,
+                           delimiter=';',
+                           header='track_radius;memory;threshold;n_particles;mean_len_traj;mean_diff;track_metric')
 
     elapsed = utils.time_report(tic, time())
     print(f'track_radius completed after {elapsed}.')
