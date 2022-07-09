@@ -19,7 +19,7 @@ def subselect_img(image):
     '''
     Returns a subregion of the image.
     '''
-    return image[600:950, 450:800]
+    return image[300:600, 300:600]
 
 
 def imsave_preproc(path, image):
@@ -59,8 +59,8 @@ img = cv2.normalize(img, None, alpha=0, beta=255,
                     dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
 
-cv2.imwrite(join(save, f'img_cv.{ext}'), img)
-plt.imsave(join(save, f'img_plt.{ext}'), img)
+imsave_preproc(join(save, f'img_plt.{ext}'), img)
+utils.imsave(join(save, f'img_plt_fullsize.{ext}'), img)
 
 # Operation: mean blur
 operation = 'meanblur'
