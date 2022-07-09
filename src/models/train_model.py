@@ -342,7 +342,7 @@ if __name__ == '__main__':
     device = utils.set_device()
     print(f'Running on {device}.')
 
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
 
     # our dataset has two classes only - background and person
     num_classes = 2
