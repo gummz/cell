@@ -122,9 +122,9 @@ for kernel_size in [1, 5, 9, 15]:
 # Operation: Bilateral filter
 operation = 'bilateral'
 utils.make_dir(join(save, operation))
-for filter_size in [5, 9]:
-    for sigma_color in range(10, 150, 10):
-        for sigma_space in range(10, 150, 10):
+for filter_size in [50, 150]:
+    for sigma_color in [50, 150]:
+        for sigma_space in [5, 9]:
             name = f'{operation}_{filter_size}_{sigma_color}_{sigma_space}'
             if os.path.exists(join(save, operation, name)):
                 break
@@ -181,8 +181,12 @@ for kernel_size in range(10, 500, 100):
     for clip_limit in np.linspace(0, 1, 11, endpoint=True):
         bright = skimage.exposure.equalize_adapthist(
             img, kernel_size, clip_limit)
-        imsave_preproc(
-            join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright)
+        utils.imsave(
+            join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright, resize=False)
+        bright_thresh = np.where(bright > 50, bright, 0)
+        utils.imsave(
+            join(save, operation, f'k_{kernel_size}_c_{clip_limit}_thresh'), bright_thresh, resize=False
+        )
 
 # bright = Image.fromarray(bright)
 
