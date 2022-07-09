@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 
-def perform_study(device, save, model, dataset,
+def perform_study(device, save, mode, model, dataset,
                   accept_ranges, match_thresholds):
 
     n_items = 6
@@ -32,9 +32,6 @@ def perform_study(device, save, model, dataset,
                 f1_score = 2 * (precision * recall) / (precision + recall)
             else:
                 f1_score = np.nan
-            precision = round(precision, 3)
-            recall = round(recall, 3)
-            f1_score = round(f1_score, 3)
 
             # confusion matrices
             matrices = metrics[0], metrics[2]
