@@ -200,12 +200,12 @@ if __name__ == '__main__':
     tic = time()
     mode = 'test'
     utils.setcwd(__file__)
-    files = tuple(c.RAW_FILES[mode].items())[-4]
-    files = utils.add_ext((file for file, range_ok in files.items()))  # add extensions (.lsm etc.)
+    files = c.RAW_FILES[mode]
+    range_ok in files.items()  # add extensions (.lsm etc.)
     files = [files]
     print(files)
     # name = files[3]  # c.PRED_FILE
-    for i, (name, range_ok) in enumerate(files):
+    for i, (name, range_ok) in enumerate(files.items()):
         print('Outputting tracks for file', name, '...', end='')
 
         load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
