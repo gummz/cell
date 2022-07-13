@@ -6,7 +6,7 @@ from os.path import join
 from aicsimageio import AICSImage
 
 if __name__ == '__main__':
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     raw_files = listdir(c.RAW_DATA_DIR)
     raw_files = [file for file in raw_files if '.czi' not in file]
     file_hists = np.empty
@@ -24,4 +24,3 @@ if __name__ == '__main__':
             hist = np.histogram(timepoint, bins)
             mean_hist = np.mean(hist)
             mean_hists[t] = mean_hist
-

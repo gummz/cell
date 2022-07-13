@@ -11,8 +11,6 @@ import src.data.constants as c
 import src.data.utils.utils as utils
 
 
-
-
 BLOCK_SIZE = 5
 C = 14
 DIR = c.RAW_DATA_DIR
@@ -163,6 +161,15 @@ def test():
     For example: Gaussian/Mean preprocess filtering,
                  Gaussian Kernel and Variance, etc.
     '''
+    BLOCK_SIZE = 5
+
+    C = 14
+    DIR = c.RAW_DATA_DIR
+    files = c.RAW_FILES
+    KERNEL = c.MEDIAN_FILTER_KERNEL
+    mode = 'train'
+    imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
+
     figures_dir = c.FIG_DIR
     folder = 'annotate_gridsearch'
 
@@ -175,7 +182,7 @@ def test():
     Cs = [2*i for i in range(10)]
 
     # Sample image
-    idx = 560
+    idx = 374
     img_name = images[idx].split('.')[0]
 
     try:
@@ -183,8 +190,9 @@ def test():
     except FileExistsError:
         pass
 
+    from PIL import Image
     path = image_paths[idx]
-    img = np.load(path)
+    img = np.array(Image.open('_00304.png').convert('L'))
     img = cv2.normalize(img, img, alpha=0, beta=255,
                         dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
     # Define various preprocessing filters
@@ -193,6 +201,7 @@ def test():
         img, (i, i), k) for i in range(9, 19, 2) for k in range(1, 15, 2)}
     filters_mean = {f'median_{i}': cv2.medianBlur(
         img, i) for i in range(9, 19, 2)}
+
     filters = {**filters_gaus, **filters_mean}
     # Add unprocessed image to dictionary
     filters['none'] = img
@@ -211,12 +220,12 @@ def test():
     plt.imshow(img)
     plt.axis('off')
     plt_save = join(figures_dir, folder, img_name,
-                    f'Original_plt_{img_name}.jpg')
-    plt.savefig(plt_save)
+                    f'__Original_plt_{img_name}.jpg')
+    utils.imsave(plt_save, img)
 
     # Draw original with opencv
     cv_save = join(figures_dir, folder, img_name,
-                   f'Original_cv_{img_name}.jpg')
+                   f'__Original_cv_{img_name}.jpg')
     cv2.imwrite(cv_save, img)
 
     for block_size in block_sizes:
@@ -233,7 +242,8 @@ def test():
                     cv2.THRESH_BINARY, block_size, C)
 
                 save = f'{img_name}_thresh_{block_size}_{C}_{name}.jpg'
-                cv2.imwrite(os.path.join(figures_dir, save), thresh)
+                cv2.imwrite(os.path.join(
+                    figures_dir, folder, img_name, save), thresh)
 
     thresholds = range(0, 240, 5)
     for threshold in thresholds:
@@ -253,5 +263,5 @@ def test():
 
 
 if __name__ == '__main__':
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     test()

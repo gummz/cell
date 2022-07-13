@@ -12,7 +12,7 @@ import pandas as pd
 
 mode = 'val'
 random.seed(41)
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 raw_data_dir = c.RAW_DATA_DIR
 
@@ -30,6 +30,8 @@ utils.make_dir(folder)
 # Get files in imgs folder - need to know what's in there so
 # we don't start the index at 0
 images = [image for image in listdir(folder) if '.npy' in image]
+if listdir(folder):
+    print('Previous images detected. Exiting to avoid image overwrite. Delete the existing images before continuing.')
 
 # This is the index we will start on, in case there are already
 # data files in there

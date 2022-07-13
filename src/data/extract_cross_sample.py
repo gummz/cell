@@ -28,7 +28,7 @@ if __name__ == '__main__':
     # or one slice across timepoints?
     which = 'timepoint'  # which = timepoint or which = slice
 
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
 
     name, file, t, z = get_slice_record(index, mode)
     t = t if which == 'timepoint' else None

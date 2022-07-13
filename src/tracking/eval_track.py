@@ -17,7 +17,7 @@ import src.visualization.utils as viz
 from matplotlib import pyplot as plt
 
 
-def eval_track(tracked_centroids, time_range, filename, location):
+def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
     # use `tracked_centroids`'s frame, x, y, p
     # to overlay the points onto MIP of raw image
 
@@ -25,11 +25,11 @@ def eval_track(tracked_centroids, time_range, filename, location):
     cmap = 'tab20'
 
     # choose marker size
-    marker_size = 10
+    marker_size = 13
 
     # folder is: pred/eval/track/
     # create relevant directories
-    tracking_folder = 'with_tracking'
+    tracking_folder = join('with_tracking', f'batch_{batch_idx}')
     utils.make_dir(join(location, tracking_folder))
 
     # in order to make a color map that uniquely identifies
@@ -49,36 +49,55 @@ def eval_track(tracked_centroids, time_range, filename, location):
     frames = tracked_centroids.groupby('frame')
     # filter according to time range (frames could contain more
     # than necessary)
-    frames = (frame for frame in frames if frame[0] in time_range)
+    frames = [frame for frame in frames if frame[0] in time_range]
+    # get unique particles from first frame
+    p_tracks = get_p_tracks(frames)
+    p_track = p_tracks[batch_idx - 1]
+
     for t, (_, frame) in zip(time_range, frames):
         exists = True  # assume image exists until proven otherwise
         name = f'{t:05d}'
 
-        # don't output if it's already there
-        if True:  # not os.path.exists(join(location, f'{name}.png')):
+        # don't output if images are already there
+        if not os.path.exists(join(location, f'{name}_xz.png')):
             exists = False
 
             images = output_raw_images(location, raw_file, channels, t, name)
-            combined, cells_scale, tubes_mip = images
+            combined, cells, cells_xz, cells_yz, tubes = images
 
         X, Y, P, I = (frame[c] for c in columns)
 
-        plt.figure(figsize=(20, 12))
+        plt.figure(figsize=(20, 14))
 
-        # plot markers on beta cell channel and combined
-        # image
         for i in range(2):
-            plt.subplot(1, 3, i + 1)
-            plot_markers(marker_size, colors_dict, X, Y, P, I)
+            plt.subplot(2, 3, i + 1)
+            plot_markers(marker_size, colors_dict, X, Y,
+                         P, I, t, time_range, p_track)
 
         if exists:
-            combined = plt.imread(join(location, f'{name}.png'))
-            cells_scale = plt.imread(join(location, f'{name}_cells.png'))
-            tubes_mip = plt.imread(join(location, f'{name}_tubes.png'))
+            combined, cells, cells_xz, cells_yz, tubes = load_existing(
+                location, name)
 
         save = join(location, tracking_folder, f'{t:05d}.png')
 
-        output_figure(filename, t, cells_scale, tubes_mip, combined, save)
+        output_tracks(filename, t, cells, cells_xz, cells_yz,
+                      tubes, combined, save, time_range)
+
+
+def load_existing(location, name):
+    combined = plt.imread(join(location, f'{name}.png'))
+    cells = plt.imread(join(location, f'{name}_cells.png'))
+    cells_xz = plt.imread(join(location, f'{name}_cells_xz.png'))
+    cells_yz = plt.imread(join(location, f'{name}_cells_yz.png'))
+    tubes = plt.imread(join(location, f'{name}_tubes.png'))
+    return combined, cells, cells_xz, cells_yz, tubes
+
+
+def get_p_tracks(frames):
+    first_frame_ptc = pd.unique(frames[0][1]['particle'])
+    n_tracks = min(len(first_frame_ptc), 5)
+    p_tracks = np.random.choice(first_frame_ptc, n_tracks, replace=False)
+    return sorted(p_tracks)
 
 
 def output_raw_images(location, raw_file, channels, t, name):
@@ -86,29 +105,29 @@ def output_raw_images(location, raw_file, channels, t, name):
         raw_file, t, ch=channels).compute()
 
     cells_mip = np.max(data[:, :, :, channels[0]], axis=0)
+    cells_mip_xz = np.max(data[:, :, :, channels[0]], axis=2)
+    cells_mip_yz = np.max(data[:, :, :, channels[0]], axis=1)
     tubes_mip = np.max(data[:, :, :, channels[1]], axis=0)
 
     cells_mip = utils.normalize(cells_mip, 0, 1, out=cv2.CV_32FC1)
-    # cells_scale = skimage.exposure.rescale_intensity(
-    #     cells_mip, in_range=(0, 255), out_range=(220, 255))
+    cells_mip_xz = utils.normalize(cells_mip_xz, 0, 1, out=cv2.CV_32FC1)
+    cells_mip_yz = utils.normalize(cells_mip_yz, 0, 1, out=cv2.CV_32FC1)
+
     cells_scale = skimage.exposure.equalize_adapthist(
         cells_mip, clip_limit=0.8)
+    cells_mip_xz = skimage.exposure.equalize_adapthist(
+        cells_mip_xz, clip_limit=0.8)
+    cells_mip_yz = skimage.exposure.equalize_adapthist(
+        cells_mip_yz, clip_limit=0.8)
 
-    # print('after rescale >=0', np.sum(cells_scale >= 0))
-    # print('after rescale', np.sum(cells_scale >= 220))
-    # cells_nl = utils.normalize(cells_scale, 220, 255, cv2.CV_8UC1)
-    # cells_nl = cv2.fastNlMeansDenoising(cells_nl, None, 11, 7, 21)
-    # cells_mip = utils.normalize(cells_mip, 0, 1, cv2.CV_32FC1)
-    # tubes_mip = utils.normalize(tubes_mip, 0, 255, cv2.CV_8UC1)
     tubes_mip = utils.normalize(tubes_mip, 0, 1, cv2.CV_32FC1)
-    # cells_scale = utils.normalize(cells_scale, 0, 1, cv2.CV_32FC1)
-    # print('after normalize', np.sum(cells_scale >= 220/255))
-    # exit()
-    # cells_nl = utils.normalize(cells_nl, 0, 1, cv2.CV_32FC1)
-    # cells_nl = np.where(cells_nl > 1, 1, cells_nl)
 
     cells_scale = np.where(cells_scale > 1, 1, cells_scale)
     cells_scale = np.where(cells_scale < 0, 0, cells_scale)
+    cells_mip_xz = np.where(cells_mip_xz > 1, 1, cells_mip_xz)
+    cells_mip_xz = np.where(cells_mip_xz < 0, 0, cells_mip_xz)
+    cells_mip_yz = np.where(cells_mip_yz > 1, 1, cells_mip_yz)
+    cells_mip_yz = np.where(cells_mip_yz < 0, 0, cells_mip_yz)
 
     tubes_mip = np.where(tubes_mip > 1, 1, tubes_mip)
     tubes_mip = np.where(tubes_mip < 0, 0, tubes_mip)
@@ -122,27 +141,6 @@ def output_raw_images(location, raw_file, channels, t, name):
     tubes_rgb = np.zeros((1024, 1024, 4), dtype=np.float32)
     tubes_rgb[:, :, 1] = tubes_mip
     tubes_rgb[:, :, 3] = 1.
-    # normalize ...
-    # cells_scale = utils.normalize(cells_scale, 200, 255, cv2.CV_8UC1)
-    # cells_rgb = np.zeros((*cells_scale.shape, 3))
-    # cells_rgb[:, :, 1] = cells_scale
-    # cv2.cvtColor(cells_scale.astype(np.float32),
-    #                         cv2.COLOR_GRAY2RGB)
-
-    # tubes_rgb = np.zeros((*tubes_mip.shape, 3))
-    # tubes_rgb[:, :, 2] = tubes_mip
-    # cv2.cvtColor(tubes_mip.astype(np.float32),
-    #                         cv2.COLOR_GRAY2RGB)
-
-    # linear blend between cells and tubes
-    # alpha = 0.90
-    # blended = cv2.addWeighted(cells_nl.astype(np.float32), alpha,
-    #                           tubes_mip.astype(np.float32), 1 - alpha,
-    #                           0, None, dtype=-1)
-    # print(np.unique(combined))
-    # print(np.unique(cells_scale))
-    # print(np.unique(cells_mip))
-    # print(np.unique(tubes_mip))
 
     utils.imsave(join(location, f'{name}.png'),
                  combined, False)
@@ -150,87 +148,173 @@ def output_raw_images(location, raw_file, channels, t, name):
     # output cells and tubes
     utils.imsave(join(location, f'{name}_cells.png'),
                  cells_scale, False, 'Reds')
+    utils.imsave(join(location, f'{name}_cells_xz.png'),
+                 cells_mip_xz, False, 'Reds')
+    utils.imsave(join(location, f'{name}_cells_yz.png'),
+                 cells_mip_yz, False, 'Reds')
     utils.imsave(join(location, f'{name}_cells_raw.png'),
                  cells_mip, False, 'viridis')
     utils.imsave(join(location, f'{name}_tubes.png'),
                  tubes_rgb, False)
 
-    return combined, cells_scale, tubes_mip
+    return (combined, cells_scale, cells_mip_xz,
+            cells_mip_yz, tubes_mip)
 
 
-def output_figure(filename, t, cells_scale, tubes_mip, combined, save):
-    plt.subplot(131)
-    plt.title('Beta cell channel (0) with amplified signal')
+def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mip, combined, save, time_range):
+
+    fontsize = 25
+    plt.subplot(231)
+    plt.title('Beta cell channel (0)\n with amplified signal', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
     plt.imshow(cells_scale, cmap='Reds')
 
-    plt.subplot(132)
+    plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
-    plt.xlabel('X dimension')
+    plt.xlabel('X dimension', fontsize=fontsize)
     plt.xlim(left=0, right=1024)
-    plt.ylabel('Y dimension')
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.ylim(top=0, bottom=1024)
+    plt.title('Tracked cells with \ntubes overlay', fontsize=fontsize)
+
+    plt.subplot(233)
+    plt.title('Tubes channel (1)', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(tubes_mip, cmap='viridis')
+    plt.ylabel('Y dimension', fontsize=fontsize)
     plt.ylim(bottom=1024, top=0)
-    plt.title('Tracked cells with tubes overlay')
+    plt.title('Tubes channel (1)', fontsize=fontsize)
 
-    plt.subplot(133)
-    plt.title('Tubes channel (1)')
-    plt.imshow(tubes_mip)
+    plt.subplot(234)
+    plt.title('MIP, XZ', fontsize=fontsize)
+    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(cells_mip_xz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
+    plt.ylim(bottom=40, top=0)
 
+    plt.subplot(236)
+    plt.title('MIP, YZ', fontsize=fontsize)
+    plt.xlabel('Y dimension', fontsize=fontsize)
+    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xticks(fontsize=fontsize, rotation=20)
+    plt.yticks(fontsize=fontsize)
+    plt.imshow(cells_mip_yz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
+    plt.ylim(bottom=40, top=0)
+
+    start, end = min(time_range), max(time_range)
     plt.suptitle(
-        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}',
+        f'Tracked beta cells for\nfile: {filename}, timepoint: {t}, \ntotal timepoints: ({start}-{end})',
         fontsize=30)
 
     plt.tight_layout()
-    plt.savefig(save, dpi=300)
+    plt.subplots_adjust(top=0.85)
+    plt.savefig(save, dpi=200)
     plt.close()
 
 
-def plot_markers(marker_size, colors, X, Y, P, I):
+def plot_markers(marker_size, colors, X, Y, P, I,
+                 t, time_range, p_track):
     marker = 'x'
+    marker_size_plt = marker_size
     for x, y, p, i in zip(X, Y, P, I):
-        # if i < c.ACTIVE_THRESHOLD:
-        #     marker = 'x'
-        # else:
-        #     marker = 'o'
-        plt.plot(x, y, c=colors[p], marker=marker,
-                 markersize=marker_size, markeredgewidth=3)
+        if p == p_track:
+            marker = 'o'
+            if t == min(time_range):
+                marker_size_plt = marker_size * 3
+            else:
+                marker_size_plt = marker_size
+
+        plt.plot(x, y, marker=marker,
+                 markersize=marker_size_plt,
+                 markeredgewidth=2,
+                 markerfacecolor=(0, 0, 0, 0),
+                 markeredgecolor=colors[p])
+
+        # reset markers to default size for next timepoint
+        if p == p_track:
+            marker = 'x'
+            marker_size_plt = marker_size
+
+
+def get_time_range(n_frames, range_ok, load_location):
+    T = len(os.listdir(join(load_location, 'timepoints')))
+    T = range_ok[1] if range_ok else T
+    time_start = np.random.randint(0, T - n_frames)
+    time_range = range(time_start, time_start + n_frames)
+    return time_range
 
 
 if __name__ == '__main__':
-    n_frames = 30
-    tic = time()
+    n_frames = 10
     mode = 'test'
-    utils.setcwd(__file__)
+    debug = False
+
+    np.random.seed(42)
+    tic = time()
+    utils.set_cwd(__file__)
+
     files = c.RAW_FILES[mode]
-    range_ok in files.items()  # add extensions (.lsm etc.)
-    files = [files]
-    print(files)
+    # add extensions (.lsm etc.)
+    files = utils.add_ext((file for file, _ in files.items()))
+    files = dict(zip(files, c.RAW_FILES[mode].values()))
     # name = files[3]  # c.PRED_FILE
-    for i, (name, range_ok) in enumerate(files.items()):
-        print('Outputting tracks for file', name, '...', end='')
+    # files = (files[-4],)
 
-        load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                             name)
-        tracked_centroids = pickle.load(
-            open(join(load_location, 'tracked_centroids.pkl'),
-                 'rb'))
+    # each batch index marks a particle in the first frame
+    # batch_idx = 2: particle at index 2-1=1 is selected
+    # batch_idx = 3: particle at index 3-1=2 is selected
+    for batch_idx in (1, 2, 3):
+        for i, (name, range_ok) in enumerate(files.items()):
+            load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                 'reject_not', name)
+            tracked_centroids = pickle.load(
+                open(join(load_location, 'tracked_centroids.pkl'),
+                     'rb'))
 
-        save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                             'eval', 'track_2D', name)
-        utils.make_dir(save_location)
+            save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                 'eval', 'track_2D', name)
+            utils.make_dir(join(save_location, 'with_tracking'))
 
-        # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
-        # time_range = range(min(unique_frames), max(unique_frames) + 1)
-        T = len(os.listdir(join(load_location, 'timepoints')))
-        time_start = np.random.randint(0, T - n_frames)
-        time_range = range(time_start, time_start + n_frames)
-        eval_track(tracked_centroids, time_range, name, save_location)
+            # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
+            # time_range = range(min(unique_frames), max(unique_frames) + 1)
+            time_range = get_time_range(n_frames, range_ok, load_location)
+            if batch_idx > 3:
+                # some frames did not have enough particles to track
+                # so we need to adjust the time range
+                if '2018-11-20_emb7_pos3' in name:
+                    time_range = range(152, 152 + n_frames)
+                if 'LI_2018-11-20_emb6_pos2' in name:
+                    time_range = range(160, 160 + n_frames)
+            print(
+                f'Outputting track range \n{tuple(time_range)} for file\n', name, f'batch {batch_idx}...\n')
 
-        print('Done', end='')
+            # debug: double check np.random.seed(42) works
+            # i.e. that the same random numbers are generated each time
+            present = sorted([int(file[:-4])
+                              for file in os.listdir(join(save_location, 'with_tracking', f'batch_{batch_idx}'))
+                              if 'png' in file])
+            print('Time range found in folder:\n', present)
 
-    # frames = tuple(tracked_centroids.groupby('frame'))
-    # time_range = range(len(frames))
-    # plot.create_movie(join(save_location, 'with_tracking'),
-    #                   time_range)
+            eval_track(tracked_centroids, time_range,
+                       name, save_location, batch_idx)
+
+            print('Done\n')
+            if debug:
+                print('Debugging mode, exiting.')
+                break
+
+            # plot.create_movie(join(save_location, 'with_tracking'),
+            #                   time_range)
 
     elapsed = utils.time_report(tic, time())
     print(f'eval_track finished in {elapsed}.')

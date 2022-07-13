@@ -22,7 +22,7 @@
 ### -- Specify the output and error file. %J is the job-id -- 
 ### -- -o and -e mean append, -oo and -eo mean overwrite -- 
 #BSUB -oo out
-#BSUB -eo err
+#BSUB -eo err_radius
 
 module load python3/3.8.11
 ###python3 -m venv ../venv_1
@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/experiments/track_radius/track_radius.py > pyout
+python3 ../src/experiments/track_radius/track_radius.py > pyout_radius

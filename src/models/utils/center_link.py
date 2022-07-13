@@ -277,13 +277,13 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
             # TODO: average intensity: take only pixels above
             # a certain threshold
             intensity = np.mean(region.numpy())
-            if intensity == np.nan or math.isnan(intensity):
-                print('\n\n\nintensity nan')
-                print('region shape', region.shape)
-                print('unique region', np.unique(region, return_counts=True))
-                print('masknonzero shape', mask_nonzero.shape)
-                print('masknonzero unique', np.unique(
-                    mask_nonzero.cpu(), return_counts=True))
+            # if intensity == np.nan or math.isnan(intensity):
+            #     print('\n\n\nintensity nan')
+            #     print('region shape', region.shape)
+            #     print('unique region', np.unique(region, return_counts=True))
+            #     print('masknonzero shape', mask_nonzero.shape)
+            #     print('masknonzero unique', np.unique(
+            #         mask_nonzero.cpu(), return_counts=True))
 
             center_link = CenterLink(center, intensity)
             centers.append(center_link)

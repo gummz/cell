@@ -41,7 +41,7 @@ So: imgs, masks, masks_full.
 '''
 
 # Set working directory to script location
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 files = c.RAW_FILES_GENERALIZE
 kernel = c.MEDIAN_FILTER_KERNEL
@@ -109,7 +109,7 @@ for folders, subfolders, files in os.walk(join(c.DATA_DIR, mode, mask_dir)):
 
             if idx % debug_every == 0:
                 plt.imsave(join(save, f'_{img_idx}.png'), thresh)  # debug
-                
+
             idx += 1
 
 

@@ -11,7 +11,7 @@ import src.visualization.utils as viz
 
 if __name__ == '__main__':
     tic = time()
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     device = utils.set_device()
     model = utils.get_model(c.MODEL_STR, device)
     mode = 'val'

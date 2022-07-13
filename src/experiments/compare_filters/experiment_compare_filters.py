@@ -1,7 +1,6 @@
 import os
-from os import listdir, makedirs
+from os import listdir
 from os.path import join
-import pickle
 import sys
 import cv2
 import matplotlib.pyplot as plt
@@ -19,7 +18,7 @@ def subselect_img(image):
     '''
     Returns a subregion of the image.
     '''
-    return image[300:600, 300:600]
+    return image[600:950, 450:800]
 
 
 def imsave_preproc(path, image):
@@ -31,10 +30,10 @@ def imsave_preproc(path, image):
 
 
 mode = 'train'
-img_idx = 1500
+img_idx = 0
 
 tic = time()
-utils.setcwd(__file__)
+utils.set_cwd(__file__)
 
 DIR = c.RAW_DATA_DIR
 ext = c.IMG_EXT
@@ -59,8 +58,8 @@ img = cv2.normalize(img, None, alpha=0, beta=255,
                     dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
 # hist = cv2.calcHist([img], [0], None, [256], [0, 256])
 
-cv2.imwrite(join(save, f'img_cv.{ext}'), img)
-plt.imsave(join(save, f'img_plt.{ext}'), img)
+imsave_preproc(join(save, f'img_plt.{ext}'), img)
+utils.imsave(join(save, f'img_plt_fullsize.{ext}'), img)
 
 # Operation: mean blur
 operation = 'meanblur'
@@ -90,13 +89,14 @@ for i in range(1, 21, 2):
 # Denoise
 operation = 'denoise'
 utils.make_dir(join(save, operation))
-for i in range(1, 21, 2):
-    for j in range(1, 10, 2):
-        for k in range(1, 30, 4):
-            name = f'{operation}_{i}_{j}_{k}'
+for h in range(1, 21, 2):
+    for template in range(1, 10, 2):
+        for search in range(1, 30, 4):
+            name = f'{operation}_{h}_{template}_{search}'
             if os.path.exists(join(save, operation, name)):
                 break
-            img_denoise = cv2.fastNlMeansDenoising(img, None, i, j, k)
+            img_denoise = cv2.fastNlMeansDenoising(
+                img, None, h, template, search)
             imsave_preproc(join(save, operation, name),
                            img_denoise)
 
@@ -122,9 +122,9 @@ for kernel_size in [1, 5, 9, 15]:
 # Operation: Bilateral filter
 operation = 'bilateral'
 utils.make_dir(join(save, operation))
-for filter_size in [50, 150]:
-    for sigma_color in [50, 150]:
-        for sigma_space in [5, 9]:
+for filter_size in [5, 9]:
+    for sigma_color in range(10, 150, 10):
+        for sigma_space in range(10, 150, 10):
             name = f'{operation}_{filter_size}_{sigma_color}_{sigma_space}'
             if os.path.exists(join(save, operation, name)):
                 break
@@ -181,8 +181,12 @@ for kernel_size in range(10, 500, 100):
     for clip_limit in np.linspace(0, 1, 11, endpoint=True):
         bright = skimage.exposure.equalize_adapthist(
             img, kernel_size, clip_limit)
-        imsave_preproc(
-            join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright)
+        utils.imsave(
+            join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright, resize=False)
+        bright_thresh = np.where(bright > 50, bright, 0)
+        utils.imsave(
+            join(save, operation, f'k_{kernel_size}_c_{clip_limit}_thresh'), bright_thresh, resize=False
+        )
 
 # bright = Image.fromarray(bright)
 

@@ -9,9 +9,9 @@ import numpy as np
 import src.experiments.eval_gridsearch.eval_gridsearch as eval_grid
 
 
-def perform_study(device, save, model, dataset, accept_ranges, match_thresholds):
+def perform_study(device, save, mode, model, dataset, accept_ranges, match_thresholds):
     metrics_tot = eval_grid.perform_study(device, save,
-                                          model, dataset,
+                                          mode, model, dataset,
                                           accept_ranges,
                                           match_thresholds)
 
@@ -28,24 +28,27 @@ def perform_study(device, save, model, dataset, accept_ranges, match_thresholds)
     confusion_matrices, avg_certainty = (subframe[c].values
                                          for c in columns)
 
-    positive_ratio = (matrix[0][0] / (matrix[0][0] + matrix[0][1])
+    positive_ratio = (matrix[0][0] / (matrix[0][0] + matrix[1][0])
                       for matrix in confusion_matrices)
-    return avg_certainty, positive_ratio
+    return avg_certainty, positive_ratio, confusion_matrices
 
 
 if __name__ == '__main__':
-    tic = time()
-    utils.setcwd(__file__)
     mode = 'val'
-    device = utils.set_device()
+    model_id = '27_06_17H_16M_53S'
+    img_mode = 'auto'
 
+    tic = time()
+    utils.set_cwd(__file__)
+    device = utils.set_device()
     save = osp.join('..', c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
-                    'seg_2d', f'model_{c.MODEL_STR}',
+                    'seg_2d', f'model_{model_id}',
                     mode, 'model_calibration')
 
-    model = utils.get_model(c.MODEL_STR, device)
+    model = utils.get_model(model_id, device)
     model = model.to(device)
-    dataset = bcd.get_dataset(mode=mode)
+    manual_select = 1 if img_mode == 'manual' else 0
+    dataset = bcd.get_dataset(mode=mode, manual_select=manual_select)
 
     # grid search variables
     int_lower = np.round(np.linspace(0, 0.9, 10), 2)
@@ -54,16 +57,16 @@ if __name__ == '__main__':
                           for lower, upper in zip(int_lower, int_upper))
     match_thresholds = (0.1,)
 
-    avg_certainty, positive_ratio = perform_study(
-        device, save, model, dataset, accept_ranges, match_thresholds)
+    avg_certainty, positive_ratio, cm = perform_study(
+        device, save, mode, model, dataset,
+        accept_ranges, match_thresholds)
 
     study = pd.DataFrame(
         {'accept_ranges': accept_ranges,
          'positive_ratio': positive_ratio,
-         'avg_certainty': avg_certainty})
+         'avg_certainty': avg_certainty,
+         'confusion_matrix': cm})
     study.to_csv('model_calibration.csv', sep=';')
-
-    study.plot()
 
     print(
         f'Model calibration complete after {utils.time_report(tic, time())}.')

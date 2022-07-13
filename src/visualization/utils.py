@@ -10,6 +10,8 @@ import src.data.constants as c
 from numpy.typing import ArrayLike
 import torch
 import cv2
+import os.path as osp
+import seaborn as sns
 import numpy as np
 
 
@@ -24,9 +26,9 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
     # debug_idx = np.random.randint(0, Z, 2)
     debug_idx = [Z - int(Z / 2), 61, Z - int(Z / 4)]
     debug_idx = range(Z)
-
     iterable = zip(debug_idx, timepoint_raw[debug_idx], preds)
     for idx, z_slice, pred in iterable:
+        save_location = osp.join(save, f't-{t}_{idx}.jpg')
         z_slice = np.int16(z_slice)
 
         boxes = pred['boxes']
@@ -36,8 +38,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
             figure = plt.figure()
             plt.imshow(z_slice)
             plt.title(f'Number of detections: {len(boxes)}')
-            utils.imsave(join(save,
-                              f't-{t}_{idx}.jpg'), figure, size)
+            utils.imsave(save_location, figure, size)
             continue
 
         # consolidate masks into one array
@@ -65,7 +66,8 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
         images = (bboxed_img, z_slice.squeeze().cpu())
         titles = ('Prediction', 'Ground Truth')
         grid = (1, 2)
-        draw_output(images, titles, grid, save, compare=True)
+        draw_output(images, titles, grid,
+                    save_location, compare=True)
 
 
 def prepare_draw(image: torch.Tensor, pred: torch.Tensor):
@@ -98,7 +100,7 @@ def get_colors(
 
     Returns color value for integer p.
 
-    If max_array contains floating values, make 
+    If max_array contains floating values, make
 
     Inputs:
         p: unique cell identifier.
@@ -137,22 +139,20 @@ def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
     if len(bboxes) != 0:
         bboxed_img = draw_bounding_boxes(image.cpu(), bboxes)
     else:
-        bboxed_img = image.squeeze()
+        bboxed_img = torch.zeros((3, 1024, 1024))
 
     if len(masks) != 0:
         masked_img = utils.get_mask(masks).cpu()
         scalar = torch.tensor(255, dtype=torch.uint8)
-        # Threshold 50 comes from function "performance_mask" where threshold
-        # is defined as 50 pixels out of 255
-        pred_img = torch.where(masked_img > 50, scalar,
+        pred_img = torch.where(masked_img > 0, scalar,
                                bboxed_img[0])
     else:
-        pred_img = bboxed_img.squeeze()
+        pred_img = bboxed_img[0].squeeze()
 
     if not save:
         save = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
                     'eval', mode)
-    # draw_output(image[0].cpu(), pred_img.cpu().squeeze(), save, compare, dpi)
+
     images = (image.squeeze(), pred_img)
     if len(inputs) > 2:
         rest = inputs[2:]
@@ -165,7 +165,6 @@ def output_pred(mode: str, i: int, inputs: tuple, titles: tuple[str],
 def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
                 grid: tuple[int], save: str, idx: int = None, compare: bool = False,
                 dpi: int = None):
-    utils.make_dir(save)
 
     if compare:
         len_arr = len(titles)
@@ -180,9 +179,11 @@ def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
         for i, (image, title) in iterable:
             plt.subplot(*grid, i + 1)
             plt.imshow(image.squeeze())
-            plt.title(title)
-            plt.xlabel(x_dim)
-            plt.ylabel(y_dim)
+            plt.title(title, fontsize=25)
+            plt.xlabel(x_dim, fontsize=20)
+            plt.xticks(fontsize=20, rotation=30)
+            plt.ylabel(y_dim, fontsize=20)
+            plt.yticks(fontsize=20)
 
         plt.suptitle(
             f'Prediction for image {idx if idx else None}', fontsize=25)
@@ -192,3 +193,17 @@ def draw_output(images: tuple[torch.Tensor], titles: tuple[str],
 
     else:
         utils.imsave(save, images[1], False)
+
+
+def save_cm(confusion_matrix: tuple, save: str):
+    confusion_matrix = np.array(tuple((int(row[0]), int(row[1]))
+                                      for row in confusion_matrix))
+
+    cm_plot = sns.heatmap(confusion_matrix, annot=True,
+                          fmt='d', cmap='Reds')
+    fig = cm_plot.get_figure()
+    plt.xlabel('Ground Truth')
+    plt.ylabel('Predicted')
+    plt.title('Confusion matrix\nfor evaluation')
+    fig.savefig(osp.join(save, 'confusion_matrix.jpg'))
+    plt.close()

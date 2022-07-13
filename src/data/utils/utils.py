@@ -38,21 +38,28 @@ def active_slices(timepoint: np.array, ratio=None):
 def add_ext(files):
     raw_files = listdir(c.RAW_DATA_DIR)
     temp_files = []
-    for file in files:
-        if f'{file}.lsm' in raw_files:
-            tmp = f'{file}.lsm'
-        elif f'{file}.czi' in raw_files:
-            tmp = f'{file}.czi'
-        elif f'{file}.ims' in raw_files:
-            tmp = f'{file}.ims'
-        else:
-            raise RuntimeError(f'File not found with extension: {file}')
-        temp_files.append(tmp)
-
-    if len(temp_files) == 1:
-        return temp_files[0]
+    if not isinstance(files, str):
+        for file in files:  # `files` is ArrayLike
+            file_with_ext = add_ext_single(file, raw_files)
+            temp_files.append(file_with_ext)
+        if len(temp_files) == 1:
+            return temp_files[0]
+    else:  # `files` is a string
+        file = os.path.basename(files)
+        return add_ext_single(file, raw_files)
 
     return temp_files
+
+
+def add_ext_single(file, raw_files):
+    if f'{file}.lsm' in raw_files:
+        return f'{file}.lsm'
+    elif f'{file}.czi' in raw_files:
+        return f'{file}.czi'
+    elif f'{file}.ims' in raw_files:
+        return f'{file}.ims'
+    else:
+        raise FileNotFoundError(f'File not found with extension: {file}')
 
 
 def del_multiple(list_object, indices):
@@ -155,9 +162,9 @@ def get_raw_array(data, t=None, z=None,
         if os.path.exists(data):
             raw_data = AICSImage(data)
         else:
-            raw_data = AICSImage(c.SAMPLE_PATH)
+            raw_data = np.load(c.SAMPLE_PATH)
             print((
-                f'WARNING: Could not access {data}.\n'
+                f'WARNING: Could not locate {data}.\n'
                 f'Using sample dataset from {c.SAMPLE_PATH}.'
             ))
     elif isinstance(data, AICSImage):  # `data` is file itself
@@ -188,8 +195,11 @@ def get_raw_array(data, t=None, z=None,
 
 
 def has_len(obj):
-    obj_method = getattr(obj, 'len', None)
-    return callable(obj_method)
+    try:
+        len(obj)
+        return True
+    except TypeError:
+        return False
 
 
 def is_int(number):
@@ -214,8 +224,8 @@ def imsave(path, img, resize=512, cmap=None):
         elif type(img) == list:
             img = np.array(img)
 
-        if len(img.shape) > 2:
-            print('Unintended: image has shape', img.shape)
+        # if len(img.shape) > 2:
+        #     print('Unintended: image has shape', img.shape)
         if resize:
             img = cv2.resize(img, (resize, resize), cv2.INTER_AREA)
 
@@ -265,7 +275,7 @@ def set_device(device_str: str = None):
     return device
 
 
-def setcwd(file_path):
+def set_cwd(file_path):
     '''Set working directory to script location'''
     abspath = os.path.abspath(file_path)
     dname = os.path.dirname(abspath)

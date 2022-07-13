@@ -5,6 +5,9 @@ import cv2
 # ACTIVE SLICES RATIO
 ACTIVE_SLICES_RATIO = 0.025
 
+ACCEPT_RANGE = (0.95, 1)
+MATCH_THRESHOLD = 0.3
+
 # CELL ACTIVATION THRESHOLD
 ACTIVE_THRESHOLD = 1e-2
 
@@ -25,7 +28,7 @@ IMG_SIZE = 1024
 CV2_CONNECTED_ALGORITHM = 1
 NUMBER_CONNECTIVITY = 8
 
-PRED_FILE = 'LI_2019-02-05_emb5_pos3.lsm'
+PRED_FILE = 'LI_2019-01-17_emb7_pos3'
 
 # DATA CONSTANTS
 RAW_DATA_DIR = '/dtu-compute/tubes/raw_data'
@@ -45,7 +48,8 @@ RAW_FILES_TRAIN = {
 RAW_FILES_VAL = {
     'LI_2020-05-06_emb4_pos2': None,
     'LI_2019-08-30_emb2_pos1': (0, 250),
-    'LI_2019-02-05_emb5_pos3': None
+    # 'LI_2019-02-05_emb5_pos3': None
+    # LI_2020-06-17_emb4_pos2.czi
 }
 
 RAW_FILES_TEST = {  # None = ok to use any timepoint
@@ -137,7 +141,7 @@ TUBE_CHANNEL = 1
 MODEL_STR = '25_05_16H_51M_45S'
 # 29_04_21H_43M_43S
 # :::::
-#
+# 
 # '28_05_12H_38M_47S'
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
 SAMPLE_PATH = join(DATA_DIR, 'sample.npy')

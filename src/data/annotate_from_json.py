@@ -84,7 +84,7 @@ def annotate_from_json(mode):
     This algorithm will be applied to the folder `imgs` in the future.
     So: imgs, masks, masks_full.
     '''
-    
+
     # STEP 1
     generate_label(mode)
 
@@ -217,7 +217,7 @@ def annotate_from_label(mode):
 
 if __name__ == "__main__":
     tic = time()
-    utils.setcwd(__file__)
+    utils.set_cwd(__file__)
     # for mode in ['train', 'val', 'test']:
     annotate_from_json(mode='train')
     elapsed = utils.time_report(tic, time())

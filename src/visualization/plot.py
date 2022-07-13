@@ -15,27 +15,28 @@ import skvideo.io
 import src.visualization.utils as viz
 
 
-def create_movie(location, time_range):
-    utils.make_dir(location)
-    images = sorted([image for image in listdir(location)
-                     if '.png' in image and
-                     int(splitext(image)[0]) in time_range])
-    start, end = time_range[0], time_range[-1]
+def create_movie(location, time_range=None):
+
+    if time_range:
+        images = sorted([image for image in listdir(location)
+                         if '.png' in image and
+                         int(splitext(image)[0]) in time_range])
+        start, end = min(time_range), max(time_range)
+    else:
+        images = sorted([image for image in listdir(location)
+                         if '.png' in image])
+        start, end = 0, len(images)
+
     name = f'movie_prediction_{start}_{end}.mp4'
 
-    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    # video = cv2.VideoWriter(join(location, name), fourcc, 1, (1200, 1548))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video = cv2.VideoWriter(join(location, name), fourcc, 1, (1200, 1548))
 
-    rate = '1'
-    vid_out = skvideo.io.FFmpegWriter(join(location, name),
-                                      inputdict={
-                                          '-r': rate,
-    },
-        outputdict={
-                                          '-vcodec': 'mpeg4',
-                                          '-pix_fmt': 'yuv420p',
-                                          '-r': rate,
-    })
+    # rate = '1'
+    # inputdict = {'-r': rate}
+    # outputdict = {'-vcodec': 'libx264', '-crf': '25', '-pix_fmt': 'yuv420p', '-vf': 'fps=1;scale=1200:1548'}
+    # vid_out = skvideo.io.FFmpegWriter(join(location, name),
+    #                                   inputdict, outputdict)
     # vcodecs:
     #    libx264
     # mpeg4
@@ -45,15 +46,16 @@ def create_movie(location, time_range):
         array = array[:, :, :-1]
         # print(array.shape)
         # print(np.histogram(array))
-        # array = utils.normalize(array, 0, 255, cv2.CV_8UC1)
-        # video.write(array)
+        array = utils.normalize(array, 0, 255, cv2.CV_8UC1)
+        video.write(array)
         # print(array.shape)
         # print(np.histogram(array))
-        vid_out.writeFrame(array)
+        print('array written is shape', array.shape)
+        # vid_out.writeFrame(array)
 
-    vid_out.close()
-    # cv2.destroyAllWindows()
-    # video.release()
+    # vid_out.close()
+    cv2.destroyAllWindows()
+    video.release()
 
 
 def prepare_3d(timepoint):
