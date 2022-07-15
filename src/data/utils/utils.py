@@ -159,7 +159,7 @@ def get_raw_array(data, t=None, z=None,
             'Either time, slice dimension, or both must be specified.')
 
     if isinstance(data, str):  # `data` is path to file, not file itself
-        if os.path.exists(data):
+        if os.path.exists(data) and os.path.isfile(data):
             raw_data = AICSImage(data)
         else:
             raw_data = np.load(c.SAMPLE_PATH)
