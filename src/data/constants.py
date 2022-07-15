@@ -1,6 +1,15 @@
-# from aicsimageio import AICSImage
-from os.path import join
+import os.path as osp
 import cv2
+
+
+def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
+    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
+    img_canny = cv2.Canny(
+        img, threshold1, threshold2,
+        apertureSize=aperture_size, L2gradient=L2_gradient)
+
+    return img_canny
+
 
 # ACTIVE SLICES RATIO
 ACTIVE_SLICES_RATIO = 0.025
@@ -141,19 +150,10 @@ TUBE_CHANNEL = 1
 MODEL_STR = '25_05_16H_51M_45S'
 # 29_04_21H_43M_43S
 # :::::
-# 
+#
 # '28_05_12H_38M_47S'
 EXCEL_FILENAME = 'Muc1-mcherry_MIP-GFP_database_3.xlsx'
-SAMPLE_PATH = join(DATA_DIR, 'sample.npy')
-
-
-def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
-    img = cv2.fastNlMeansDenoising(img, None, 11, 7, 21)
-    img_canny = cv2.Canny(
-        img, threshold1, threshold2,
-        apertureSize=aperture_size, L2gradient=L2_gradient)
-
-    return img_canny
+SAMPLE_PATH = osp.join(PROJECT_DATA_DIR, 'sample.npy')
 
 
 FILTERS = {
