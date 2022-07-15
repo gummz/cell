@@ -1,10 +1,7 @@
 import os
 from os import listdir
 from os.path import join
-import sys
 import cv2
-import matplotlib.pyplot as plt
-from PIL import Image
 import numpy as np
 from time import time
 from skimage import filters  # threshold_yen, frangi
@@ -12,6 +9,9 @@ from skimage.exposure import rescale_intensity
 import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
+import os.path as osp
+import skimage.feature as skf
+import matplotlib.pyplot as plt
 
 
 def subselect_img(image):
@@ -42,9 +42,6 @@ def mean_out(save, img):
                        img_blur)
 
 
-mean_out(imsave_preproc, save, img)
-
-
 def median_out(save, img):
     # Operation
     # Median Blur
@@ -59,9 +56,6 @@ def median_out(save, img):
                        img_blur)
 
     return img_blur
-
-
-img_blur = median_out(imsave_preproc, save, img)
 
 
 def denoise_out(save, img):
@@ -79,9 +73,6 @@ def denoise_out(save, img):
                     img, None, h, template, search)
                 imsave_preproc(join(save, operation, name),
                                img_denoise)
-
-
-denoise_out(imsave_preproc, save, img)
 
 
 def gaussian_out(save, img):
@@ -186,14 +177,64 @@ def adaptive_out(save, img):
         join(save, operation, f'_c_{clip_limit}'), bright, resize=False)
 
 
+def laplace_gaussian_2d_out(save, img):
+    # Operation
+    # Laplace Gaussian
+    operation = 'laplace_gaussian'
+    for min_sigma in range(5, 21, 2):
+        for max_sigma in range(8, 21, 2):
+            for num_sigma in range(10, 20, 2):
+                name = f'{operation}_{min_sigma}_{max_sigma}_{num_sigma}'
+                if os.path.exists(join(save, operation, name)):
+                    break
+                blobs = skf.blob_log(
+                    img, min_sigma, max_sigma, num_sigma)
+                figure = plt.gcf()
+                axis = plt.gca()
+
+                axis.imshow(img)
+                for blob in blobs:
+                    y, x, r = blob
+                    circle = plt.Circle(
+                        (x, y), r, color=(0, 1, 1), linewidth=2, fill=False)
+                    axis.add_patch(circle)
+
+                utils.imsave(join(save, operation, name), figure)
+                plt.close()
+
+
+def laplace_gaussian_3d_out(save, img):
+    # Operation
+    # Laplace Gaussian
+    operation = 'laplace_gaussian'
+    for min_sigma in range(1, 21, 2):
+        for max_sigma in range(1, 21, 2):
+            for num_sigma in range(1, 21, 2):
+                name = f'{operation}_{min_sigma}_{max_sigma}_{num_sigma}'
+                if os.path.exists(join(save, operation, name)):
+                    break
+                blobs = skf.blob_log(
+                    img, min_sigma, max_sigma, num_sigma)
+
+                for blob in blobs:
+                    y, x, r = blob
+                    circle = plt.Circle(
+                        (x, y), r, color=(0, 0, 255), linewidth=2, fill=False)
+                    plt.add_patch(circle)
+                plt.imshow(img)
+                utils.imsave(join(save, operation, name), img)
+                plt.close()
+
+
 if __name__ == '__main__':
     mode = 'train'
     img_idx = 0
     func_list = {0: adaptive_out, 1: bilateral_out,
                  2: canny_out, 3: gaussian_out,
-                 4: denoise_out, 5: rescale_out}
+                 4: denoise_out, 5: rescale_out,
+                 6: laplace_gaussian_2d_out}
     # select indices of functions which should be run
-    func_to_run = (5,)
+    func_to_run = (6,)
     # fetch functions which should run
     # during this execution
     functions = (func_list[i] for i in func_to_run)
@@ -205,7 +246,8 @@ if __name__ == '__main__':
     ext = c.IMG_EXT
     files = c.RAW_FILES
     KERNEL = c.MEDIAN_FILTER_KERNEL
-    imgs_path = join('..', c.DATA_DIR, mode, c.IMG_DIR)
+    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    imgs_path = join('..', data_dir, mode, c.IMG_DIR)
     filename = os.path.basename(__file__)
     filename = os.path.splitext(filename)[0]
 
@@ -222,9 +264,16 @@ if __name__ == '__main__':
     img = np.int16(np.load(path))
     img = cv2.normalize(img, None, alpha=0, beta=255,
                         dtype=cv2.CV_8UC1, norm_type=cv2.NORM_MINMAX)
+    # img_sample = np.load(osp.join('..', c.SAMPLE_PATH))
+    # img_sample_slice = img_sample[0, 1, :, :]
+    # img_mip = np.max(img_sample[0], axis=0)
+    # rescale_out(save, img_sample_slice)
+    # adaptive_out(save, img_sample_slice)
 
     imsave_preproc(join(save, f'img_plt.{ext}'), img)
     utils.imsave(join(save, f'img_plt_fullsize.{ext}'), img)
+    # utils.imsave(join(save, f'img_plt_mip.{ext}'), img_mip)
+    # utils.imsave(join(save, f'img_plt_sample_slice.{ext}'), img_sample_slice)
 
     for function in functions:
         function(save, img)
