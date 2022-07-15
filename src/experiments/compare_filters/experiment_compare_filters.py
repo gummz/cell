@@ -162,14 +162,14 @@ def adaptive_out(save, img):
     # Adaptive Histogram Equalization
     operation = 'adaptive_hist_eq'
     for kernel_size in range(10, 500, 100):
-        for clip_limit in np.linspace(0, 1, 11, endpoint=True):
+        for clip_limit in np.linspace(0, 1, 51, endpoint=True):
             bright = skimage.exposure.equalize_adapthist(
                 img, kernel_size, clip_limit)
             utils.imsave(
                 join(save, operation, f'k_{kernel_size}_c_{clip_limit}'), bright, resize=False)
             bright_thresh = np.where(bright > 50, bright, 0)
             utils.imsave(
-                join(save, operation, f'k_{kernel_size}_c_{clip_limit}_thresh'), bright_thresh, resize=False
+                join(save, operation, f'k_{kernel_size}_c_{clip_limit:.2f}_thresh'), bright_thresh, resize=False
             )
     bright = skimage.exposure.equalize_adapthist(
         img, clip_limit=0.8)
@@ -228,13 +228,13 @@ def laplace_gaussian_3d_out(save, img):
 
 if __name__ == '__main__':
     mode = 'train'
-    img_idx = 0
+    img_idx = 1500
     func_list = {0: adaptive_out, 1: bilateral_out,
                  2: canny_out, 3: gaussian_out,
                  4: denoise_out, 5: rescale_out,
                  6: laplace_gaussian_2d_out}
     # select indices of functions which should be run
-    func_to_run = (6,)
+    func_to_run = (0,)
     # fetch functions which should run
     # during this execution
     functions = (func_list[i] for i in func_to_run)
