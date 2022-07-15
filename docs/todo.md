@@ -1,22 +1,26 @@
-- Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
+- Find optimal adaptive histogram equalization parameters
 
-- Use rejected! It's possible to filter out tracks with shorter than 20 frames, but this will make calculations of the centers in center_link very unreliable.
+- Annotate 200 images with the optimal parameters
+
+- Train a model on the images
+
+- Compare with previous results
+    - Compare model input is vanilla (bilateral) input
+    - Compare model input is preprocessed (adaptive hist -> bilateral) input
+
+- If model is better, annotate more images
+
+- Combine Kasra's results with mine and analyze
+
+
+
+
+- Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
 
 - LabelMe already outputs segmentations that are colored by identity. So just use that to assign identities.
 
-- Rich visualizations for the tracked centroids. Temporal paths on one image, with a marker where the cell turned on.
-
-- Redo the manual label impact tables with the new runs
-
 - Fix Java out of memory: install conda on HPC
     - https://allencellmodeling.github.io/aicsimageio/aicsimageio.readers.html?highlight=bioformat#aicsimageio.readers.bioformats_reader.BioformatsReader
-
-- Tracking grid search - metric is: average change in number of cells frame-by-frame. Fewer changes = better tracking result.
-
-- Exploratory analysis
-    - Histograms
-        - Before and after preprocessing
-        - Of train, validation, and test set to compare distributions
 
 - Make an absolute color scale for 3D points (right now, the relatively brightest is a dark dot) (is it?)
     - Investigate what should be considered a high intensity, so that I can determine when a cell activates
@@ -25,20 +29,11 @@
     - Or Silja's method of gradients
     - Investigate cell intensity, why is it so low?
 
-
 - 3D segmentations
     - use for tracking (size, shape, etc.)
     - could even use a custom algorithm for detecting cell based on object shape
 
-- Model calibration
-    - Train model without manual labels and investigate
-
-- From HOTA paper: find optimal map (not necessarily bijective) between targets and predictions via algorithm [link](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.linear_sum_assignment.html)
-
 - Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
-
-- Graph to show validation loss as a function of a hyperparameter (since I have many)
-
 
 - Create `make` commands for json, train, test, etc.
 
@@ -55,6 +50,15 @@
 - - -
 
 *Done*
+
+- Model calibration
+    - Train model without manual labels and investigate
+
+- Tracking grid search - metric is: average change in number of cells frame-by-frame. Fewer changes = better tracking result.
+
+- Rich visualizations for the tracked centroids. Temporal paths on one image, with a marker where the cell turned on.
+
+- Redo the manual label impact tables with the new runs
 
 - Create script in `/visualization/` which will serve to visualize all kinds of stuff for the report
 
