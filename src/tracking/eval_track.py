@@ -283,7 +283,8 @@ if __name__ == '__main__':
 
             save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
                                  'eval', 'track_2D', name)
-            utils.make_dir(join(save_location, 'with_tracking'))
+            utils.make_dir(join(save_location, 'with_tracking',
+                                f'batch_{batch_idx}'))
 
             # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
             # time_range = range(min(unique_frames), max(unique_frames) + 1)
