@@ -1,7 +1,5 @@
 - Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
 
-- Use rejected! It's possible to filter out tracks with shorter than 20 frames, but this will make calculations of the centers in center_link very unreliable.
-
 - LabelMe already outputs segmentations that are colored by identity. So just use that to assign identities.
 
 - Rich visualizations for the tracked centroids. Temporal paths on one image, with a marker where the cell turned on.
