@@ -25,12 +25,18 @@ if __name__ == '__main__':
 
     images = sorted((image for image in os.listdir(load_path)
                      if '.png' in image))
-    already_sampled = [image for image in os.listdir(sample_dir)]
+    already_sampled = sorted([image for image in os.listdir(sample_dir)])
     # remove images which have already been sampled
     images = [image for image in images
               if image not in already_sampled]
 
-    k = int(len(images) * ratio_sample)
+    k = int(len(images) * ratio_sample) - len(already_sampled)
+    if k <= 0:
+        print(('With the chosen ratio,'
+               'no more images can be sampled as there are'
+               'already more than enough sampled images.'))
+        exit()
+
     sampled_imgs = random.sample(images, k=k)
 
     for sample in sampled_imgs:
