@@ -113,6 +113,8 @@ DATA_DIR = '/work3/s203004/data/interim/'
 PROJECT_DATA_DIR = '../../data/interim/'
 EXPERIMENT_DIR = '../experiments/'
 
+DB_VERSION = 'hist_eq'
+
 IMG_DIR = 'imgs'
 IMG_DIR_TEST = 'imgs'
 

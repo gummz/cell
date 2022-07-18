@@ -14,7 +14,6 @@ import base64
 import io
 import json
 import os
-from os import listdir
 from os.path import join
 from time import time
 import PIL.Image
@@ -27,7 +26,7 @@ import src.data.constants as c
 'labelme_json_to_dataset _00400.json -o _00400_json'
 
 
-def annotate_from_json(mode):
+def annotate_from_json(db_version, mode):
     # logger.warning(
     #     "This script is aimed to demonstrate how to convert the "
     #     "JSON file to a single image dataset."
@@ -86,27 +85,32 @@ def annotate_from_json(mode):
     '''
 
     # STEP 1
-    generate_label(mode)
+    generate_label(db_version, mode)
 
     # STEP 2
-    annotate_from_label(mode)
+    annotate_from_label(db_version, mode)
 
 
-def generate_label(mode):
-    mask_dir = join(c.DATA_DIR, mode, c.MASK_DIR)
-    files = listdir(mask_dir)
-    json_files = [file for file in files if '.json' in file]
-
+def generate_label(db_version, mode):
+    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    process_dir = osp.join(data_dir, 'db_versions',
+                           db_version, mode)
+    files = os.listdir(osp.join(process_dir, c.IMG_DIR))
+    json_files = sorted((file for file in files if '.json' in file))
+    image_files = [image for image in files if '.png' in image]
+    # take only json files which have corresponding image files
+    json_files = (file for file in json_files
+                  if file.split('.')[0] + '.png' in image_files)
     for json_file in json_files:
-        out_dir = json_file.replace('.', '_')
-        out_dir = join(mask_dir, out_dir)
+        out_name = json_file.replace('.', '_')
+        out_dir = osp.join(process_dir, c.MASK_DIR, out_name)
         utils.make_dir(out_dir)
-        json_path = join(mask_dir, json_file)
+        json_path = osp.join(process_dir, c.IMG_DIR, json_file)
         data = json.load(open(json_path))
         imageData = data.get("imageData")
 
         if not imageData:
-            imagePath = os.path.join(
+            imagePath = osp.join(
                 os.path.dirname(json_path), data["imagePath"])
             with open(imagePath, "rb") as f:
                 imageData = f.read()
@@ -135,7 +139,8 @@ def generate_label(mode):
 
         PIL.Image.fromarray(img).save(osp.join(out_dir, "img.png"))
         labelme_utils.lblsave(osp.join(out_dir, "label.png"), lbl)
-        PIL.Image.fromarray(lbl_viz).save(osp.join(out_dir, "label_viz.png"))
+        PIL.Image.fromarray(lbl_viz).save(
+            osp.join(out_dir, "label_viz.png"))
 
         with open(osp.join(out_dir, "label_names.txt"), "w") as f:
             for lbl_name in label_names:
@@ -144,73 +149,51 @@ def generate_label(mode):
         # logger.info("Saved to: {}".format(out_dir))
 
 
-def annotate_from_label(mode):
+def annotate_from_label(db_version, mode):
 
     files = c.RAW_FILES[mode]
-    kernel = c.MEDIAN_FILTER_KERNEL
-    threshold = c.SIMPLE_THRESHOLD
 
+    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
     img_dir = c.IMG_DIR
-    mask_dir = c.MASK_DIR
     mask_dir_full = c.MASK_DIR_FULL
 
     # Create folder in case it doesn't exist yet
-    folder_name = c.MASK_DIR
-    folder = join(c.DATA_DIR, mode, folder_name)
-    utils.make_dir(folder)
-    utils.make_dir(join(c.DATA_DIR, mode, img_dir))
-    utils.make_dir(join(c.DATA_DIR, mode, mask_dir_full))
-    utils.make_dir(c.FIG_DIR)
+    folder = osp.join(data_dir, 'db_versions',
+                      db_version, mode)
+    utils.make_dir(osp.join(folder, img_dir))
+    utils.make_dir(osp.join(folder, mask_dir_full))
 
     # How often to print out with matplotlib
     debug_every = c.DBG_EVERY
 
-    # Name of the folder in which the images will reside
-    imgs_path = join(c.DATA_DIR, mode, c.IMG_DIR)
-    masks_path = join(c.DATA_DIR, mode, c.MASK_DIR)
-    # List of filenames of the .npy images
-    # .jpg files are for visualizing the process
-    images = [image for image in listdir(imgs_path) if '.json' in image]
-    masks = [mask for mask in listdir(masks_path) if '.npy' in mask]
-    # Get full image paths from filename list `images`
-    image_paths = sorted([join(imgs_path, image) for image in images])
-
-    # This is the index we will start on, in case there are already
-    # data files in there
-    # So, we are only adding to the existing list of files in /imgs/
-    # -1 for zero-indexing, +1 because we want to start at the next free index
-    img_idx = len(masks) - 1 + 1
-    idx = img_idx if img_idx > 0 else 0  # numbering for images
-
-    thresholds = []
     idx = 0
-    tic = time()
-    manual_labels = []
-    auto_labels = []
-    for folders, subfolders, files in os.walk(join(c.DATA_DIR, mode, mask_dir)):
+
+    sequence = os.walk(osp.join(data_dir, 'db_versions',
+                                db_version, mode, img_dir))
+    for folders, subfolders, files in sequence:
         for file in files:
             # if '.npy' in file:
             #     img_idx = file[0:5]
-            #     load_path = join(c.DATA_DIR, mask_dir)
-            #     auto_img = np.load(join(load_path, f'{img_idx}.npy'))
+            #     load_path = osp.join(c.DATA_DIR, mask_dir)
+            #     auto_img = np.load(osp.join(load_path, f'{img_idx}.npy'))
             #     if len(auto_img.shape) > 2:
             #         print(file)
             #         print(auto_img.shape)
             if file == 'label.png':
-                img_idx = folders.split('_')[-2]
-                path = join(folders, file)
+                img_idx = osp.basename(folders)[:5]
+                path = osp.join(folders, file)
                 added_img = PIL.Image.open(path)
                 added_img = np.array(added_img)
                 added_img *= 255
 
                 _, thresh = cv2.threshold(
                     added_img, c.SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
-                save = join(c.DATA_DIR, mode, mask_dir_full)
-                np.save(join(save, img_idx), thresh)
+                save = osp.join(folder, mask_dir_full)
+                np.save(osp.join(save, img_idx), thresh)
 
                 if idx % debug_every == 0:
                     utils.imsave(
-                        join(save, f'_{img_idx}.jpg'), thresh, 512)  # debug
+                        osp.join(save, f'_{img_idx}.jpg'), thresh, 512)  # debug
 
                 idx += 1
 
@@ -218,7 +201,9 @@ def annotate_from_label(mode):
 if __name__ == "__main__":
     tic = time()
     utils.set_cwd(__file__)
-    # for mode in ['train', 'val', 'test']:
-    annotate_from_json(mode='train')
+    db_version = 'hist_eq'
+    for mode in ('train', 'val', 'test'):
+        annotate_from_json('hist_eq', mode=mode)
+
     elapsed = utils.time_report(tic, time())
     print(f'annotate_from_json completed after {elapsed}.')
