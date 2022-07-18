@@ -20,16 +20,19 @@ if __name__ == '__main__':
 
     for mode, sample_ratio in zip(modes, sample_ratios):
 
-        src_dir = osp.join(root_dir, mode, c.IMG_DIR)
-        dst_dir = osp.join(root_dir, 'db_versions',
+        src_dir = osp.join('..', root_dir, mode, c.IMG_DIR)
+        dst_dir = osp.join('..', root_dir, 'db_versions',
                            db_version, mode, c.IMG_DIR)
         utils.make_dir(src_dir)
         utils.make_dir(dst_dir)
 
+        # parameters for adaptive histogram equalization
         kernel_size = 10
         clip_limit = 0.92
+        # images present in main dataset
         images = sorted([image for image in os.listdir(src_dir)
                         if '.npy' in image])
+        # images which have already been sampled
         already_sampled = sorted([image
                                   for image in os.listdir(dst_dir)
                                   if '.png' in image])
@@ -40,9 +43,9 @@ if __name__ == '__main__':
         k = int(len(images) * sample_ratio) - len(already_sampled)
         if k <= 0:
             print((f'With the chosen ratio,'
-                   f'no more images can be sampled from {mode}'
-                   f'dataset as there are'
-                   f'already more than enough sampled images.'))
+                   f' no more images can be sampled from {mode}'
+                   f' dataset as there are'
+                   f' already more than enough sampled images.'))
             continue
 
         sampled_imgs = sorted(random.sample(images, k=k))
