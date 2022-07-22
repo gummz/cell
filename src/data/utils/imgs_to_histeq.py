@@ -25,11 +25,12 @@ if __name__ == '__main__':
     random.seed(42)
     utils.set_cwd(__file__)
     root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    root_dir = osp.join('..', root_dir)
 
     for mode, sample_ratio in zip(modes, sample_ratios):
 
-        src_dir = osp.join('..', root_dir, mode, c.IMG_DIR)
-        dst_dir = osp.join('..', root_dir, 'db_versions',
+        src_dir = osp.join(root_dir, mode, c.IMG_DIR)
+        dst_dir = osp.join(root_dir, 'db_versions',
                            db_version, mode, c.IMG_DIR)
         utils.make_dir(src_dir)
         utils.make_dir(dst_dir)
@@ -56,8 +57,7 @@ if __name__ == '__main__':
                    f' already more than enough sampled images.'))
             continue
 
-        record_path = osp.join(root_dir, 'db_versions',
-                               db_version, mode,
+        record_path = osp.join(root_dir, mode,
                                c.IMG_DIR, 'slice_record.csv')
         slice_record = pd.read_csv(
             record_path, sep='\t', header=0, dtype={'name': str})
