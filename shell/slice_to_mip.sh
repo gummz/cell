@@ -40,4 +40,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/data/slice_to_mip.py > pyout_mip
+python3 ../src/data/utils/slice_to_mip.py > pyout_mip
