@@ -2,7 +2,7 @@ import cv2
 import inspect
 import os
 from os import makedirs, mkdir, listdir
-from os.path import join
+import os.path as osp
 import numpy as np
 import src.data.constants as c
 from aicsimageio import AICSImage
@@ -95,6 +95,16 @@ def get_czi_dims(metadata):
     return dims
 
 
+def get_data_dir():
+    if osp.exists(c.DATA_DIR):
+        return c.DATA_DIR
+    else:
+        if osp.exists(c.PROJECT_DATA_DIR):
+            return c.PROJECT_DATA_DIR
+        else:
+            return osp.join('..', c.PROJECT_DATA_DIR)
+
+
 def get_mask(output):
     '''Consolidates the masks into one mask.'''
     if type(output) == dict:  # `output` is direct output of model (from one image)
@@ -124,11 +134,11 @@ def get_mask(output):
 
 def get_model(time_str: str, device: torch.device, ):
 
-    folder = join(c.PROJECT_DIR, 'src', 'models',
+    folder = osp.join(c.PROJECT_DIR, 'src', 'models',
                   'interim', f'run_{time_str}')
 
     # Load model
-    load_path = join(folder, f'model_{time_str}.pkl')
+    load_path = osp.join(folder, f'model_{time_str}.pkl')
     if device.type == 'cuda':
         model = pickle.load(open(load_path, 'rb'))
     else:
