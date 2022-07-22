@@ -1,14 +1,22 @@
 import os
 
 import numpy as np
+import pandas as pd
 import src.data.constants as c
 import os.path as osp
 import skimage.exposure as ske
 import src.data.utils.utils as utils
 from time import time
 import random
+from aicsimageio import AICSImage
 
 if __name__ == '__main__':
+    # TODO: requested sample sizes using `sample_ratios`
+    # should result in those exact requested sample sizes,
+    # regardless of how many images there are in the sample
+    # directory already. I.e. if there are 5 files in the sample
+    # dir, and there are 100 requested, then only 95 will be sampled
+    # -- excluding the ones already there.
     modes = ('train', 'val', 'test')
     sample_ratios = (0.1,)*3
     db_version = 'hist_eq'
@@ -48,14 +56,36 @@ if __name__ == '__main__':
                    f' already more than enough sampled images.'))
             continue
 
+        record_path = osp.join(root_dir, 'db_versions',
+                               db_version, mode,
+                               c.IMG_DIR, 'slice_record.csv')
+        slice_record = pd.read_csv(
+            record_path, sep='\t', header=0, dtype={'name': str})
+
         sampled_imgs = sorted(random.sample(images, k=k))
 
+        raw_file_path = ''
         for sample in sampled_imgs:
-            image_arr = np.load(osp.join(src_dir, sample))
+            # TODO: don't take from src_dir, take from raw data
+            # use "get record" function to get the file, timepoint, and slice
+            # see `slice_to_mip` function in `src/data/utils/slice_to_mip.py`
+            index = int(osp.splitext(sample)[0])
+            name, file, t, z = slice_record.iloc[index].values
+
+            raw_temp = osp.join(c.RAW_DATA_DIR, file)
+
+            if raw_file_path != raw_temp:
+                raw_data = AICSImage(raw_temp)
+                raw_file_path = raw_temp
+
+            image_arr = utils.get_raw_array(raw_data, t, z, name)
             bright = ske.equalize_adapthist(
                 image_arr, kernel_size, clip_limit)
-            name = sample[:-4] + '.png'
+            name = sample[:-4]
             # np.save(osp.join(dst_dir, image), bright)
-            utils.imsave(osp.join(dst_dir, name), bright, resize=False)
+            utils.imsave(
+                osp.join(dst_dir, f'{name}.png'), bright, resize=False)
+            utils.imsave(
+                osp.join(dst_dir, f'{name}_orig.png'), image_arr, resize=False)
 
     print(f'imgs_to_histeq.py completed in {utils.time_report(tic, time())}.')
