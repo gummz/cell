@@ -1,4 +1,3 @@
-from os import listdir
 import os
 import os.path as osp
 from time import time
@@ -60,8 +59,9 @@ def slice_to_mip(db_version, mode, resize,
 
         # make movie from MIP to aid the annotation process
         T = raw_data.dims['T'][0]
-        mip_to_movie(raw_data, range(t-5, min(t+5, T)),
-                     osp.join(output_path, 'movies'), name)
+        mip_to_movie(raw_data, range(t-10, min(t+10, T)),
+                     osp.join(output_path, 'movies',
+                     f'{name}_movie.mp4'))
 
         print(f'{name}_mip.{ext}')
         print(f'{name}_mip_eq.{ext}')
@@ -70,7 +70,7 @@ def slice_to_mip(db_version, mode, resize,
     return output_path
 
 
-def mip_to_movie(raw_data, time_range, output_path, name):
+def mip_to_movie(raw_data, time_range, output_path):
     data_movie = utils.get_raw_array(
         raw_data, time_range).compute()
     data_movie_mip = np.max(data_movie, axis=1)
@@ -81,15 +81,15 @@ def mip_to_movie(raw_data, time_range, output_path, name):
         bright = utils.normalize(bright, 0, 255, out=cv2.CV_8UC1)
         movie_frames.append(bright)
 
-    utils.make_dir(output_path)
-    save_path = osp.join(output_path, f'{name}.mp4')
-    imageio.mimsave(save_path, movie_frames, fps=1)
+    utils.make_dir(osp.dirname(output_path))
+    imageio.mimsave(output_path, movie_frames, fps=1)
 
 
 if __name__ == '__main__':
     db_version = 'hist_eq'
     mode = 'train'
     resize = False
+
     # which:
     # Should the extract be one timepoint across slices,
     # or one slice across timepoints?
