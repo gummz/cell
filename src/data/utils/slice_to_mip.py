@@ -12,19 +12,19 @@ import tifffile
 
 def slice_to_mip(db_version, mode, resize,
                  which, ext='jpg'):
-    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
 
     images = sorted([img for img in listdir(
-        osp.join(data_dir, mode, c.IMG_DIR)) if '.npy' in img])
+        osp.join(root_dir, mode, c.IMG_DIR)) if '.npy' in img])
 
-    record_path = osp.join(data_dir, 'db_versions',
+    record_path = osp.join(root_dir, 'db_versions',
                            db_version, mode,
                            c.IMG_DIR, 'slice_record.csv')
     slice_record = pd.read_csv(
         record_path, sep='\t', header=0, dtype={'name': str})
 
     folder = f'{which}s_{mode}'
-    output_path = osp.join(data_dir, c.EXTRACT_DIR, folder)
+    output_path = osp.join(root_dir, c.EXTRACT_DIR, folder)
     utils.make_dir(output_path)
 
     raw_file_path = ''
