@@ -1,16 +1,34 @@
-- Find optimal adaptive histogram equalization parameters
+- Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
 
-- Annotate 200 images with the optimal parameters
+- Annotate 200 images with the optimal parameters, including validation set (with the samples)
 
 - Train a model on the images
+    - One in which the input is vanilla input
+    - One in which the input is the preprocessed (adaptive hist -> bilateral) input
+        - Take mean of equalized and raw image
+
 
 - Compare with previous results
-    - Compare model input is vanilla (bilateral) input
-    - Compare model input is preprocessed (adaptive hist -> bilateral) input
+    - Compare when model input is vanilla (bilateral) input
+    - Compare when model input is preprocessed (adaptive hist -> bilateral) input
+    - Just run eval_track, 1 batch, for each combination (there are four combinations in total)
 
-- If model is better, annotate more images
+- If model is significantly better, annotate 400 more images
 
 - Combine Kasra's results with mine and analyze
+
+- Reg R-RCNN
+
+- Dimension reduction methods
+
+- Pixel intensity histograms of all files
+    - Compare those for which the equalization works well with those for which it doesn't work as well
+    - Does the method's effectiveness depend on the number of pixels above a certain threshold in the target image?
+        - Seems so: if there are many bright cells in the image, it works remarkably well
+    - Maybe the files have different noise levels?
+    - Need to thoroughly understand how the method works
+
+- In the empty space in the subplot in eval_track, add the unprocessed MIP of the beta cell channel.
 
 
 
@@ -50,6 +68,12 @@
 - - -
 
 *Done*
+
+- slice_to_mip_movie script to show 5 timepoints before and 5 timepoints after
+
+- Make annotate_from_json.py ready
+
+- Find optimal adaptive histogram equalization parameters
 
 - Model calibration
     - Train model without manual labels and investigate
