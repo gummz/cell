@@ -5,11 +5,11 @@ import os
 import pickle
 import sys
 import math
+import os.path as osp
 from os import mkdir
 # from torchsummary import summary
 from os.path import join
 from time import time
-from memory_profiler import profile
 
 import cv2
 import matplotlib.pyplot as plt
@@ -30,6 +30,7 @@ from src.data.constants import (CV2_CONNECTED_ALGORITHM, DATA_DIR, IMG_DIR,
                                 NUMBER_CONNECTIVITY, SIMPLE_THRESHOLD)
 from src.models.utils import transforms as T
 from src.models.utils.model import get_instance_segmentation_model
+import src.data.constants as c
 from torch import optim
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR
@@ -370,9 +371,12 @@ if __name__ == '__main__':
     # manual_select_val = 0 if img_mode == 'auto' else 1
     img_filter = 'bilateral'
 
+    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    root_dir = osp.join(data_dir, c.DB_VERSION)
     data_tr, data_val = get_dataloaders(
-        batch_size=batch_size, num_workers=4, resize=size,
-        n_img_select=(n_img_select, 1), manual_select=(manual_select, 1), img_filter=img_filter)
+        root=root_dir, batch_size=batch_size, num_workers=4,
+        resize=size, n_img_select=(n_img_select, 1),
+        manual_select=(manual_select, 1), img_filter=img_filter)
 
     # get the model using our helper function
     model = get_instance_segmentation_model(pretrained=pretrained)
