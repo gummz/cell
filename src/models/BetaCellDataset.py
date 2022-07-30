@@ -4,6 +4,7 @@ from os.path import join
 import random
 
 import cv2
+from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from PIL import Image
@@ -50,11 +51,11 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # load all image files, sorting them to
         # ensure that they are aligned
         imgs = sorted([image for image in listdir(
-            join(root, mode, c.IMG_DIR)) if '.npy' in image])
+            join(root, mode, c.IMG_DIR)) if '.png' in image])
         masks = sorted([mask for mask in listdir(
-            join(root, mode, c.MASK_DIR)) if '.npy' in mask])
+            join(root, mode, c.MASK_DIR)) if '.png' in mask])
         masks_full = sorted([mask for mask in listdir(
-            join(root, mode, c.MASK_DIR_FULL)) if '.npy' in mask])
+            join(root, mode, c.MASK_DIR_FULL)) if '.png' in mask])
 
         if n_img_select < 1:
             # don't need min( len(imgs), len(masks_full) )
@@ -143,9 +144,9 @@ class BetaCellDataset(torch.utils.data.Dataset):
         mask_path = join(self.root, self.mode,
                          mask_dir, self.masks[idx])
 
-        img = np.int16(np.load(img_path))
+        img = np.int16(plt.imread(img_path)[:, :, :-1])
 
-        mask = np.load(mask_path)
+        mask = plt.imread(mask_path)[:, :, :-1]
         mask = np.array(mask)
 
         if self.resize != 1024:
@@ -163,9 +164,6 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # lower number of labels by 1 to account for
         # background removal
         numLabels = output[0] - 1
-        # TODO: preprocess inside __getitem__
-        # don't need to create a new dataset every time!
-        # easier to experiment this way.
 
         # `labels_out` denotes
         labels_out = np.array(output[1])
