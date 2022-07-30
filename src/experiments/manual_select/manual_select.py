@@ -106,9 +106,6 @@ def objective(n_img_select, manual_select, n_epochs, device):
     bbox_score, mask_score = results[1], results[3]
     sans_bbox_score, sans_mask_score = results_no_manual[1], results_no_manual[3]
 
-    # TODO: separate into manual and automatic annotations
-    # in this function
-
     return (cm_bbox, cm_mask, cm_sans_bbox, cm_sans_mask,
             sens_bbox, bbox_score, sens_mask, mask_score,
             sens_sans_bbox, sans_bbox_score, sens_sans_mask,
