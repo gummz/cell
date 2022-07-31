@@ -46,7 +46,7 @@ def eval_track(tracked_centroids, time_range,
         # /dtu-compute/tubes/results/test/LI_2019-02-05_emb5_pos4/
         #       /cyctpy15-pred-0.7-semi-40_2019-02-05_emb5_pos4.tif
         loops_path = osp.join(c.TUBES_DIR,
-                              c.LOOP_FILES_LOC[filename],
+                              c.LOOP_FILES_LOC[filename[:-3]],
                               filename.replace(c.RAW_DATA_PREFIX,
                                                c.CYC_PREFIX) + '.tif')
         loops_file = AICSImage(loops_path)
@@ -193,7 +193,7 @@ def output_tracks(filename, t,
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(cells_scale, cmap='Reds')
-    plt.imshow()
+    plt.imshow(loops, cmap='Greens')
 
     plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
