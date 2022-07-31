@@ -190,7 +190,8 @@ def annotate_from_label(db_version, mode):
                 _, thresh = cv2.threshold(
                     added_img, c.SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
                 save = osp.join(folder, mask_dir_full)
-                utils.imsave(osp.join(save, img_idx + '.png'), thresh)
+                utils.imsave(osp.join(save, img_idx + '.png'),
+                             thresh, resize=False)
 
                 if idx % debug_every == 0:
                     utils.imsave(
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     tic = time()
     utils.set_cwd(__file__)
     db_version = 'hist_eq'
-    for mode in ('train',):
+    for mode in ('train', 'val'):
         annotate_from_json(db_version, mode)
 
     elapsed = utils.time_report(tic, time())
