@@ -105,12 +105,13 @@ def eval_track(tracked_centroids, time_range,
 
 def create_track_movie(filename, save, time_range):
     images = []
-    for image in os.listdir(save):
-        if image.endswith('.png') and int(img.split('.')[0]) in time_range:
-            images.append(image)
+    save_dir = osp.dirname(save)
+    for image in os.listdir(save_dir):
+        if image.endswith('.png') and int(image.split('.')[0]) in time_range:
+            images.append(plt.imread(osp.join(save_dir, image)))
 
-    imageio.mimsave(osp.join(save,
-                             f'movie_{filename}_{time_range}.mp4'),
+    imageio.mimsave(osp.join(save_dir,
+                             f'movie_{filename}.mp4'),
                     sorted(images), fps=1)
 
 
@@ -208,7 +209,7 @@ def output_tracks(filename, t,
     plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
-    plt.imshow(cells_scale, cmap='Reds')
+    # plt.imshow(cells_scale, cmap='Reds')
     plt.imshow(loops, cmap='Greens', alpha=0.5)
 
     plt.subplot(232)
@@ -326,10 +327,11 @@ if __name__ == '__main__':
                                      'eval', 'track_2D', name)
             utils.make_dir(osp.join(save_location, 'with_tracking',
                                     f'batch_{batch_idx}'))
-
-            # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
-            # time_range = range(min(unique_frames), max(unique_frames) + 1)
-            time_range = get_time_range(n_frames, range_ok, load_location)
+            if n_frames == 'max':
+                unique_frames = tuple(pd.unique(tracked_centroids['frame']))
+                time_range = range(min(unique_frames), max(unique_frames) + 1)
+            else:
+                time_range = get_time_range(n_frames, range_ok, load_location)
 
             if '2019-02-05_emb5_pos4' not in name:
                 continue
