@@ -9,6 +9,7 @@ from time import time
 import random
 from aicsimageio import AICSImage
 
+
 if __name__ == '__main__':
     # TODO: requested sample sizes using `sample_ratios`
     # should result in those exact requested sample sizes,
@@ -24,8 +25,7 @@ if __name__ == '__main__':
     tic = time()
     random.seed(42)
     utils.set_cwd(__file__)
-    root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
-    root_dir = osp.join('..', root_dir)
+    root_dir = utils.get_data_dir()
 
     for mode, sample_ratio in zip(modes, sample_ratios):
 

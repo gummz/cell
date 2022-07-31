@@ -17,7 +17,7 @@ def slice_to_mip(db_version, mode, resize,
                  which, ext='jpg'):
     root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
 
-    images = sorted([img for img in listdir(
+    images = sorted([img for img in os.listdir(
         osp.join(root_dir, mode, c.IMG_DIR)) if '.npy' in img])
 
     record_path = osp.join(root_dir, 'db_versions',
@@ -87,7 +87,7 @@ def mip_to_movie(raw_data, time_range, output_path):
 
 if __name__ == '__main__':
     db_version = 'hist_eq'
-    mode = 'train'
+    mode = 'val'
     resize = False
 
     # which:
