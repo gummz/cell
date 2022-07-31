@@ -1,26 +1,26 @@
 from __future__ import annotations
 import os
-import logging
 import pickle
-from os import listdir
-from os.path import join
+import os.path as osp
 from time import time
 from aicsimageio import AICSImage
 import cv2
 import numpy as np
 import pandas as pd
+from pydantic import NoneBytes
 import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
-import src.visualization.plot as plot
 import src.visualization.utils as viz
 from matplotlib import pyplot as plt
 
 
-def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
-    # use `tracked_centroids`'s frame, x, y, p
-    # to overlay the points onto MIP of raw image
-
+def eval_track(tracked_centroids, time_range,
+               filename, location,
+               batch_idx, loops=False):
+    '''
+    Optional to overlay Kasra's loops over beta cells.
+    '''
     # choose colormap
     cmap = 'tab20'
 
@@ -29,8 +29,8 @@ def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
 
     # folder is: pred/eval/track/
     # create relevant directories
-    tracking_folder = join('with_tracking', f'batch_{batch_idx}')
-    utils.make_dir(join(location, tracking_folder))
+    tracking_folder = osp.join('with_tracking', f'batch_{batch_idx}')
+    utils.make_dir(osp.join(location, tracking_folder))
 
     # in order to make a color map that uniquely identifies
     # each cell, the total number of cells is needed
@@ -39,8 +39,17 @@ def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
     colors = viz.get_colors(len(particles), cmap)
     colors_dict = dict(zip(particles, colors))
 
-    path = join(c.RAW_DATA_DIR, filename)
-    raw_file = AICSImage(path)
+    cells_path = osp.join(c.RAW_DATA_DIR, filename)
+    cells_file = AICSImage(cells_path)
+    if loops:
+        # example path: 
+        # /dtu-compute/tubes/results/test/LI_2019-02-05_emb5_pos4/
+        #       /cyctpy15-pred-0.7-semi-40_2019-02-05_emb5_pos4.tif
+        loops_path = osp.join(c.TUBES_DIR,
+                              c.LOOP_FILES_LOC[filename[:-4]],
+                              filename.replace(c.RAW_DATA_PREFIX,
+                                               c.CYC_PREFIX) + '.tif')
+        loops_file = AICSImage(loops_path)
     channels = [c.CELL_CHANNEL, c.TUBE_CHANNEL]
     columns = ['x', 'y', 'particle', 'intensity']
 
@@ -59,10 +68,10 @@ def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
         name = f'{t:05d}'
 
         # don't output if images are already there
-        if not os.path.exists(join(location, f'{name}_xz.png')):
+        if not os.path.exists(osp.join(location, f'{name}_xz.png')):
             exists = False
 
-            images = output_raw_images(location, raw_file, channels, t, name)
+            images = output_raw_images(location, cells_file, channels, t, name)
             combined, cells, cells_xz, cells_yz, tubes = images
 
         X, Y, P, I = (frame[c] for c in columns)
@@ -78,18 +87,23 @@ def eval_track(tracked_centroids, time_range, filename, location, batch_idx):
             combined, cells, cells_xz, cells_yz, tubes = load_existing(
                 location, name)
 
-        save = join(location, tracking_folder, f'{t:05d}.png')
+        save = osp.join(location, tracking_folder, f'{t:05d}.png')
+        if loops:
+            loops_t = utils.get_raw_array(loops_file, t)
 
-        output_tracks(filename, t, cells, cells_xz, cells_yz,
-                      tubes, combined, save, time_range)
+        output_tracks(filename, t,
+                      cells, cells_xz, cells_yz,
+                      tubes, combined,
+                      save, time_range,
+                      None if not loops else loops_t)
 
 
 def load_existing(location, name):
-    combined = plt.imread(join(location, f'{name}.png'))
-    cells = plt.imread(join(location, f'{name}_cells.png'))
-    cells_xz = plt.imread(join(location, f'{name}_cells_xz.png'))
-    cells_yz = plt.imread(join(location, f'{name}_cells_yz.png'))
-    tubes = plt.imread(join(location, f'{name}_tubes.png'))
+    combined = plt.imread(osp.join(location, f'{name}.png'))
+    cells = plt.imread(osp.join(location, f'{name}_cells.png'))
+    cells_xz = plt.imread(osp.join(location, f'{name}_cells_xz.png'))
+    cells_yz = plt.imread(osp.join(location, f'{name}_cells_yz.png'))
+    tubes = plt.imread(osp.join(location, f'{name}_tubes.png'))
     return combined, cells, cells_xz, cells_yz, tubes
 
 
@@ -142,61 +156,70 @@ def output_raw_images(location, raw_file, channels, t, name):
     tubes_rgb[:, :, 1] = tubes_mip
     tubes_rgb[:, :, 3] = 1.
 
-    utils.imsave(join(location, f'{name}.png'),
+    utils.imsave(osp.join(location, f'{name}.png'),
                  combined, False)
 
     # output cells and tubes
-    utils.imsave(join(location, f'{name}_cells.png'),
+    utils.imsave(osp.join(location, f'{name}_cells.png'),
                  cells_scale, False, 'Reds')
-    utils.imsave(join(location, f'{name}_cells_xz.png'),
+    utils.imsave(osp.join(location, f'{name}_cells_xz.png'),
                  cells_mip_xz, False, 'Reds')
-    utils.imsave(join(location, f'{name}_cells_yz.png'),
+    utils.imsave(osp.join(location, f'{name}_cells_yz.png'),
                  cells_mip_yz, False, 'Reds')
-    utils.imsave(join(location, f'{name}_cells_raw.png'),
+    utils.imsave(osp.join(location, f'{name}_cells_raw.png'),
                  cells_mip, False, 'viridis')
-    utils.imsave(join(location, f'{name}_tubes.png'),
+    utils.imsave(osp.join(location, f'{name}_tubes.png'),
                  tubes_rgb, False)
 
     return (combined, cells_scale, cells_mip_xz,
             cells_mip_yz, tubes_mip)
 
 
-def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mip, combined, save, time_range):
+def output_tracks(filename, t,
+                  cells_scale, cells_mip_xz, cells_mip_yz,
+                  tubes_mip, combined,
+                  save, time_range, loops=None):
 
     fontsize = 25
+    x_dim_str = 'X dimension'
+    y_dim_str = 'Y dimension'
+    z_dim_str = 'Z dimension'
+
     plt.subplot(231)
-    plt.title('Beta cell channel (0)\n with amplified signal', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.title('Beta cell channel (0)\n with amplified signal',
+              fontsize=fontsize)
+    plt.xlabel(x_dim_str, fontsize=fontsize)
+    plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(cells_scale, cmap='Reds')
+    plt.imshow(loops, cmap='Greens')
 
     plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
-    plt.xlabel('X dimension', fontsize=fontsize)
+    plt.xlabel(x_dim_str, fontsize=fontsize)
     plt.xlim(left=0, right=1024)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.ylim(top=0, bottom=1024)
     plt.title('Tracked cells with \ntubes overlay', fontsize=fontsize)
 
     plt.subplot(233)
     plt.title('Tubes channel (1)', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.xlabel(x_dim_str, fontsize=fontsize)
+    plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(tubes_mip, cmap='viridis')
-    plt.ylabel('Y dimension', fontsize=fontsize)
+    plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.ylim(bottom=1024, top=0)
     plt.title('Tubes channel (1)', fontsize=fontsize)
 
     plt.subplot(234)
     plt.title('MIP, XZ', fontsize=fontsize)
-    plt.xlabel('X dimension', fontsize=fontsize)
-    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xlabel(x_dim_str, fontsize=fontsize)
+    plt.ylabel(z_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(cells_mip_xz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
@@ -204,8 +227,8 @@ def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mi
 
     plt.subplot(236)
     plt.title('MIP, YZ', fontsize=fontsize)
-    plt.xlabel('Y dimension', fontsize=fontsize)
-    plt.ylabel('Z dimension', fontsize=fontsize)
+    plt.xlabel(y_dim_str, fontsize=fontsize)
+    plt.ylabel(z_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(cells_mip_yz, cmap='Reds', extent=(0, 1024, 40, 0), aspect=10)
@@ -223,7 +246,8 @@ def output_tracks(filename, t, cells_scale, cells_mip_xz, cells_mip_yz, tubes_mi
 
 
 def plot_markers(marker_size, colors, X, Y, P, I,
-                 t, time_range, p_track):
+                 t, time_range, p_track,
+                 loops=None):
     marker = 'x'
     marker_size_plt = marker_size
     for x, y, p, i in zip(X, Y, P, I):
@@ -247,7 +271,7 @@ def plot_markers(marker_size, colors, X, Y, P, I,
 
 
 def get_time_range(n_frames, range_ok, load_location):
-    T = len(os.listdir(join(load_location, 'timepoints')))
+    T = len(os.listdir(osp.join(load_location, 'timepoints')))
     T = range_ok[1] if range_ok else T
     time_start = np.random.randint(0, T - n_frames)
     time_range = range(time_start, time_start + n_frames)
@@ -265,56 +289,65 @@ if __name__ == '__main__':
 
     files = c.RAW_FILES[mode]
     # add extensions (.lsm etc.)
-    files = utils.add_ext((file for file, _ in files.items()))
+    files = utils.add_ext(files.keys())
     files = dict(zip(files, c.RAW_FILES[mode].values()))
-    # name = files[3]  # c.PRED_FILE
-    # files = (files[-4],)
+
+    loops = c.LOOP_FILES_LOC
 
     # each batch index marks a particle in the first frame
     # batch_idx = 2: particle at index 2-1=1 is selected
     # batch_idx = 3: particle at index 3-1=2 is selected
     for batch_idx in (1,):
         for i, (name, range_ok) in enumerate(files.items()):
-            load_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                                 'reject_not', name)
+
+            load_location = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                     'reject_not', name)
             tracked_centroids = pickle.load(
-                open(join(load_location, 'tracked_centroids.pkl'),
+                open(osp.join(load_location, 'tracked_centroids.pkl'),
                      'rb'))
 
-            save_location = join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                                 'eval', 'track_2D', name)
-            utils.make_dir(join(save_location, 'with_tracking',
-                                f'batch_{batch_idx}'))
+            save_location = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                     'eval', 'track_2D', name)
+            utils.make_dir(osp.join(save_location, 'with_tracking',
+                                    f'batch_{batch_idx}'))
 
             # unique_frames = tuple(pd.unique(tracked_centroids['frame']))
             # time_range = range(min(unique_frames), max(unique_frames) + 1)
             time_range = get_time_range(n_frames, range_ok, load_location)
+
+            if '2019-02-05_emb5_pos4' not in name:
+                continue
+
             if batch_idx > 3:
-                # some frames did not have enough particles to track
+                # some files did not have enough particles to track
+                # at the beginning of the file,
                 # so we need to adjust the time range
                 if '2018-11-20_emb7_pos3' in name:
                     time_range = range(152, 152 + n_frames)
-                if 'LI_2018-11-20_emb6_pos2' in name:
+                if '2018-11-20_emb6_pos2' in name:
                     time_range = range(160, 160 + n_frames)
             print(
                 f'Outputting track range \n{tuple(time_range)} for file\n', name, f'batch {batch_idx}...\n')
 
             # debug: double check np.random.seed(42) works
             # i.e. that the same random numbers are generated each time
+            iterable = os.listdir(osp.join(save_location, 'with_tracking',
+                                           f'batch_{batch_idx}'))
             present = sorted([int(file[:-4])
-                              for file in os.listdir(join(save_location, 'with_tracking', f'batch_{batch_idx}'))
+                              for file in iterable
                               if 'png' in file])
             print('Time range found in folder:\n', present)
 
             eval_track(tracked_centroids, time_range,
-                       name, save_location, batch_idx)
+                       name, save_location,
+                       batch_idx, loops)
 
             print('Done\n')
             if debug:
                 print('Debugging mode, exiting.')
                 break
 
-            # plot.create_movie(join(save_location, 'with_tracking'),
+            # plot.create_movie(osp.join(save_location, 'with_tracking'),
             #                   time_range)
 
     elapsed = utils.time_report(tic, time())
