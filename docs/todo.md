@@ -1,6 +1,8 @@
 - Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
 
 - Annotate 200 images with the optimal parameters, including validation set (with the samples)
+    - Finish validation set
+    - Upload to DTU
 
 - Train a model on the images
     - One in which the input is vanilla input
