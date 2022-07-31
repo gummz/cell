@@ -67,9 +67,6 @@ if __name__ == '__main__':
 
         raw_file_path = ''
         for sample in sampled_imgs:
-            # TODO: don't take from src_dir, take from raw data
-            # use "get record" function to get the file, timepoint, and slice
-            # see `slice_to_mip` function in `src/data/utils/slice_to_mip.py`
             index = int(osp.splitext(sample)[0])
             name, file, t, z = slice_record.iloc[index].values
 
@@ -83,7 +80,7 @@ if __name__ == '__main__':
             bright = ske.equalize_adapthist(
                 image_arr, kernel_size, clip_limit)
             name = sample[:-4]
-            # np.save(osp.join(dst_dir, image), bright)
+
             utils.imsave(
                 osp.join(dst_dir, f'{name}.png'), bright, resize=False)
             utils.imsave(
