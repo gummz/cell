@@ -36,9 +36,6 @@
 
 - Change annotate_from_json so that no intermediate files or folders are created
 
-
-
-
 - Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
 
 - LabelMe already outputs segmentations that are colored by identity. So just use that to assign identities.
