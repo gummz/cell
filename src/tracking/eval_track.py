@@ -297,7 +297,7 @@ if __name__ == '__main__':
     # each batch index marks a particle in the first frame
     # batch_idx = 2: particle at index 2-1=1 is selected
     # batch_idx = 3: particle at index 3-1=2 is selected
-    for batch_idx in (1, 2, 3):
+    for batch_idx in (1,):
         for i, (name, range_ok) in enumerate(files.items()):
 
             load_location = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,

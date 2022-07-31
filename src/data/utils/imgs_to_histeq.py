@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import pandas as pd
 import src.data.constants as c
 import os.path as osp
@@ -10,6 +9,7 @@ from time import time
 import random
 from aicsimageio import AICSImage
 
+
 if __name__ == '__main__':
     # TODO: requested sample sizes using `sample_ratios`
     # should result in those exact requested sample sizes,
@@ -17,20 +17,21 @@ if __name__ == '__main__':
     # directory already. I.e. if there are 5 files in the sample
     # dir, and there are 100 requested, then only 95 will be sampled
     # -- excluding the ones already there.
-    modes = ('train', 'val', 'test')
+    # modes = ('train', 'val', 'test')
+    modes = ('val',)
     sample_ratios = (0.1,)*3
     db_version = 'hist_eq'
 
     tic = time()
     random.seed(42)
     utils.set_cwd(__file__)
-    root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
-    root_dir = osp.join('..', root_dir)
+    root_dir = utils.get_data_dir()
 
     for mode, sample_ratio in zip(modes, sample_ratios):
 
-        src_dir = osp.join(root_dir, mode, c.IMG_DIR)
-        dst_dir = osp.join(root_dir, 'db_versions',
+        src_dir = osp.join(root_dir, c.DB_VERS_DIR,
+                           c.VANILLA_VERSION, mode, c.IMG_DIR)
+        dst_dir = osp.join(root_dir, c.DB_VERS_DIR,
                            db_version, mode, c.IMG_DIR)
         utils.make_dir(src_dir)
         utils.make_dir(dst_dir)
