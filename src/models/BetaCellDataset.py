@@ -57,6 +57,12 @@ class BetaCellDataset(torch.utils.data.Dataset):
         masks_full = sorted([mask for mask in listdir(
             join(root, mode, c.MASK_DIR_FULL)) if '.png' in mask])
 
+        # if no automatic annotations are being used,
+        # set the masks equal to each other
+        # (this way, the full masks will be selected every time)
+        if not masks:
+            masks = masks_full
+
         if n_img_select < 1:
             # don't need min( len(imgs), len(masks_full) )
             # yet because we don't yet know how many full
@@ -144,12 +150,17 @@ class BetaCellDataset(torch.utils.data.Dataset):
         mask_path = join(self.root, self.mode,
                          mask_dir, self.masks[idx])
 
-        img = np.int16(plt.imread(img_path)[:, :, :-1])
+        img = np.int16(plt.imread(img_path)[:, :, 0])
 
-        mask = plt.imread(mask_path)[:, :, :-1]
+        mask = plt.imread(mask_path)[:, :, 0]
         mask = np.array(mask)
 
-        if self.resize != 1024:
+        print(img.shape, mask.shape)
+        print(np.unique(img), np.unique(mask))
+        
+        exit()
+
+        if self.resize not in (1024, False):
             size = (self.resize, self.resize)
             img = cv2.resize(img, size, cv2.INTER_AREA)
             mask = cv2.resize(mask, size, cv2.INTER_AREA)
