@@ -20,9 +20,9 @@ def slice_to_mip(db_version, mode, resize,
     images = sorted([img for img in os.listdir(
         osp.join(root_dir, mode, c.IMG_DIR)) if '.npy' in img])
 
-    record_path = osp.join(root_dir, 'db_versions',
-                           db_version, mode,
-                           c.IMG_DIR, 'slice_record.csv')
+    record_path = osp.join(root_dir, c.DB_VERS_DIR,
+                           db_version, c.VANILLA_VERSION,
+                           mode, c.IMG_DIR, 'slice_record.csv')
     slice_record = pd.read_csv(
         record_path, sep='\t', header=0, dtype={'name': str})
 
