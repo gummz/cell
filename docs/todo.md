@@ -1,3 +1,5 @@
+- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
+
 - Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
 
 - Annotate 200 images with the optimal parameters, including validation set (with the samples)
