@@ -93,7 +93,7 @@ def annotate_from_json(db_version, mode):
 
 def generate_label(db_version, mode):
     data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
-    process_dir = osp.join(data_dir, 'db_versions',
+    process_dir = osp.join(data_dir, c.DB_VERS_DIR,
                            db_version, mode)
     files = os.listdir(osp.join(process_dir, c.IMG_DIR))
     json_files = sorted((file for file in files if '.json' in file))
@@ -133,14 +133,14 @@ def generate_label(db_version, mode):
         for name, value in label_name_to_value.items():
             label_names[value] = name
 
-        lbl_viz = imgviz.label2rgb(
-            lbl, imgviz.asgray(img), label_names=label_names, loc="rb"
-        )
+        # lbl_viz = imgviz.label2rgb(
+        #     lbl, imgviz.asgray(img), label_names=label_names, loc="rb"
+        # )
 
-        PIL.Image.fromarray(img).save(osp.join(out_dir, "img.png"))
+        # PIL.Image.fromarray(img).save(osp.join(out_dir, "img.png"))
         labelme_utils.lblsave(osp.join(out_dir, "label.png"), lbl)
-        PIL.Image.fromarray(lbl_viz).save(
-            osp.join(out_dir, "label_viz.png"))
+        # PIL.Image.fromarray(lbl_viz).save(
+        #     osp.join(out_dir, "label_viz.png"))
 
         with open(osp.join(out_dir, "label_names.txt"), "w") as f:
             for lbl_name in label_names:
@@ -168,8 +168,8 @@ def annotate_from_label(db_version, mode):
 
     idx = 0
 
-    sequence = os.walk(osp.join(data_dir, 'db_versions',
-                                db_version, mode, img_dir))
+    sequence = os.walk(osp.join(data_dir, c.DB_VERS_DIR,
+                                db_version, mode, c.MASK_DIR))
     for folders, subfolders, files in sequence:
         for file in files:
             # if '.npy' in file:
@@ -179,6 +179,7 @@ def annotate_from_label(db_version, mode):
             #     if len(auto_img.shape) > 2:
             #         print(file)
             #         print(auto_img.shape)
+
             if file == 'label.png':
                 img_idx = osp.basename(folders)[:5]
                 path = osp.join(folders, file)
@@ -189,7 +190,7 @@ def annotate_from_label(db_version, mode):
                 _, thresh = cv2.threshold(
                     added_img, c.SIMPLE_THRESHOLD, 255, cv2.THRESH_BINARY)
                 save = osp.join(folder, mask_dir_full)
-                np.save(osp.join(save, img_idx), thresh)
+                utils.imsave(osp.join(save, img_idx + '.png'), thresh)
 
                 if idx % debug_every == 0:
                     utils.imsave(
@@ -202,8 +203,8 @@ if __name__ == "__main__":
     tic = time()
     utils.set_cwd(__file__)
     db_version = 'hist_eq'
-    for mode in ('train', 'val', 'test'):
-        annotate_from_json('hist_eq', mode=mode)
+    for mode in ('train',):
+        annotate_from_json(db_version, mode)
 
     elapsed = utils.time_report(tic, time())
     print(f'annotate_from_json completed after {elapsed}.')
