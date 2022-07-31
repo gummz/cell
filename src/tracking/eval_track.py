@@ -58,7 +58,7 @@ def eval_track(tracked_centroids, time_range,
     # overlay points in each frame on corresponding
     # raw MIP image
     frames = tracked_centroids.groupby('frame')
-    # filter according to time range (frames could contain more
+    # filter according to time range (there could be more
     # than necessary)
     frames = [frame for frame in frames if frame[0] in time_range]
     # get unique particles from first frame
@@ -92,7 +92,8 @@ def eval_track(tracked_centroids, time_range,
         save = osp.join(location, tracking_folder, f'{t:05d}.png')
         if loops:
             loops_t = utils.get_raw_array(loops_file, 0)
-            loops_t = loops_t[t]
+            loops_t = loops_t[t].compute()
+            loops_t = utils.normalize(loops_t, 0, 1, out=cv2.CV_8UC1)
 
         output_tracks(filename, t,
                       cells, cells_xz, cells_yz,
@@ -106,16 +107,20 @@ def eval_track(tracked_centroids, time_range,
 def create_track_movie(filename, save, time_range):
     images = []
     save_dir = osp.dirname(save)
-    for image in os.listdir(save_dir):
+    for image in sorted(os.listdir(save_dir)):
         if image.endswith('.png') and int(image.split('.')[0]) in time_range:
             images.append(plt.imread(osp.join(save_dir, image)))
 
     imageio.mimsave(osp.join(save_dir,
                              f'movie_{filename}.mp4'),
-                    sorted(images), fps=1)
+                    images, fps=1)
 
 
 def load_existing(location, name):
+    '''
+    Loads existing images. It is assumed that the images exist
+    in storage.
+    '''
     combined = plt.imread(osp.join(location, f'{name}.png'))
     cells = plt.imread(osp.join(location, f'{name}_cells.png'))
     cells_xz = plt.imread(osp.join(location, f'{name}_cells_xz.png'))
@@ -296,7 +301,7 @@ def get_time_range(n_frames, range_ok, load_location):
 
 
 if __name__ == '__main__':
-    n_frames = 10
+    n_frames = 'max'
     mode = 'test'
     debug = False
 
