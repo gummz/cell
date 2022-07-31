@@ -17,15 +17,16 @@ def slice_to_mip(db_version, mode, resize,
                  which, ext='jpg'):
     root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
 
-    files = os.listdir(osp.join(root_dir, c.DB_VERS_DIR,
-                                db_version, mode,
-                                c.IMG_DIR))
+    files_path = osp.join(root_dir, c.DB_VERS_DIR,
+                          db_version, mode,
+                          c.IMG_DIR)
+    files = os.listdir(files_path)
     images = sorted([img for img in files
-                     if '.npy' in img])
+                     if '.png' in img])
 
     record_path = osp.join(root_dir, c.DB_VERS_DIR,
-                           db_version, c.VANILLA_VERSION,
-                           mode, c.IMG_DIR, 'slice_record.csv')
+                           c.VANILLA_VERSION, mode, c.IMG_DIR,
+                           'slice_record.csv')
     slice_record = pd.read_csv(
         record_path, sep='\t', header=0, dtype={'name': str})
 
