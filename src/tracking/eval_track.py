@@ -42,13 +42,15 @@ def eval_track(tracked_centroids, time_range,
     cells_path = osp.join(c.RAW_DATA_DIR, filename)
     cells_file = AICSImage(cells_path)
     if loops:
-        # example path: 
-        # /dtu-compute/tubes/results/test/LI_2019-02-05_emb5_pos4/
+        # example loops_path:
+        # /dtu-compute/tubes/results/test/LI_2019-02-05_emb5_pos4...
         #       /cyctpy15-pred-0.7-semi-40_2019-02-05_emb5_pos4.tif
+        name = filename[:-4]  # remove extension
         loops_path = osp.join(c.TUBES_DIR,
-                              c.LOOP_FILES_LOC[filename[:-4]],
-                              filename.replace(c.RAW_DATA_PREFIX,
-                                               c.CYC_PREFIX) + '.tif')
+                              c.LOOP_FILES_LOC[name],
+                              name,
+                              name.replace(c.RAW_DATA_PREFIX,
+                                           c.CYC_PREFIX) + '.tif')
         loops_file = AICSImage(loops_path)
     channels = [c.CELL_CHANNEL, c.TUBE_CHANNEL]
     columns = ['x', 'y', 'particle', 'intensity']
@@ -89,7 +91,8 @@ def eval_track(tracked_centroids, time_range,
 
         save = osp.join(location, tracking_folder, f'{t:05d}.png')
         if loops:
-            loops_t = utils.get_raw_array(loops_file, t)
+            loops_t = utils.get_raw_array(loops_file, 0)
+            loops_t = loops_t[t]
 
         output_tracks(filename, t,
                       cells, cells_xz, cells_yz,
@@ -193,7 +196,7 @@ def output_tracks(filename, t,
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
     plt.imshow(cells_scale, cmap='Reds')
-    plt.imshow(loops, cmap='Greens')
+    plt.imshow(loops, cmap='Greens', alpha=0.5)
 
     plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
