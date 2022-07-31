@@ -18,7 +18,7 @@ def slice_to_mip(db_version, mode, resize,
     root_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
 
     files = os.listdir(osp.join(root_dir, c.DB_VERS_DIR,
-                                c.VANILLA_VERSION, mode,
+                                db_version, mode,
                                 c.IMG_DIR))
     images = sorted([img for img in files
                      if '.npy' in img])
