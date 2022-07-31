@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
         if mode != 'val':
             continue
-        
+
         raw_file_path = ''
         for sample in sampled_imgs:
             index = int(osp.splitext(sample)[0])
@@ -79,7 +79,7 @@ if __name__ == '__main__':
                 raw_data = AICSImage(raw_temp)
                 raw_file_path = raw_temp
 
-            image_arr = utils.get_raw_array(raw_data, t, z, name)
+            image_arr = utils.get_raw_array(raw_data, t, z)
             bright = ske.equalize_adapthist(
                 image_arr, kernel_size, clip_limit)
             name = sample[:-4]
