@@ -32,6 +32,8 @@
 
 - In the empty space in the subplot in eval_track, add the unprocessed MIP of the beta cell channel.
 
+- Change annotate_from_json so that no intermediate files or folders are created
+
 
 
 
