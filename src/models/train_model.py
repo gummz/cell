@@ -349,6 +349,7 @@ if __name__ == '__main__':
     threshold = SIMPLE_THRESHOLD
 
     device = utils.set_device()
+    gpu = device.type == 'cuda'
     print(f'Running on {device}.')
 
     utils.set_cwd(__file__)
@@ -358,21 +359,21 @@ if __name__ == '__main__':
 
     # hyperparameters (optimal from train_gridsearch experiment)
     img_mode = 'auto'
-    size = 1024
-    batch_size = 8  # 2
+    size = 1024 if gpu else 28
+    batch_size = 8 if gpu else 1
     pretrained = True
     num_epochs = 20  # 500
     lr = 3.418507038460298e-06
     wd = 1.2957404400334042e-08
     beta1 = 0.2438598958001344
     beta2 = 0.9849760264270886
-    n_img_select = 1101
-    manual_select = 0  # if img_mode == 'auto' else 1
+    n_img_select = 1101 if gpu else 20
+    manual_select = 1  # if img_mode == 'auto' else 1
     # manual_select_val = 0 if img_mode == 'auto' else 1
     img_filter = 'bilateral'
 
     data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
-    root_dir = osp.join(data_dir, c.DB_VERSION)
+    root_dir = osp.join(data_dir, c.DB_VERS_DIR, c.DB_VERSION)
     data_tr, data_val = get_dataloaders(
         root=root_dir, batch_size=batch_size, num_workers=4,
         resize=size, n_img_select=(n_img_select, 1),
