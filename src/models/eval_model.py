@@ -15,7 +15,6 @@ from torch.utils.data import DataLoader
 import os.path as osp
 import seaborn as sns
 import src.models.train_model as train
-import torchmetrics.functional as F
 import src.models.BetaCellDataset as bcd
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 import src.data.constants as c
@@ -257,18 +256,21 @@ def score_report(metrics):
 
 
 if __name__ == '__main__':
-    mode = 'test'
+    mode = 'val'
+    model_id = '31_07_18H_59M_15S'
 
     tic = time()
     utils.set_cwd(__file__)
     device = utils.set_device()
+    gpu = device.type == 'cuda'
+    n_img_select = 1 if gpu else 5
     save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
-                    'seg_2d', f'model_{c.MODEL_STR}', mode)
+                    'seg_2d', f'model_{model_id}', mode)
     print('Outputting images to', save)
 
-    model = utils.get_model(c.MODEL_STR, device)
+    model = utils.get_model(model_id, device)
     model = model.to(device)
-    dataset = bcd.get_dataset(mode=mode)
+    dataset = bcd.get_dataset(mode, n_img_select)
 
     metrics = eval_model(model, dataset, mode, device, save,
                          accept_range=(0.91, 1), match_threshold=0.3)
