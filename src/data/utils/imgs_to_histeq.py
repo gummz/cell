@@ -18,7 +18,7 @@ if __name__ == '__main__':
     # dir, and there are 100 requested, then only 95 will be sampled
     # -- excluding the ones already there.
     # modes = ('train', 'val', 'test')
-    modes = ('val',)
+    modes = ('train', 'val', 'test')
     sample_ratios = (0.1,)*3
     db_version = 'hist_eq'
 
@@ -50,21 +50,24 @@ if __name__ == '__main__':
         images = [image for image in images
                   if image not in already_sampled]
 
-        k = int(len(images) * sample_ratio) - len(already_sampled)
-        if k <= 0:
-            print((f'With the chosen ratio,'
-                   f' no more images can be sampled from {mode}'
-                   f' dataset as there are'
-                   f' already more than enough sampled images.'))
-            continue
+        k = int(len(images) * sample_ratio)  # - len(already_sampled)
+        # if k <= 0:
+        #     print((f'With the chosen ratio,'
+        #            f' no more images can be sampled from {mode}'
+        #            f' dataset as there are'
+        #            f' already more than enough sampled images.'))
+        #     continue
 
-        record_path = osp.join(root_dir, mode,
-                               c.IMG_DIR, 'slice_record.csv')
+        record_path = osp.join(root_dir, c.DB_VERS_DIR, c.VANILLA_VERSION,
+                               mode, c.IMG_DIR, 'slice_record.csv')
         slice_record = pd.read_csv(
             record_path, sep='\t', header=0, dtype={'name': str})
 
         sampled_imgs = sorted(random.sample(images, k=k))
 
+        if mode != 'val':
+            continue
+        
         raw_file_path = ''
         for sample in sampled_imgs:
             index = int(osp.splitext(sample)[0])
