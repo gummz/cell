@@ -183,7 +183,7 @@ def get_raw_array(data, t=None, z=None,
         raise ValueError('Unknown data type for `data`.')
 
     t_tuple = 'T' if has_len(t) or t is None else ''
-    z_tuple = 'Z' if has_len(z) != int or z is None else ''
+    z_tuple = 'Z' if has_len(z) or z is None else ''
     channel_tuple = 'C' if type(ch) != int or ch is None else ''
     order = f'{t_tuple}{z_tuple}XY{channel_tuple}'
 

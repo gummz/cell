@@ -103,7 +103,7 @@ Makefile
 /shell/err*
 /shell/out
 **/output.*
-**/imgs*
+**/imgs/*
 **/masks*
 **/runs/
 descr_*
