@@ -30,7 +30,7 @@ def slice_to_mip(db_version, mode, resize,
     slice_record = pd.read_csv(
         record_path, sep='\t', header=0, dtype={'name': str})
 
-    folder = f'{which}s_{mode}'
+    folder = f'{db_version}_{which}s_{mode}'
     output_path = osp.join(root_dir, c.EXTRACT_DIR, folder)
     utils.make_dir(output_path)
 
