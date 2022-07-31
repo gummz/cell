@@ -74,6 +74,15 @@ RAW_FILES_TEST = {  # None = ok to use any timepoint
     'LI_2020-06-04_emb1_pos1': None,
 }
 
+LOOP_FILES_LOC = {
+    'LI_2019-02-05_emb5_pos4': 'results/test',
+}
+
+TUBES_DIR = '/dtu-compute/tubes'
+
+RAW_DATA_PREFIX = 'LI'
+CYC_PREFIX = 'cyctpy15-pred-0.7-semi-40'
+
 RAW_FILES = {
     'train': RAW_FILES_TRAIN,
     'val': RAW_FILES_VAL,
