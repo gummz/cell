@@ -115,7 +115,7 @@ TIMEPOINTS = [328, 288, 295, 276, 290, 288, 276]
 TIMEPOINTS_TEST = [280, 289]
 
 # absolute project path
-PROJECT_DIR = '/zhome/e2/e/154260/cell/'
+PROJECT_DIR = '~/cell/'
 
 # To be used within the src/[subfolder] directories
 DATA_DIR = '/work3/s203004/data/interim/'
