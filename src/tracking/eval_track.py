@@ -7,12 +7,12 @@ from aicsimageio import AICSImage
 import cv2
 import numpy as np
 import pandas as pd
-from pydantic import NoneBytes
 import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
 import src.visualization.utils as viz
 from matplotlib import pyplot as plt
+import imageio
 
 
 def eval_track(tracked_centroids, time_range,
@@ -99,6 +99,19 @@ def eval_track(tracked_centroids, time_range,
                       tubes, combined,
                       save, time_range,
                       None if not loops else loops_t)
+
+    create_track_movie(filename, save, time_range)
+
+
+def create_track_movie(filename, save, time_range):
+    images = []
+    for image in os.listdir(save):
+        if image.endswith('.png') and int(img.split('.')[0]) in time_range:
+            images.append(image)
+
+    imageio.mimsave(osp.join(save,
+                             f'movie_{filename}_{time_range}.mp4'),
+                    sorted(images), fps=1)
 
 
 def load_existing(location, name):
