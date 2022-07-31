@@ -1,6 +1,5 @@
 import os
 
-import numpy as np
 import pandas as pd
 import src.data.constants as c
 import os.path as osp
