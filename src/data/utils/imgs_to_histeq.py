@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
         if mode != 'val':
             continue
-        
+
         raw_file_path = ''
         for sample in sampled_imgs:
             index = int(osp.splitext(sample)[0])
