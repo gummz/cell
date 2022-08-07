@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-import pickle
 import os.path as osp
 from time import time
 from aicsimageio import AICSImage
@@ -13,11 +12,12 @@ import src.data.utils.utils as utils
 import src.visualization.utils as viz
 from matplotlib import pyplot as plt
 import imageio
+from PIL import Image
 
 
-def eval_track(tracked_centroids, time_range,
-               filename, location,
-               batch_idx, loops=False):
+def make_tracks(tracked_centroids, time_range,
+                filename, location,
+                batch_idx, loops=False):
     '''
     Optional to overlay Kasra's loops over beta cells.
     '''
@@ -32,12 +32,32 @@ def eval_track(tracked_centroids, time_range,
     tracking_folder = osp.join('with_tracking', f'batch_{batch_idx}')
     utils.make_dir(osp.join(location, tracking_folder))
 
-    # in order to make a color map that uniquely identifies
-    # each cell, the total number of cells is needed
-    particles = pd.unique(tracked_centroids['particle'])
-    # get unique colors for each detected cell
-    colors = viz.get_colors(len(particles), cmap)
-    colors_dict = dict(zip(particles, colors))
+    if tracked_centroids:
+        # in order to make a color map that uniquely identifies
+        # each cell, the total number of cells is needed
+        particles = pd.unique(tracked_centroids['particle'])
+        # get unique colors for each detected cell
+        colors = viz.get_colors(len(particles), cmap)
+        colors_dict = dict(zip(particles, colors))
+
+        # overlay points in each frame on corresponding
+        # raw MIP image
+        frames = tracked_centroids.groupby('frame')
+        # filter according to time range (there could be more
+        # than necessary)
+        frames = [frame for frame in frames if frame[0] in time_range]
+        # get unique particles from first frame
+        p_tracks = get_p_tracks(frames)
+        if batch_idx > len(p_tracks):
+            # all available particles at the first frame are used;
+            # nothing to do
+            return
+
+        p_track = p_tracks[batch_idx - 1]
+    else:
+        # without centroids, there are no frames; so
+        # to make for-loop work, just define frames as time range
+        frames = zip(time_range, time_range)
 
     cells_path = osp.join(c.RAW_DATA_DIR, filename)
     cells_file = AICSImage(cells_path)
@@ -55,16 +75,6 @@ def eval_track(tracked_centroids, time_range,
     channels = [c.CELL_CHANNEL, c.TUBE_CHANNEL]
     columns = ['x', 'y', 'particle', 'intensity']
 
-    # overlay points in each frame on corresponding
-    # raw MIP image
-    frames = tracked_centroids.groupby('frame')
-    # filter according to time range (there could be more
-    # than necessary)
-    frames = [frame for frame in frames if frame[0] in time_range]
-    # get unique particles from first frame
-    p_tracks = get_p_tracks(frames)
-    p_track = p_tracks[batch_idx - 1]
-
     for t, (_, frame) in zip(time_range, frames):
         exists = True  # assume image exists until proven otherwise
         name = f'{t:05d}'
@@ -76,14 +86,21 @@ def eval_track(tracked_centroids, time_range,
             images = output_raw_images(location, cells_file, channels, t, name)
             combined, cells, cells_xz, cells_yz, tubes = images
 
-        X, Y, P, I = (frame[c] for c in columns)
-
         plt.figure(figsize=(20, 14))
 
-        for i in range(2):
-            plt.subplot(2, 3, i + 1)
-            plot_markers(marker_size, colors_dict, X, Y,
-                         P, I, t, time_range, p_track)
+        if tracked_centroids:
+            X, Y, P, I = (frame[c] for c in columns)
+            for i in range(2):
+                plt.subplot(2, 3, i + 1)
+                # TODO: make it possible to plot an arbitrary
+                # number of times (e.g. for ground truth
+                # and predicted)
+                # for example a list of things to plot
+                # e.g. [ground_truth, predicted, loops]
+                # instead of this if-else tracked_centroids,
+                # loops, ...
+                plot_markers(marker_size, colors_dict, X, Y,
+                             P, I, t, time_range, p_track)
 
         if exists:
             combined, cells, cells_xz, cells_yz, tubes = load_existing(
@@ -91,9 +108,7 @@ def eval_track(tracked_centroids, time_range,
 
         save = osp.join(location, tracking_folder, f'{t:05d}.png')
         if loops:
-            loops_t = utils.get_raw_array(loops_file, 0)
-            loops_t = loops_t[t].compute()
-            loops_t = utils.normalize(loops_t, 0, 1, out=cv2.CV_8UC1)
+            loops_t = get_loops(loops_file, t)
 
         output_tracks(filename, t,
                       cells, cells_xz, cells_yz,
@@ -102,6 +117,13 @@ def eval_track(tracked_centroids, time_range,
                       None if not loops else loops_t)
 
     create_track_movie(filename, save, time_range)
+
+
+def get_loops(loops_file, t):
+    loops_t = utils.get_raw_array(loops_file, 0)
+    loops_t = loops_t[t].compute()
+    loops_t = utils.normalize(loops_t, 0, 1, out=cv2.CV_8UC1)
+    return loops_t
 
 
 def create_track_movie(filename, save, time_range):
@@ -168,7 +190,6 @@ def output_raw_images(location, raw_file, channels, t, name):
     tubes_mip = np.where(tubes_mip > 1, 1, tubes_mip)
     tubes_mip = np.where(tubes_mip < 0, 0, tubes_mip)
 
-    # cells_nl = np.where(cells_nl < 0, 0, cells_nl)
     combined = np.zeros((1024, 1024, 4), dtype=np.float32)
     combined[:, :, 0] = cells_scale
     combined[:, :, 1] = tubes_mip
@@ -214,8 +235,9 @@ def output_tracks(filename, t,
     plt.ylabel(y_dim_str, fontsize=fontsize)
     plt.xticks(fontsize=fontsize, rotation=20)
     plt.yticks(fontsize=fontsize)
-    # plt.imshow(cells_scale, cmap='Reds')
-    plt.imshow(loops, cmap='Greens', alpha=0.5)
+    plt.imshow(cells_scale, cmap='Reds')
+    if loops:
+        plt.imshow(loops, cmap='Greens', alpha=0.5)
 
     plt.subplot(232)
     plt.imshow(combined, extent=(0, 1024, 1024, 0))
@@ -300,21 +322,59 @@ def get_time_range(n_frames, range_ok, load_location):
     return time_range
 
 
-if __name__ == '__main__':
-    n_frames = 'max'
-    mode = 'test'
-    debug = False
+def get_present_timerange(batch_idx, save_location):
+    '''Fetches the time range already present in the
+    specified directory (save_location) and batch.
+    '''
+    iterable = os.listdir(osp.join(save_location,
+                                   'with_tracking',
+                                   f'batch_{batch_idx}'))
+    present = sorted([int(osp.splitext(file)[0])
+                      for file in iterable
+                      if 'png' in file])
 
-    np.random.seed(42)
+    return present
+
+
+def tracks_to_movie(time_range, location):
+    '''Saves a movie from a list of images.
+    Saves the movie in the specified location,
+    where it is assumed the images are (in `location`).
+    '''
+    utils.make_dir(osp.dirname(location))
+    # append each image to the movie frames list
+    # and convert the image to grayscale
+    # (since the dataset is grayscale)
+    movie_frames = []
+    for image in os.listdir(location):
+        name, ext = osp.splitext(image)
+        image_path = osp.join(location, image)
+        if ext == 'png' and int(name) in time_range:
+            movie_frames.append(Image.open(image_path))  # .convert('L'))
+
+    raw_data_name = osp.dirname(osp.dirname(osp.dirname(location)))
+    start, stop = time_range[0], time_range[-1]
+    movie_name = f'{raw_data_name}_movie_{start}-{stop}.mp4'
+
+    imageio.mimsave(movie_name, movie_frames, fps=1)
+
+
+if __name__ == '__main__':
+    n_frames = 10  # set to 'max' for all frames, or choose range
+    mode = 'test'
+    debug = True
+
+    np.random.seed(42)  # so that cell sampling is reproducible
     tic = time()
     utils.set_cwd(__file__)
 
     files = c.RAW_FILES[mode]
     # add extensions (.lsm etc.)
+    # to make the file-finding process extension-agnostic
     files = utils.add_ext(files.keys())
     files = dict(zip(files, c.RAW_FILES[mode].values()))
 
-    loops = c.LOOP_FILES_LOC
+    loops = None  # c.LOOP_FILES_LOC
 
     # each batch index marks a particle in the first frame
     # batch_idx = 2: particle at index 2-1=1 is selected
@@ -322,56 +382,61 @@ if __name__ == '__main__':
     for batch_idx in (1,):
         for i, (name, range_ok) in enumerate(files.items()):
 
-            load_location = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+            load_location = osp.join(c.PROJECT_DATA_DIR,
+                                     c.PRED_DIR,
                                      'reject_not', name)
-            tracked_centroids = pickle.load(
-                open(osp.join(load_location, 'tracked_centroids.pkl'),
-                     'rb'))
-
-            save_location = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+            save_location = osp.join(c.PROJECT_DATA_DIR,
+                                     c.PRED_DIR,
                                      'eval', 'track_2D', name)
-            utils.make_dir(osp.join(save_location, 'with_tracking',
+            utils.make_dir(osp.join(save_location,
+                                    'with_tracking',
                                     f'batch_{batch_idx}'))
-            if n_frames == 'max':
+
+            tracked_centroids = None  # pickle.load(
+            # open(osp.join(load_location, 'tracked_centroids.pkl'),
+            #      'rb'))
+
+            if n_frames == 'max':  # max frames requested
                 unique_frames = tuple(pd.unique(tracked_centroids['frame']))
                 time_range = range(min(unique_frames), max(unique_frames) + 1)
-            else:
+            else:  # specific time range requested
                 time_range = get_time_range(n_frames, range_ok, load_location)
 
-            if '2019-02-05_emb5_pos4' not in name:
-                continue
+            # if '2019-02-05_emb5_pos4' not in name:
+            #     continue
 
-            if batch_idx > 3:
-                # some files did not have enough particles to track
-                # at the beginning of the file,
-                # so we need to adjust the time range
-                if '2018-11-20_emb7_pos3' in name:
-                    time_range = range(152, 152 + n_frames)
-                if '2018-11-20_emb6_pos2' in name:
-                    time_range = range(160, 160 + n_frames)
+            # Keep this commented for now.
+            # Probably better to just take whatever cells are
+            # available at the first timepoint,
+            # or else we introduce bias.
+            # if batch_idx > 3:
+            #     # some files did not have enough particles to track
+            #     # at the beginning of the file,
+            #     # so we need to adjust the time range
+            #     if '2018-11-20_emb7_pos3' in name:
+            #         time_range = range(152, 152 + n_frames)
+            #     if '2018-11-20_emb6_pos2' in name:
+            #         time_range = range(160, 160 + n_frames)
             print(
                 f'Outputting track range \n{tuple(time_range)} for file\n', name, f'batch {batch_idx}...\n')
 
             # debug: double check np.random.seed(42) works
             # i.e. that the same random numbers are generated each time
-            iterable = os.listdir(osp.join(save_location, 'with_tracking',
-                                           f'batch_{batch_idx}'))
-            present = sorted([int(file[:-4])
-                              for file in iterable
-                              if 'png' in file])
+            present = get_present_timerange(batch_idx, save_location)
             print('Time range found in folder:\n', present)
 
-            eval_track(tracked_centroids, time_range,
-                       name, save_location,
-                       batch_idx, loops)
+            make_tracks(tracked_centroids, time_range,
+                        name, save_location,
+                        batch_idx, loops)
 
-            print('Done\n')
+            tracks_to_movie(time_range, osp.join(
+                save_location, 'with_tracking', f'batch_{batch_idx}'))
+
             if debug:
                 print('Debugging mode, exiting.')
                 break
 
-            # plot.create_movie(osp.join(save_location, 'with_tracking'),
-            #                   time_range)
+            print('Done\n')
 
     elapsed = utils.time_report(tic, time())
     print(f'eval_track finished in {elapsed}.')
