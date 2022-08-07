@@ -4,6 +4,7 @@ import os
 from os import makedirs, mkdir, listdir
 import os.path as osp
 import numpy as np
+import pandas as pd
 import src.data.constants as c
 from aicsimageio import AICSImage
 import pickle
@@ -36,7 +37,10 @@ def active_slices(timepoint: np.array, ratio=None):
 
 
 def add_ext(files):
-    raw_files = listdir(c.RAW_DATA_DIR)
+    if osp.exists(c.RAW_DATA_DIR):
+        raw_files = listdir(c.RAW_DATA_DIR)
+    else:
+        raw_files = pd.read_csv(osp.join(c.PROJECT_DATA_DIR, 'raw', 'raw_files.csv'))['file'].values
     temp_files = []
     if not isinstance(files, str):
         for file in files:  # `files` is ArrayLike
@@ -135,7 +139,7 @@ def get_mask(output):
 def get_model(time_str: str, device: torch.device, ):
 
     folder = osp.join(c.PROJECT_DIR, 'src', 'models',
-                  'interim', f'run_{time_str}')
+                      'interim', f'run_{time_str}')
 
     # Load model
     load_path = osp.join(folder, f'model_{time_str}.pkl')
@@ -221,7 +225,7 @@ def imsave(path, img, resize=512, cmap=None):
     dirs = os.path.dirname(path)
     make_dir(dirs)
 
-    if path[-4:] not in ['.png', '.jpg']:
+    if path[-4:] not in ('.png', '.jpg'):
         path += '.jpg'
 
     if type(img) == mplt.figure.Figure:
@@ -269,8 +273,6 @@ def normalize(image, alpha, beta, out, device=None):
 
 
 def record_dict(t, slice_idx):
-    # print('slice idx', slice_idx)
-    # slice_idx = [str(idx) for idx in slice_idx]
     record = {t: slice_idx}
     return record
 
