@@ -346,13 +346,14 @@ def tracks_to_movie(time_range, location):
     # and convert the image to grayscale
     # (since the dataset is grayscale)
     movie_frames = []
-    for image in os.listdir(location):
+    for image in sorted(os.listdir(location)):
         name, ext = osp.splitext(image)
         image_path = osp.join(location, image)
-        if ext == 'png' and int(name) in time_range:
+        if ext == '.png' and int(name) in time_range:
             movie_frames.append(Image.open(image_path))  # .convert('L'))
 
-    raw_data_name = osp.dirname(osp.dirname(osp.dirname(location)))
+    raw_data_name, _ = osp.splitext(
+        osp.dirname(osp.dirname(osp.dirname(location))))
     start, stop = time_range[0], time_range[-1]
     movie_name = f'{raw_data_name}_movie_{start}-{stop}.mp4'
 
@@ -362,7 +363,7 @@ def tracks_to_movie(time_range, location):
 if __name__ == '__main__':
     n_frames = 10  # set to 'max' for all frames, or choose range
     mode = 'test'
-    debug = True
+    debug = False
 
     np.random.seed(42)  # so that cell sampling is reproducible
     tic = time()
