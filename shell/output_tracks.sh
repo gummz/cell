@@ -42,4 +42,4 @@ source ../venv_1/bin/activate
 
 
 # Run file
-python3 ../src/tracking/eval_track.py > pyout_track
+python3 ../src/tracking/output_tracks.py > pyout_track

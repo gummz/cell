@@ -362,7 +362,7 @@ def tracks_to_movie(time_range, location):
 
 if __name__ == '__main__':
     n_frames = 10  # set to 'max' for all frames, or choose range
-    mode = 'test'
+    mode = 'val'
     debug = False
 
     np.random.seed(42)  # so that cell sampling is reproducible
