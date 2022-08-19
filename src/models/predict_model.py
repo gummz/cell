@@ -228,14 +228,14 @@ def predict(data: AICSImage,
     chains_tot = []
     for t in time_range:
         chains = predict_timepoint(data, device, model, output_dir,
-                                   save_pred, load_pred, t)
+                                   save_pred, load_pred, t, accept_range)
         chains_tot.append(chains)
 
     return chains_tot
 
 
 def predict_timepoint(data, device, model, output_dir,
-                      save_pred, load_pred, t):
+                      save_pred, load_pred, t, accept_range):
     timepoint_raw = utils.get_raw_array(
         data, t=t).compute()
 
@@ -244,7 +244,8 @@ def predict_timepoint(data, device, model, output_dir,
     timepoint = prepare_model_input(timepoint_raw, device)
 
     preds = handle_predictions(device, model, output_dir,
-                               save_pred, load_pred, t, timepoint)
+                               save_pred, load_pred, t, timepoint,
+                               accept_range=accept_range)
 
     # draw bounding boxes on slice for debugging
     viz.output_sample(osp.join(output_dir, 'debug'), t,
@@ -260,7 +261,8 @@ def predict_timepoint(data, device, model, output_dir,
 
 
 def handle_predictions(device, model, output_dir, save_pred,
-                       load_pred, t, timepoint):
+                       load_pred, t, timepoint,
+                       accept_range=(0.5, 1.0)):
     '''
     Returns predictions for timepoint.
     Supports loading predictions from disk, and saving predictions to disk.
@@ -284,7 +286,7 @@ def handle_predictions(device, model, output_dir, save_pred,
             open(osp.osp.join(output_dir, f'preds_{t}.pkl'), 'rb'))
     else:
         preds = get_predictions(
-            model, device, timepoint, accept_range=(0.85, 1))
+            model, device, timepoint, accept_range=accept_range)
         # save predictions to file
         if save_pred:
             save_predictions(preds, output_dir, t)
@@ -330,11 +332,11 @@ def prepare_model_input(timepoint, device):
 
 
 def predict_file(load, device, model,
-                 save, name, time_range=None, accept_range=(0, 1)):
+                 output_dir, name, time_range=None, accept_range=(0, 1)):
 
     if load:  # use old (saved) predictions
         centroids = pickle.load(
-            open(osp.join(save, 'centroids_save.pkl'), 'rb'))
+            open(osp.join(output_dir, 'centroids_save.pkl'), 'rb'))
     else:  # predict
         path = osp.join(c.RAW_DATA_DIR, name)
         data = AICSImage(path)
@@ -345,7 +347,7 @@ def predict_file(load, device, model,
             time_range = range(time_start, time_end)
 
         centroids = predict(data, time_range, accept_range,
-                            device, model, save)
+                            device, model, output_dir)
         try:
             data.close()
             print(f'File {name} closed successfully.')
@@ -359,7 +361,7 @@ def predict_file(load, device, model,
 
     tracked_centroids = tracker.track(centroids_np, threshold=5)
 
-    save_tracks(name, save, time_start, time_end,
+    save_tracks(name, output_dir, time_start, time_end,
                 centroids, centroids_np, tracked_centroids)
 
 
@@ -413,11 +415,11 @@ if __name__ == '__main__':
     for i, name in enumerate(files):
         print('Predicting file', name,
               f'(file {i + 1}/{len_files})...', end='')
-        save = osp.osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                            experiment_name, name)
-        utils.make_dir(save)
+        output_dir = osp.osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                                  experiment_name, name)
+        utils.make_dir(output_dir)
         predict_file(load, device,
-                     model, save, name,
+                     model, output_dir, name,
                      time_range, accept_range)
         print('done.')
         # break
