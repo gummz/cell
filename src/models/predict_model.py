@@ -365,22 +365,22 @@ def predict_file(load, device, model,
                 centroids, centroids_np, tracked_centroids)
 
 
-def save_tracks(name, save, time_start, time_end,
+def save_tracks(name, output_dir, time_start, time_end,
                 centroids, centroids_np, tracked_centroids):
 
     pickle.dump(centroids, open(
-        osp.join(save, 'centroids_save.pkl'), 'wb'))
+        osp.join(output_dir, 'centroids_save.pkl'), 'wb'))
 
     np.savetxt(
-        osp.join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+        osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
     pickle.dump(tracked_centroids,
-                open(osp.join(save, 'tracked_centroids.pkl'), 'wb'))
+                open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
 
     tracked_centroids.to_csv(osp.osp.join(
-        save, 'tracked_centroids.csv'), sep=';')
+        output_dir, 'tracked_centroids.csv'), sep=';')
 
-    location = osp.join(save, 'timepoints')
+    location = osp.join(output_dir, 'timepoints')
     plot.save_figures(tracked_centroids, location)
     utils.png_to_movie(time_range, location)
 
@@ -388,8 +388,8 @@ def save_tracks(name, save, time_start, time_end,
 if __name__ == '__main__':
     mode = 'val'
     load = False
-    experiment_name = 'reject_not'
-    accept_range = (0.91, 1)  # reject no predictions
+    experiment_name = 'pred_1'
+    accept_range = (0.91, 1)
     model_id = c.MODEL_STR
 
     utils.set_cwd(__file__)
