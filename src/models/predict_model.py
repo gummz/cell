@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pickle
-from os.path import join
+import os.path as osp
 import cv2
 import numpy as np
 import skimage
@@ -73,21 +73,14 @@ def get_prediction(model, device, input, accept_range=(0.5, 1)):
     # perform modified NMS algorithm
     idx = remove_boxes(bboxes, scores, accept_range)
     # select boxes by idx
-    # print('len of boxes before rejection', len(pred['boxes']))
     pred['boxes'] = pred['boxes'][idx]
-    # print('len of boxes after rejection', len(pred['boxes']))
 
     # select masks by idx
     pred['masks'] = pred['masks'][idx]
     # select scores by idx
-    # print('accept range', accept_range)
-    # print(pred['scores'])
-    # print('avg score before rejection', np.mean(pred['scores'].cpu().numpy()))
     pred['scores'] = pred['scores'][idx]
-    # print('avg score after rejection', np.mean(
-    # pred['scores'].cpu().numpy()), '\n')
 
-    # pred['masks'] = threshold_masks(pred['masks'])
+    pred['masks'] = threshold_masks(pred['masks'])
 
     return pred
 
@@ -203,7 +196,7 @@ def bbox_contained(box1, box2):
 
 
 def predict(data: AICSImage,
-            time_range: range,
+            time_range: range, accept_range: tuple,
             device: torch.device,
             model, save: str) -> list(tuple):
 
@@ -217,10 +210,10 @@ def predict(data: AICSImage,
         timepoint = prepare_model_input(timepoint_raw, device)
 
         preds = get_predictions(
-            model, device, timepoint, accept_range=(0.85, 1))
+            model, device, timepoint, accept_range=accept_range)
 
         # draw bounding boxes on slice for debugging
-        viz.output_sample(join(save, 'debug'), t,
+        viz.output_sample(osp.join(save, 'debug'), t,
                           timepoint_raw, preds, 1024, device)
 
         # adjust slices from being model inputs to being
@@ -265,13 +258,14 @@ def prepare_model_input(timepoint, device):
     return timepoint.unsqueeze(1)
 
 
-def predict_file(mode, load, device, model, save, name, time_range=None):
+def predict_file(load, device, model,
+                 save, name, time_range=None, accept_range=(0, 1)):
 
     if load:  # use old (saved) predictions
         centroids = pickle.load(
-            open(join(save, 'centroids_save.pkl'), 'rb'))
+            open(osp.join(save, 'centroids_save.pkl'), 'rb'))
     else:  # predict
-        path = join(c.RAW_DATA_DIR, name)
+        path = osp.join(c.RAW_DATA_DIR, name)
         data = AICSImage(path)
         if time_range:
             time_start, time_end = min(time_range), max(time_range)
@@ -279,7 +273,7 @@ def predict_file(mode, load, device, model, save, name, time_range=None):
             time_start, time_end = 0, data.dims['T'][0]
             time_range = range(time_start, time_end)
 
-        centroids = predict(data, time_range,
+        centroids = predict(data, time_range, accept_range,
                             device, model, save)
         try:
             data.close()
@@ -302,54 +296,58 @@ def save_tracks(name, save, time_start, time_end,
                 centroids, centroids_np, tracked_centroids):
 
     pickle.dump(centroids, open(
-        join(save, 'centroids_save.pkl'), 'wb'))
+        osp.join(save, 'centroids_save.pkl'), 'wb'))
 
     np.savetxt(
-        join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+        osp.join(save, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
 
     pickle.dump(tracked_centroids,
-                open(join(save, 'tracked_centroids.pkl'), 'wb'))
+                open(osp.join(save, 'tracked_centroids.pkl'), 'wb'))
 
-    tracked_centroids.to_csv(join(save, 'tracked_centroids.csv', sep=';'))
+    tracked_centroids.to_csv(osp.join(save, 'tracked_centroids.csv'), sep=';')
 
-    location = join(save, 'timepoints')
+    location = osp.join(save, 'timepoints')
     plot.save_figures(tracked_centroids, location)
-    # plot.create_movie(location, time_range)
+    utils.png_to_movie(time_range, location)
 
 
 if __name__ == '__main__':
-    mode = 'pred'
+    mode = 'val'
     load = False
-    experiment_name = ''
+    experiment_name = 'reject_not'
+    accept_range = (0.91, 1)  # reject no predictions
+    model_id = c.MODEL_STR
 
     utils.set_cwd(__file__)
     # Running on CUDA?
     device = utils.set_device()
     print(f'Running on {device}.')
 
-    model = utils.get_model(c.MODEL_STR, device)
+    model = utils.get_model(model_id, device)
     model.to(device)
 
     # Choose time range
     time_start = 150
     time_end = 155  # endpoint excluded
-    time_range = range(time_start, time_end)
+    time_range = None  # range(time_start, time_end)
 
     # 1. Choose raw data file(s)
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    files = c.RAW_FILES['test'].keys()
+    files = c.RAW_FILES[mode].keys()
     files = utils.add_ext(files)
     len_files = len(files)
 
     for i, name in enumerate(files):
         print('Predicting file', name,
               f'(file {i + 1}/{len_files})...', end='')
-        save = join(c.PROJECT_DATA_DIR, mode,
-                    experiment_name, name)
+        save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                        experiment_name, name)
         utils.make_dir(save)
-        predict_file(mode, load, device, model, save, name, time_range)
+        predict_file(load, device,
+                     model, save, name,
+                     time_range, accept_range)
         print('done.')
-        break
+        # break
 
     print('predict_model.py complete')
