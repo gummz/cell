@@ -403,9 +403,6 @@ if __name__ == '__main__':
             else:  # specific time range requested
                 time_range = get_time_range(n_frames, range_ok, load_location)
 
-            # if '2019-02-05_emb5_pos4' not in name:
-            #     continue
-
             # Keep this commented for now.
             # Probably better to just take whatever cells are
             # available at the first timepoint,
@@ -440,4 +437,4 @@ if __name__ == '__main__':
             print('Done\n')
 
     elapsed = utils.time_report(tic, time())
-    print(f'eval_track finished in {elapsed}.')
+    print(f'output_tracks finished in {elapsed}.')
