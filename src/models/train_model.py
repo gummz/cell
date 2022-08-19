@@ -51,19 +51,11 @@ def train(model, device, opt, epochs, data_tr, data_val,
     size = hparam_dict['image_size']
     batch_size = hparam_dict['batch_size']
 
-    # TODO: send HPC support email
-    # regarding why it runs out of memory but shows only
-    # 2 gb used
-
     scheduler = ReduceLROnPlateau(opt, threshold=0.01, verbose=True)
     log_every = 1  # How often to print out losses
     save_every = 10  # How often to save model
     scaler = GradScaler()
     loss_list = hparam_dict['losses'].split(';')
-    # loss_classifier, loss_objectness
-    # TODO: remove loss_classifier from loss_list
-    # and also objectness? if we don't care about detecting
-    # objects, maybe the faint ones will be caught as well.
 
     # Transforms
     scale_jitter = T.ScaleJitter((size / 2, size / 2), scale_range=[0.7, 1.5])
@@ -146,13 +138,6 @@ def train(model, device, opt, epochs, data_tr, data_val,
                          for t in y_val]
 
                 val_losses += get_loss(model, loss_list, x_val, y_val)
-
-                # TODO: make sure scheduler works
-                # by printing out the learning rate each epoch
-                # if write:
-
-                # if i == save_every:
-                #     debug_opencv_mask()
 
                 model.eval()
                 y_hat = model(x_val)
@@ -359,15 +344,15 @@ if __name__ == '__main__':
 
     # hyperparameters (optimal from train_gridsearch experiment)
     img_mode = 'auto'
-    size = 1024 if gpu else 28
+    size = 1024 if gpu else 16
     batch_size = 8 if gpu else 1
     pretrained = True
-    num_epochs = 20  # 500
+    num_epochs = 20 if gpu else 2  # 500
     lr = 3.418507038460298e-06
     wd = 1.2957404400334042e-08
     beta1 = 0.2438598958001344
     beta2 = 0.9849760264270886
-    n_img_select = 1101 if gpu else 20
+    n_img_select = 1101 if gpu else 5
     manual_select = 1  # if img_mode == 'auto' else 1
     # manual_select_val = 0 if img_mode == 'auto' else 1
     img_filter = 'bilateral'
@@ -376,7 +361,8 @@ if __name__ == '__main__':
     root_dir = osp.join(data_dir, c.DB_VERS_DIR, c.DB_VERSION)
     data_tr, data_val = get_dataloaders(
         root=root_dir, batch_size=batch_size, num_workers=4,
-        resize=size, n_img_select=(n_img_select, 1),
+        resize=size,
+        n_img_select=(n_img_select, 1 if gpu else n_img_select),
         manual_select=(manual_select, 1), img_filter=img_filter)
 
     # get the model using our helper function

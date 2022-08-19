@@ -178,7 +178,7 @@ def find_closest_center(z: int, center: CenterLink,
     Inputs:
         z: the current slice.
         center: the current CenterLink.
-        centers: CenterLink of next slice (z+1).
+        centers: CenterLink[] of next slice (z+1).
         searchrange: the range of which to search for a
             candidate center, in (x,y) coordinates.
 

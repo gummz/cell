@@ -436,4 +436,4 @@ if __name__ == '__main__':
             print('Done\n')
 
     elapsed = utils.time_report(tic, time())
-    print(f'eval_track finished in {elapsed}.')
+    print(f'output_tracks finished in {elapsed}.')

@@ -3,7 +3,7 @@ import os
 import random
 from matplotlib import pyplot as plt
 import pandas as pd
-from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
+from torchvision.utils import draw_bounding_boxes
 import src.data.utils.utils as utils
 from os.path import join
 import src.data.constants as c
@@ -15,9 +15,9 @@ import seaborn as sns
 import numpy as np
 
 
-def output_sample(save: str, t: int, timepoint_raw, preds,
+def output_sample(output_dir: str, t: int, timepoint_raw, preds,
                   size: int = 256, device='cpu'):
-    utils.make_dir(save)
+    utils.make_dir(output_dir)
     # TODO: merge this function with output_pred
     # just by indexing on timepoint_raw
 
@@ -28,7 +28,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
     debug_idx = range(Z)
     iterable = zip(debug_idx, timepoint_raw[debug_idx], preds)
     for idx, z_slice, pred in iterable:
-        save_location = osp.join(save, f't-{t}_{idx}.jpg')
+        output_path = osp.join(output_dir, f't-{t}_{idx}.jpg')
         z_slice = np.int16(z_slice)
 
         boxes = pred['boxes']
@@ -38,7 +38,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
             figure = plt.figure()
             plt.imshow(z_slice)
             plt.title(f'Number of detections: {len(boxes)}')
-            utils.imsave(save_location, figure, size)
+            utils.imsave(output_path, figure, size)
             continue
 
         # consolidate masks into one array
@@ -67,7 +67,7 @@ def output_sample(save: str, t: int, timepoint_raw, preds,
         titles = ('Prediction', 'Ground Truth')
         grid = (1, 2)
         draw_output(images, titles, grid,
-                    save_location, compare=True)
+                    output_path, compare=True)
 
 
 def prepare_draw(image: torch.Tensor, pred: torch.Tensor):

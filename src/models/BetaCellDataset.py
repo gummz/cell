@@ -1,20 +1,16 @@
 from os import listdir
-import os
 from os.path import join
 import random
 
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from PIL import Image
 import src.data.constants as c
 from src.models.utils import transforms as T
-import skimage
 from src.models.utils.utils import collate_fn
 import src.data.utils.utils as utils
 from torch.utils.data import DataLoader
-from torchvision.transforms import functional as F
 
 conn = c.NUMBER_CONNECTIVITY
 algo = c.CV2_CONNECTED_ALGORITHM
@@ -51,11 +47,14 @@ class BetaCellDataset(torch.utils.data.Dataset):
         # load all image files, sorting them to
         # ensure that they are aligned
         imgs = sorted([image for image in listdir(
-            join(root, mode, c.IMG_DIR)) if '.png' in image])
+            join(root, mode, c.IMG_DIR))
+            if '.png' in image and 'orig' not in image])
         masks = sorted([mask for mask in listdir(
-            join(root, mode, c.MASK_DIR)) if '.png' in mask])
+            join(root, mode, c.MASK_DIR))
+            if '.png' in mask and 'orig' not in mask])
         masks_full = sorted([mask for mask in listdir(
-            join(root, mode, c.MASK_DIR_FULL)) if '.png' in mask])
+            join(root, mode, c.MASK_DIR_FULL))
+            if '.png' in mask and 'orig' not in mask])
 
         # if no automatic annotations are being used,
         # set the masks equal to each other
@@ -143,22 +142,17 @@ class BetaCellDataset(torch.utils.data.Dataset):
         img_path = join(self.root, self.mode,
                         c.IMG_DIR, self.imgs[idx])
 
-        if self.masks[idx] in self.masks_full:
+        if self.imgs[idx] in self.masks_full:
             mask_dir = c.MASK_DIR_FULL
         else:
             mask_dir = c.MASK_DIR
         mask_path = join(self.root, self.mode,
-                         mask_dir, self.masks[idx])
+                         mask_dir, self.imgs[idx])
 
-        img = np.int16(plt.imread(img_path)[:, :, 0])
+        img = np.uint8(Image.open(img_path).convert('L'))
 
-        mask = plt.imread(mask_path)[:, :, 0]
-        mask = np.array(mask)
-
-        print(img.shape, mask.shape)
-        print(np.unique(img), np.unique(mask))
-        
-        exit()
+        mask = Image.open(mask_path).convert('L')
+        mask = np.uint8(np.where(np.array(mask) > 50, 255, 0))
 
         if self.resize not in (1024, False):
             size = (self.resize, self.resize)

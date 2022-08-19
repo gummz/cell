@@ -4,7 +4,6 @@ import pickle
 import os.path as osp
 import cv2
 import numpy as np
-import skimage
 import src.data.constants as c
 import src.data.utils.utils as utils
 import src.models.utils.center_link as CL
@@ -80,8 +79,6 @@ def get_prediction(model, device, input, accept_range=(0.5, 1)):
     # select scores by idx
     pred['scores'] = pred['scores'][idx]
 
-    pred['masks'] = threshold_masks(pred['masks'])
-
     return pred
 
 
@@ -101,10 +98,10 @@ def threshold_masks(masks, threshold=0.8):
 
 def remove_boxes(bboxes, scores,
                  accept_range=(0.5, 1), nms_threshold=0.3):
-    if len(bboxes) == 0:
+    if not bboxes:
         return torch.tensor([], dtype=torch.int64)
 
-    # reject uncertain predictions
+    # select = reject uncertain predictions
     lower, upper = accept_range
     select = torch.logical_and(lower < scores, scores < upper)
     # bboxes = bboxes[select]
@@ -119,9 +116,6 @@ def remove_boxes(bboxes, scores,
 
     # remove bboxes both using idx and select
     idx = torch.logical_and(indices, select)
-    # print(scores)
-    # print(indices, select)
-    # exit()
 
     # #TODO: better: find clusters of bounding boxes, and run
     # NMS on them separately
@@ -168,9 +162,9 @@ def remove_boxes(bboxes, scores,
                 idx[i] = False
                 continue
 
+    # reject small bounding boxes
     for i, box in enumerate(bboxes[idx]):
         area = calc_bbox_area(box)
-        # reject small bounding boxes
         if area <= 4:
             idx[i] = False
 
@@ -185,6 +179,18 @@ def calc_bbox_area(box):
 
 
 def bbox_contained(box1, box2):
+    '''
+    Returns true if box1 is contained in box2.
+
+    Inputs:
+        box1: [x1, y1, x2, y2]
+        box2: [x1, y1, x2, y2]
+        x1 <= x2
+        y1 <= y2
+
+    Output:
+        bool
+    '''
     cond0 = box1[0] >= box2[0]
     cond1 = box1[1] >= box2[1]
     cond2 = box1[2] <= box2[2]
@@ -198,34 +204,99 @@ def bbox_contained(box1, box2):
 def predict(data: AICSImage,
             time_range: range, accept_range: tuple,
             device: torch.device,
-            model, save: str) -> list(tuple):
+            model, output_dir: str,
+            save_pred: bool = True,
+            load_pred: bool = False) -> list(tuple):
+    '''
+    Returns a list of CenterChains for each timepoint in time_range.
 
+    Inputs:
+        data: AICSImage - data to predict on
+        time_range: range - range of timepoints to predict on
+        device: torch.device - device to predict on
+        model: torch.nn.Module - model to predict with
+        output_dir: str - directory to save predictions to
+        save_pred: bool - whether to save predictions to disk
+
+    Output:
+        list(list(CenterChain)) - list of CenterChains
+            for each timepoint in time_range
+    '''
+
+    # TODO: save predictions to enable rapid dev iteration
+    # on local machine
     chains_tot = []
     for t in time_range:
-        timepoint_raw = utils.get_raw_array(
-            data, t=t).compute()
-
-        # prepare data for model, since we're not using
-        # BetaCellDataset class
-        timepoint = prepare_model_input(timepoint_raw, device)
-
-        preds = get_predictions(
-            model, device, timepoint, accept_range=accept_range)
-
-        # draw bounding boxes on slice for debugging
-        viz.output_sample(osp.join(save, 'debug'), t,
-                          timepoint_raw, preds, 1024, device)
-
-        # adjust slices from being model inputs to being
-        # inputs to get_chains
-        timepoint = [z_slice.squeeze() for z_slice in timepoint]
-        # get center and intensity of all cells in timepoint
-        chains = CL.get_chains(timepoint, preds, c.SEARCHRANGE)
+        chains = predict_timepoint(data, device, model, output_dir,
+                                   save_pred, load_pred, t)
         chains_tot.append(chains)
 
-        del timepoint_raw
-
     return chains_tot
+
+
+def predict_timepoint(data, device, model, output_dir,
+                      save_pred, load_pred, t):
+    timepoint_raw = utils.get_raw_array(
+        data, t=t).compute()
+
+    # prepare data for model, since we're not using
+    # BetaCellDataset class
+    timepoint = prepare_model_input(timepoint_raw, device)
+
+    preds = handle_predictions(device, model, output_dir,
+                               save_pred, load_pred, t, timepoint)
+
+    # draw bounding boxes on slice for debugging
+    viz.output_sample(osp.join(output_dir, 'debug'), t,
+                      timepoint_raw, preds, 1024, device)
+
+    # adjust slices from being model inputs to being
+    # inputs to get_chains
+    timepoint = [z_slice.squeeze() for z_slice in timepoint]
+    # get center and intensity of all cells in timepoint
+    chains = CL.get_chains(timepoint, preds, c.SEARCHRANGE)
+
+    return chains
+
+
+def handle_predictions(device, model, output_dir, save_pred,
+                       load_pred, t, timepoint):
+    '''
+    Returns predictions for timepoint.
+    Supports loading predictions from disk, and saving predictions to disk.
+
+    Inputs:
+        device: torch.device - device to predict on
+        model: torch.nn.Module - model to predict with
+        output_dir: str - directory to save predictions to
+        save_pred: bool - whether to save predictions to disk
+        load_pred: bool - whether to load predictions from disk
+        t: int - timepoint to predict on
+        timepoint: list(torch.Tensor) - list of tensors to predict on
+
+    Output:
+        list(torch.Tensor) - list of predictions for timepoint
+
+    '''
+    if load_pred:
+        # load predictions from disk
+        preds = pickle.load(
+            open(osp.osp.join(output_dir, f'preds_{t}.pkl'), 'rb'))
+    else:
+        preds = get_predictions(
+            model, device, timepoint, accept_range=(0.85, 1))
+        # save predictions to file
+        if save_pred:
+            save_predictions(preds, output_dir, t)
+    return preds
+
+
+def save_predictions(preds, output_dir, t):
+    '''
+    Saves predictions to file.
+    '''
+    with open(osp.osp.join(output_dir, f'predictions_t{t}.pkl'), 'wb') as f:
+        pickle.dump(preds, f)
 
 
 def prepare_model_input(timepoint, device):
@@ -304,7 +375,8 @@ def save_tracks(name, save, time_start, time_end,
     pickle.dump(tracked_centroids,
                 open(osp.join(save, 'tracked_centroids.pkl'), 'wb'))
 
-    tracked_centroids.to_csv(osp.join(save, 'tracked_centroids.csv'), sep=';')
+    tracked_centroids.to_csv(osp.osp.join(
+        save, 'tracked_centroids.csv'), sep=';')
 
     location = osp.join(save, 'timepoints')
     plot.save_figures(tracked_centroids, location)
@@ -341,8 +413,8 @@ if __name__ == '__main__':
     for i, name in enumerate(files):
         print('Predicting file', name,
               f'(file {i + 1}/{len_files})...', end='')
-        save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
-                        experiment_name, name)
+        save = osp.osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                            experiment_name, name)
         utils.make_dir(save)
         predict_file(load, device,
                      model, save, name,
