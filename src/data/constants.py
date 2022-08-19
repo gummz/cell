@@ -116,6 +116,7 @@ TIMEPOINTS_TEST = [280, 289]
 
 # absolute project path
 PROJECT_DIR = '~/cell/'
+HPC_PROJECT = '/zhome/e2/e/154260/cell/'
 
 # To be used within the src/[subfolder] directories
 DATA_DIR = '/work3/s203004/data/interim/'
