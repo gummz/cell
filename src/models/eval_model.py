@@ -262,15 +262,19 @@ if __name__ == '__main__':
     tic = time()
     utils.set_cwd(__file__)
     device = utils.set_device()
+
     gpu = device.type == 'cuda'
     n_img_select = 1 if gpu else 5
+
     save = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR, 'eval',
                     'seg_2d', f'model_{model_id}', mode)
     print('Outputting images to', save)
 
     model = utils.get_model(model_id, device)
     model = model.to(device)
-    dataset = bcd.get_dataset(mode, n_img_select)
+    data_dir = c.DATA_DIR if osp.exists(c.DATA_DIR) else c.PROJECT_DATA_DIR
+    root = osp.join(data_dir, c.DB_VERS_DIR, c.DB_VERSION, mode)
+    dataset = bcd.get_dataset(root, mode, n_img_select=n_img_select)
 
     metrics = eval_model(model, dataset, mode, device, save,
                          accept_range=(0.91, 1), match_threshold=0.3)
