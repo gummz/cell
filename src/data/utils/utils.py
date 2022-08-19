@@ -3,11 +3,13 @@ import inspect
 import os
 from os import makedirs, mkdir, listdir
 import os.path as osp
+import imageio
 import numpy as np
 import pandas as pd
 import src.data.constants as c
 from aicsimageio import AICSImage
 import pickle
+from PIL import Image
 import torch
 import matplotlib.pyplot as plt
 import matplotlib as mplt
@@ -40,7 +42,8 @@ def add_ext(files):
     if osp.exists(c.RAW_DATA_DIR):
         raw_files = listdir(c.RAW_DATA_DIR)
     else:
-        raw_files = pd.read_csv(osp.join(c.PROJECT_DATA_DIR, 'raw', 'raw_files.csv'))['file'].values
+        raw_files = pd.read_csv(osp.join(c.PROJECT_DATA_DIR, 'raw', 'raw_files.csv'))[
+            'file'].values
     temp_files = []
     if not isinstance(files, str):
         for file in files:  # `files` is ArrayLike
@@ -140,6 +143,9 @@ def get_model(time_str: str, device: torch.device, ):
 
     folder = osp.join(c.PROJECT_DIR, 'src', 'models',
                       'interim', f'run_{time_str}')
+    if not osp.exists(folder):
+        folder = osp.join(c.HPC_PROJECT, 'src', 'models',
+                          'interim', f'run_{time_str}')
 
     # Load model
     load_path = osp.join(folder, f'model_{time_str}.pkl')
@@ -225,7 +231,7 @@ def imsave(path, img, resize=512, cmap=None):
     dirs = os.path.dirname(path)
     make_dir(dirs)
 
-    if path[-4:] not in ('.png', '.jpg'):
+    if osp.splitext(path)[1] not in ('.png', '.jpg'):
         path += '.jpg'
 
     if type(img) == mplt.figure.Figure:
@@ -250,6 +256,8 @@ def imsave(path, img, resize=512, cmap=None):
 
 
 def make_dir(path):
+    if not path:
+        return
     dirs = os.path.dirname(path)
     if len(dirs) > 1:  # more than one directory
         makedirs(path, exist_ok=True)
@@ -270,6 +278,30 @@ def normalize(image, alpha, beta, out, device=None):
                             if device else torch.device('cpu'))
 
     return cv2.normalize(image, None, alpha=alpha, beta=beta, norm_type=cv2.NORM_MINMAX, dtype=out)
+
+
+def png_to_movie(time_range, location):
+    '''Saves a movie from a list of images.
+    Saves the movie in the specified location,
+    where it is assumed the images are (in `location`).
+    '''
+    make_dir(osp.dirname(location))
+    # append each image to the movie frames list
+    movie_frames = []
+    iterable = sorted(os.listdir(location))
+    time_range = time_range if time_range else range(len(iterable))
+    for image in iterable:
+        name, ext = osp.splitext(image)
+        image_path = osp.join(location, image)
+        if ext == '.png' and int(name) in time_range:
+            movie_frames.append(Image.open(image_path))
+
+    raw_data_name, _ = osp.splitext(osp.basename(
+        osp.dirname(osp.dirname(location))))
+    start, stop = time_range[0], time_range[-1]
+    movie_name = f'{raw_data_name}_movie_t{start}-{stop}.mp4'
+    save_loc = osp.join(location, movie_name)
+    imageio.mimsave(save_loc, movie_frames, fps=1)
 
 
 def record_dict(t, slice_idx):
