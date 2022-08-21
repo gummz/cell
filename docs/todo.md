@@ -1,8 +1,8 @@
-- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
+- Combine Kasra's results with mine and analyze
 
-- Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
-
-- Annotate 200 images with the optimal parameters, including validation set (with the samples)
+- Re-sample train dataset, where you don't use Active Slices sampling   
+  - Finish labeling based on adaptive histogram eq.
+  -  Annotate 200 images with the optimal parameters, including validation set (with the samples)
     - Finish validation set
     - Upload to DTU
 
@@ -11,7 +11,6 @@
     - One in which the input is the preprocessed (adaptive hist -> bilateral) input
         - Take mean of equalized and raw image
 
-
 - Compare with previous results
     - Compare when model input is vanilla (bilateral) input
     - Compare when model input is preprocessed (adaptive hist -> bilateral) input
@@ -19,7 +18,16 @@
 
 - If model is significantly better, annotate 400 more images
 
-- Combine Kasra's results with mine and analyze
+- Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
+  - Construct evaluation version of tracked_centroids from their labels
+  - Match true positives (scipy optimization)
+  - Starting with the first instance of a predicted identity that is a true positive, calculate associative score (once per trajectory)
+
+  
+- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
+
+
+
 
 - Reg R-RCNN
 
@@ -32,11 +40,7 @@
     - Maybe the files have different noise levels?
     - Need to thoroughly understand how the method works
 
-- In the empty space in the subplot in eval_track, add the unprocessed MIP of the beta cell channel.
-
 - Change annotate_from_json so that no intermediate files or folders are created
-
-- Use MIPs, so xy, xz, yz? (x, y, z are the three axes). For training and prediction.
 
 - LabelMe already outputs segmentations that are colored by identity. So just use that to assign identities.
 
@@ -71,6 +75,16 @@
 - - -
 
 *Done*
+
+- Rename eval_track.py and .sh to output_tracks.py and .sh (and change script name inside .sh)
+
+- Extract coordinates
+
+- Set up local debugging
+  - json and pkl files locally
+  - Make it so that `center_link.py` can be iteratively tested rapidly by saving the prediction results to disk
+
+- Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
 
 - slice_to_mip_movie script to show 5 timepoints before and 5 timepoints after
 
