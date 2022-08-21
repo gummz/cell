@@ -19,6 +19,7 @@ if __name__ == '__main__':
     # -- excluding the ones already there.
     # modes = ('train', 'val', 'test')
     modes = ('train', 'val', 'test')
+    selected_mode = 'train'
     sample_ratios = (0.1,)*3
     db_version = 'hist_eq'
 
@@ -51,12 +52,12 @@ if __name__ == '__main__':
                   if image not in already_sampled]
 
         k = int(len(images) * sample_ratio)  # - len(already_sampled)
-        # if k <= 0:
-        #     print((f'With the chosen ratio,'
-        #            f' no more images can be sampled from {mode}'
-        #            f' dataset as there are'
-        #            f' already more than enough sampled images.'))
-        #     continue
+        if k <= 0:
+            print((f'With the chosen ratio,'
+                   f' no more images can be sampled from {mode}'
+                   f' dataset as there are'
+                   f' already more than enough sampled images.'))
+            continue
 
         record_path = osp.join(root_dir, c.DB_VERS_DIR, c.VANILLA_VERSION,
                                mode, c.IMG_DIR, 'slice_record.csv')
@@ -65,7 +66,7 @@ if __name__ == '__main__':
 
         sampled_imgs = sorted(random.sample(images, k=k))
 
-        if mode != 'val':
+        if mode != selected_mode:
             continue
 
         raw_file_path = ''
