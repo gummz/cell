@@ -1,4 +1,8 @@
-- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
+- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment. Also, try things out quickly in the console
+
+- Save randomly generated results for re-use, so I don't have to worry about something going wrong so they can't be reproduced
+    - Save results in current working directory
+    - Check if results already exist, only run if they don't
 
 - Re-draw the same images from the raw dataset so that no automatic annotations are present in the dataset
 
@@ -10,7 +14,6 @@
     - One in which the input is vanilla input
     - One in which the input is the preprocessed (adaptive hist -> bilateral) input
         - Take mean of equalized and raw image
-
 
 - Compare with previous results
     - Compare when model input is vanilla (bilateral) input
