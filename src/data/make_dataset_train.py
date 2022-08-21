@@ -1,6 +1,6 @@
 import os
 from os import listdir
-from os.path import join, splitext
+import os.path as osp
 from time import time
 from PIL import Image
 import numpy as np
@@ -11,6 +11,7 @@ import pandas as pd
 from aicsimageio import AICSImage
 
 mode = 'train'
+db_version = 'vanilla'
 random.seed(40)
 utils.set_cwd(__file__)
 
@@ -20,12 +21,13 @@ files = c.RAW_FILES[mode].keys()
 temp_files = utils.add_ext(files)
 files = temp_files
 
-file_paths = [join(raw_data_dir, file) for file in files]
+file_paths = [osp.join(raw_data_dir, file) for file in files]
 cell_ch = c.CELL_CHANNEL
 
 # Create `IMG_DIR` folder, in case it doesn't exist
 # f'../data/interim/{folder_name}'
-folder = join(c.DATA_DIR, mode, c.IMG_DIR)
+folder = osp.join(c.DATA_DIR, 'db_versions', db_version,
+                  mode, c.IMG_DIR)
 utils.make_dir(folder)
 
 # Get files in imgs folder - need to know what's in there so
@@ -42,7 +44,7 @@ idx = img_idx if img_idx > 0 else 0  # numbering for images
 debug_every = c.DBG_EVERY
 
 tic = time()
-n_timepoints = 80
+n_timepoints = 30
 n_slices = 5
 idx = 0
 # To store which timepoints and slices
@@ -61,7 +63,7 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         Z = dims['Z']
 
     # What timepoints it's ok to use, according to excel sheet
-    time_ok = c.RAW_FILES[mode][splitext(file)[0]]
+    time_ok = c.RAW_FILES[mode][osp.splitext(file)[0]]
     time_ok = T if time_ok is None else time_ok[1]
     # We can't sample more timepoints (n_timepoints)
     # than there are timepoints which are ok to use
@@ -76,20 +78,20 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
         timepoint = data.get_image_dask_data(
             'ZXY', T=t, C=cell_ch).compute()
 
-        slice_idx = utils.active_slices(timepoint)
+        slice_idx = random.sample(range(Z), n_slices)
         record = utils.record_dict(t, slice_idx)
         indices.append(record)
 
         timepoint_sliced = timepoint[slice_idx]
         for i, z_slice in enumerate(timepoint_sliced):
             name = f'{idx:05d}'
-            save = os.path.join(folder, name)
+            output_dir = osp.join(folder, name)
 
-            np.save(save, z_slice)
+            np.save(output_dir, z_slice)
             if idx % debug_every == 0:
-                dirs = os.path.dirname(save)
-                filename = os.path.basename(save)
-                image = Image.fromarray(z_slice)
+                dirs = osp.dirname(output_dir)
+                filename = osp.basename(output_dir)
+                image = np.array(Image.fromarray(z_slice))
                 utils.imsave(f'{dirs}/_{filename}.jpg', image, 512)
 
             slice_record.append((name, file, t, slice_idx[i]))
@@ -98,16 +100,17 @@ for j, (file, file_path) in enumerate(zip(files, file_paths)):
     file_indices[file] = indices
 
 # Record keeping over which indices were randomly selected
-save = join(c.DATA_DIR, mode, c.IMG_DIR)
+output_dir = folder
 
-# np.savetxt(join(save, 'index_record_np.csv', file_indices))
+# np.savetxt(osp.join(save, 'index_record_np.csv', file_indices))
 
 index_record = pd.DataFrame(file_indices, columns=list(file_indices.keys()))
-index_record.to_csv(join(save, 'index_record.csv'), sep=';')
+index_record.to_csv(osp.join(output_dir, 'index_record.csv'), sep=';')
 
 slices_record = pd.DataFrame(slice_record, columns=[
                              'name', 'file', 'timepoint', 'slice'])
-slices_record.to_csv(join(save, 'slice_record.csv'), sep='\t', index=False)
+slices_record.to_csv(
+    osp.join(output_dir, 'slice_record.csv'), sep='\t', index=False)
 
 toc = time()
 print(f'make_dataset_train.py complete after {(toc-tic)/60: .1f} minutes.')
