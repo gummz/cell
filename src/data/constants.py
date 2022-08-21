@@ -11,6 +11,8 @@ def canny_filter(img, threshold1, threshold2, aperture_size, L2_gradient):
     return img_canny
 
 
+BIGFIG_OFFSET = (300, 560)
+
 # ACTIVE SLICES RATIO
 ACTIVE_SLICES_RATIO = 0.025
 
@@ -121,6 +123,7 @@ HPC_PROJECT = '/zhome/e2/e/154260/cell/'
 # To be used within the src/[subfolder] directories
 DATA_DIR = '/work3/s203004/data/interim/'
 PROJECT_DATA_DIR = '../../data/interim/'
+PROJECT_DATA_DIR_FULL = '/home/gummz/cell/data/interim/'
 EXPERIMENT_DIR = '../experiments/'
 
 DB_VERS_DIR = 'db_versions'
