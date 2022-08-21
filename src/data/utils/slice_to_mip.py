@@ -91,7 +91,7 @@ def mip_to_movie(raw_data, time_range, output_path):
 
 if __name__ == '__main__':
     db_version = 'hist_eq'
-    mode = 'val'
+    mode = 'train'
     resize = False
 
     # which:
