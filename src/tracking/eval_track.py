@@ -41,30 +41,14 @@ def get_timepoints(png_files, cell_images):
 
 
 def get_pr_trajs(pred_dir_path, timepoints, groupby='particle'):
-    time_range = range(min(timepoints), max(timepoints) + 2)
+    time_range = range(min(timepoints), max(timepoints) + 1)
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
     tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
-    tc_filter = tracked_centroids[tracked_centroids['frame'].isin(time_range)]
-    return tc_filter.groupby(groupby)
-
-
-def get_groundtruth(json_found, json_file):
-    if json_found:  # ground truth is available
-        json_data = json.load(open(json_file, 'rb'))
-        gt_labels = pd.DataFrame(json_data['shapes'])[['points', 'label']]
-        gt_labels['x'] = gt_labels['points'].apply(
-            lambda x: x[0][0])
-        gt_labels['y'] = gt_labels['points'].apply(
-            lambda x: x[0][1])
-        gt_labels['particle'] = gt_labels['label']
-        gt_labels = gt_labels[['x', 'y', 'particle']]
-    else:  # no json files, so empty ground truth
-        # in the case where there were no beta cells
-        # on the image
-        gt_labels = pd.DataFrame(
-            {'x': [], 'y': [], 'particle': []})
-
-    return gt_labels
+    if timepoints:
+        tc_filter = tracked_centroids[tracked_centroids['frame'].isin(time_range)]
+    else:
+        tc_filter = tracked_centroids
+    return tc_filter.groupby(groupby) if groupby else tc_filter
 
 
 def get_gt_trajs(json_files, cell_images):
@@ -83,32 +67,27 @@ def get_gt_trajs(json_files, cell_images):
     return df_json.groupby('particle')
 
 
-def compute_distance_matrix(pred_labels, gt_labels):
-    distance_matrix = np.zeros((len(pred_labels), len(gt_labels)))
-    for i, pred_label in enumerate(pred_labels.iterrows()):
-        for j, gt_label in enumerate(gt_labels.iterrows()):
-            coord_gt = gt_label[1][['x', 'y']]
-            coord_pred = pred_label[1][['x', 'y']]
-            distance_matrix[i, j] = np.linalg.norm(
-                coord_pred - coord_gt)
-
-    return distance_matrix
-
-
 def compute_traj_matrix(frames, pr_trajs, gt_trajs, threshold=50):
     '''
     Compute similarity between predicted and ground truth trajectories
     '''
     columns = ['frame', 'x', 'y']
-    traj_matrix = np.zeros((len(pr_trajs.groups), len(gt_trajs.groups)))
+    traj_score_matrix = np.zeros((len(pr_trajs), len(gt_trajs)))
+    traj_matrix = pd.DataFrame(index=range(len(pr_trajs.groups)),
+                               columns=range(len(gt_trajs.groups)),
+                               dtype=object)
     for i, pr_label in enumerate(pr_trajs.groups):
         pr_traj = pr_trajs.get_group(pr_label)[columns]
         for j, gt_label in enumerate(gt_trajs.groups):
+
             gt_traj = gt_trajs.get_group(gt_label)[columns]
-            traj_matrix[i, j] = compute_similarity(
+            similarity, arrays = compute_similarity(
                 frames, pr_traj, gt_traj, threshold)
 
-    return traj_matrix
+            traj_score_matrix[i, j] = similarity
+            traj_matrix.iloc[i, j] = arrays
+
+    return traj_score_matrix, traj_matrix
 
 
 def compute_similarity(frames, pr_traj, gt_traj, threshold):
@@ -116,36 +95,40 @@ def compute_similarity(frames, pr_traj, gt_traj, threshold):
     Compute similarity between predicted and ground truth trajectories
     '''
     args = (frames, pr_traj, gt_traj, threshold)
-    fp = get_traj_fp(*args)
-    fn = get_traj_fn(*args)
-    tp = get_traj_tp(*args)
+    tp_idx = get_traj_tp(*args)
+    # fn_idx = get_traj_fn(*args)
+    fp_idx = get_traj_fp(*args)
+    tp = np.sum(tp_idx)
+    # fn = np.sum(fn_idx)
+    fp = np.sum(fp_idx)
     similarity = tp / (tp + fn + fp)
-    return similarity
+    return similarity, np.array((tp_idx, fn_idx, fp_idx))
 
 
 def get_traj_fp(frames, pr_traj, gt_traj, threshold):
     in_gt = pr_traj['frame'].isin(gt_traj['frame'])
     in_pr = gt_traj['frame'].isin(pr_traj['frame'])
-    fp = np.sum(~in_gt)
     coord = ['x', 'y']
 
     pr_in_gt = pr_traj[in_gt][coord].values
     gt_in_pr = gt_traj[in_pr][coord].values
     norms = np.linalg.norm(pr_in_gt - gt_in_pr, axis=1)
     exceed_threshold = norms > threshold
-    fp += np.sum(exceed_threshold)
 
-    exceed_idx = np.zeros((len(frames), 2))
+    exceed_idx = np.zeros((len(frames), 2), dtype=np.int32)
     exceed_idx[:, 0] = frames
-    pr_frames = pr_traj[in_gt]['frame'].values
-    gt_frames = gt_traj[in_pr]['frame'].values
-    intersect = np.intersect1d(pr_frames, gt_frames,
-                               assume_unique=True,
-                               return_indices=True)
-    exceed_idx[(exceed_idx[:, 0] == intersect), 1] = exceed_threshold
-    fp_idx = np.logical_and(exceed_idx[~in_gt], exceed_idx)
+    # TODO: ~in_gt is wrong
+    # it will raise an error when number of frames in pred 
+    # is less than the total number of frames
+    gt_idx = np.zeros(len(frames))
+    gt_idx[~in_gt] = 1
+    pr_frames = pr_traj['frame'].values
+    gt_frames = gt_traj['frame'].values
+    intersect = np.intersect1d(pr_frames, gt_frames)
+    exceed_idx[exceed_idx[:, 0].isin(intersect), 1] = exceed_threshold
+    fp_idx = np.logical_or(exceed_idx[:, 1], gt_idx)
 
-    return fp, fp_idx
+    return fp_idx
 
 
 def get_traj_fn(frames, pr_traj, gt_traj, threshold):
@@ -154,26 +137,34 @@ def get_traj_fn(frames, pr_traj, gt_traj, threshold):
     the threshold, then it is counted as a false positive,
     not a false negative.
     '''
-    in_pr = gt_traj['frame'].isin(pr_traj['frame'])
-    fn = np.sum(~in_pr)
-    fn_idx = np.zeros(frames)
+    in_pr = np.in1d(gt_traj['frame'], pr_traj['frame'])
 
-    return fn, fn_idx
+    in_both = np.intersect1d(pr_traj['frame'], gt_traj['frame'])
+    idx = np.zeros((len(frames), 2), dtype=np.int32)
+    idx[:, 0] = frames
+    fn_idx = np.zeros(len(frames))
+    fn_idx[~in_pr] = 1
+
+    return fn_idx
 
 
 def get_traj_tp(frames, pr_traj, gt_traj, threshold):
     in_gt = pr_traj['frame'].isin(gt_traj['frame'])
     in_pr = gt_traj['frame'].isin(pr_traj['frame'])
-    tp = 0
     coord = ['x', 'y']
     pr_in_gt = pr_traj[in_gt][coord].values
     gt_in_pr = gt_traj[in_pr][coord].values
     norms = np.linalg.norm(pr_in_gt - gt_in_pr, axis=1)
     within_threshold = norms <= threshold
-    tp += np.sum(within_threshold)
-    tp_idx = in_gt & in_pr & ()
 
-    return tp
+    within_idx = np.zeros((len(frames), 2), dtype=np.int32)
+    within_idx[:, 0] = frames
+    pr_frames = pr_traj[in_gt]['frame'].values
+    gt_frames = gt_traj[in_pr]['frame'].values
+    intersect = np.intersect1d(pr_frames, gt_frames)
+    within_idx[np.in1d(within_idx[:, 0], intersect), 1] = within_threshold
+    tp_idx = within_idx[:, 1]
+    return tp_idx
 
 
 def match_trajs(frames, pr_trajs, gt_trajs, threshold=80):
@@ -182,22 +173,24 @@ def match_trajs(frames, pr_trajs, gt_trajs, threshold=80):
     ground truth trajectories (GtTraj)
 
     '''
-    traj_matrix = compute_traj_matrix(frames, pr_trajs, gt_trajs, threshold)
+    traj_score_matrix, traj_matrix = compute_traj_matrix(
+        frames, pr_trajs, gt_trajs, threshold)
 
     # linear sum assignment problem
-    row_ind, col_ind = sciopt.linear_sum_assignment(traj_matrix)
+    row_ind, col_ind = sciopt.linear_sum_assignment(traj_score_matrix)
 
     return row_ind, col_ind, traj_matrix
 
 
-def compute_score(row_ind, col_ind, traj_matrix,
-                  pr_trajs, gt_trajs):
+def compute_score(row_ind, col_ind, traj_matrix, gt_trajs):
     '''
     Compute HOTA score.
     '''
     for i, j in zip(row_ind, col_ind):
-        pr_traj = pr_trajs.get_group(i)
+        tp, fn, fp = traj_matrix.iloc[i, j]
         gt_traj = gt_trajs.get_group(j)
+        # calculate associative scores
+        pass
 
     score = np.sum(traj_matrix[row_ind, col_ind])
 
@@ -212,6 +205,22 @@ def find_png_files(gt_dir_path):
         if png_files and json_files:
             break
     return png_files
+
+
+def find_files(gt_dir_path):
+    json_files, cell_images = find_json_files(gt_dir_path)
+    png_files = find_png_files(gt_dir_path)
+    return json_files, cell_images, png_files
+
+
+def evaluate(pred_dir_path, json_files, cell_images, timepoints):
+    pred_trajs = get_pr_trajs(pred_dir_path, timepoints)
+    gt_trajs = get_gt_trajs(json_files if json_files else None,
+                            cell_images)
+    row_ind, col_ind, traj_matrix = match_trajs(
+        timepoints, pred_trajs, gt_trajs, 80)
+    score = compute_score(row_ind, col_ind, traj_matrix, gt_trajs)
+    return score
 
 
 if __name__ == '__main__':
@@ -229,18 +238,11 @@ if __name__ == '__main__':
         gt_dir_path = osp.join(groundtruth_path, gt_dir)
         pred_dir_path = osp.join(pred_path, gt_dir)
 
-        # find json files
-        json_files, cell_images = find_json_files(gt_dir_path)
-        png_files = find_png_files(gt_dir_path)
+        # find json and png files
+        json_files, cell_images, png_files = find_files(gt_dir_path)
 
         timepoints = get_timepoints(png_files, cell_images)
 
-        pred_trajs = get_pr_trajs(pred_dir_path, timepoints)
-        gt_trajs = get_gt_trajs(json_files if json_files else None,
-                                cell_images)
-        row_ind, col_ind, traj_mat = match_trajs(
-            timepoints, pred_trajs, gt_trajs, 80)
-        matches = (row_ind, col_ind)
-        score = compute_score(matches, traj_mat, pred_trajs, gt_trajs)
+        score = evaluate(pred_dir_path, json_files, cell_images, timepoints)
 
         score_tot[gt_dir] = score
