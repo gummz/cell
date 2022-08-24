@@ -4,12 +4,6 @@
     - Save results in current working directory
     - Check if results already exist, only run if they don't
 
-- Re-sample train dataset, where you don't use Active Slices sampling   
-  - Finish labeling based on adaptive histogram eq.
-  -  Annotate 200 images with the optimal parameters, including validation set (with the samples)
-    - Finish validation set
-    - Upload to DTU
-
 - Train a model on the images
     - One in which the input is vanilla input
     - One in which the input is the preprocessed (adaptive hist -> bilateral) input
@@ -21,17 +15,8 @@
     - Just run eval_track, 1 batch, for each combination (there are four combinations in total)
 
 - If model is significantly better, annotate 400 more images
-
-- Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
-  - Construct evaluation version of tracked_centroids from their labels
-  - Match true positives (scipy optimization)
-  - Starting with the first instance of a predicted identity that is a true positive, calculate associative score (once per trajectory)
-
   
 - Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
-
-
-
 
 - Reg R-RCNN
 
@@ -79,6 +64,11 @@
 - - -
 
 *Done*
+
+- Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
+  - Construct evaluation version of tracked_centroids from their labels
+  - Match true positives (scipy optimization)
+  - Starting with the first instance of a predicted identity that is a true positive, calculate associative score (once per trajectory)
 
 - Rename eval_track.py and .sh to output_tracks.py and .sh (and change script name inside .sh)
 
