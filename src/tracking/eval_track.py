@@ -289,21 +289,26 @@ def compute_DetA(pred_frames, gt_frames, threshold):
     fn_tot = 0
     fp_tot = 0
     coord = ['x', 'y']
-    for pred_frame, gt_frame in zip(pred_frames, gt_frames):
-        dist_matrix = compute_dist_matrix(
-            pred_frame[1][coord], gt_frame[1][coord])
-        row_ind, col_ind = sciopt.linear_sum_assignment(dist_matrix)
-        matrix_thresh = np.where(dist_matrix[row_ind, col_ind] < threshold,
-                                 1, 0)
-        tp_tot += np.sum(matrix_thresh == 1)
+    if pred_frames and gt_frames:
+        for pred_frame, gt_frame in zip(pred_frames, gt_frames):
+            dist_matrix = compute_dist_matrix(
+                pred_frame[1][coord], gt_frame[1][coord])
+            row_ind, col_ind = sciopt.linear_sum_assignment(dist_matrix)
+            matrix_thresh = np.where(dist_matrix[row_ind, col_ind] < threshold,
+                                     1, 0)
+            tp_tot += np.sum(matrix_thresh == 1)
 
-        fn_tot += dist_matrix.shape[1] - len(col_ind)
-        fn_tot += np.sum(matrix_thresh == 0)
+            fn_tot += dist_matrix.shape[1] - len(col_ind)
+            fn_tot += np.sum(matrix_thresh == 0)
 
-        fp_tot += dist_matrix.shape[0] - len(row_ind)
-        fp_tot += np.sum(matrix_thresh == 0)
+            fp_tot += dist_matrix.shape[0] - len(row_ind)
+            fp_tot += np.sum(matrix_thresh == 0)
 
-    DetA = 1 / (tp_tot + fn_tot + fp_tot)
+        DetA = 1 / (tp_tot + fn_tot + fp_tot)
+    elif not pred_frames and gt_frames:
+        DetA = 1 / len(gt_frames)
+    elif pred_frames and not gt_frames:
+        DetA = 1 / len(pred_frames)
 
     return DetA
 
