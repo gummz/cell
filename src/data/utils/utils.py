@@ -174,10 +174,6 @@ def get_raw_array(data, t=None, z=None,
     as `input`.
     '''
 
-    if t is None and z is None:
-        raise ValueError(
-            'Either time, slice dimension, or both must be specified.')
-
     if isinstance(data, str):  # `data` is path to file, not file itself
         if os.path.exists(data) and os.path.isfile(data):
             raw_data = AICSImage(data)
@@ -210,6 +206,10 @@ def get_raw_array(data, t=None, z=None,
     elif t is not None and z is not None:
         data = raw_data.get_image_dask_data(
             order, T=t, Z=z, C=ch)
+
+    elif t is None and z is None:
+        data = raw_data.get_image_dask_data(
+            order, C=ch)
 
     return data
 
