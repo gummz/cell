@@ -16,4 +16,15 @@ Correlate loops with beta cells
 
 Loops have unique pixel intensities in each 3D image.
 
-How to find center:
+**Task**: Determine if a beta cell inside a loop.
+- For each cell B:
+  - For each slice S of B:
+    - For each loop L:
+        - Is 
+
+- For each cell B:
+  - Find outer contour of B
+  - Find if contour intersects area inside of a loop
+
+**Questions for Pia and Silja**
+- What amount of intersection is required for the cell to be considered to be inside the loop?
