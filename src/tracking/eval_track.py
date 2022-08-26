@@ -82,8 +82,7 @@ def evaluate(pred_dir_path, json_files, cell_images,
     return score
 
 
-def get_pr_trajs(pred_dir_path, timepoints, groupby='particle'):
-    time_range = range(min(timepoints), max(timepoints) + 1)
+def get_pr_trajs(pred_dir_path, timepoints=None, groupby='particle'):
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
     tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
     if timepoints:
