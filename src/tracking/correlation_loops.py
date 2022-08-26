@@ -28,7 +28,7 @@ def get_loop_files(loops_path, pred_dirs, draft_file,
     return loop_files
 
 
-def loops_terse(frames, loops):
+def matrix_to_terse(frames, loops):
     '''
     Condense loops into a terse representation.
     '''
@@ -65,7 +65,7 @@ def get_loops(loop_path, frames, save=False, load=False):
         loops = np.moveaxis(loop_file.get_image_dask_data('CZYXS'), 1, 0)
         columns = ['timepoint', 'loop_id', 'x', 'y', 'z']
         # condense loops into terse representation
-        loops = pd.DataFrame(loops_terse(frames, loops), columns=columns)
+        loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
 
         if save:
             orig_name = osp.splitext(osp.basename(loop_path))[0]
