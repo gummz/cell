@@ -1,41 +1,48 @@
-- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment. Also, try things out quickly in the console
+*To-do list - primary items*
+
+- Review mean pixel intensity calculation
+
+- Make code that compares loops and cells
+  - Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
 
 - Save randomly generated results for re-use, so I don't have to worry about something going wrong so they can't be reproduced
     - Save results in current working directory
     - Check if results already exist, only run if they don't
 
-- Re-sample train dataset, where you don't use Active Slices sampling   
-  - Finish labeling based on adaptive histogram eq.
-  -  Annotate 200 images with the optimal parameters, including validation set (with the samples)
-    - Finish validation set
-    - Upload to DTU
+- Adaptive histogram equalization
+  - Train a model on the images
+      - One in which the input is vanilla input
+      - One in which the input is the preprocessed (adaptive hist -> bilateral) input
+          - Take mean of equalized and raw image
 
-- Train a model on the images
-    - One in which the input is vanilla input
-    - One in which the input is the preprocessed (adaptive hist -> bilateral) input
-        - Take mean of equalized and raw image
+  - Compare with previous results
+      - Compare when model input is vanilla (bilateral) input
+      - Compare when model input is preprocessed (adaptive hist -> bilateral) input
+      - Just run eval_track, 1 batch, for each combination (there are four combinations in total)
 
-- Compare with previous results
-    - Compare when model input is vanilla (bilateral) input
-    - Compare when model input is preprocessed (adaptive hist -> bilateral) input
-    - Just run eval_track, 1 batch, for each combination (there are four combinations in total)
-
-- If model is significantly better, annotate 400 more images
-
-- Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
-  - Construct evaluation version of tracked_centroids from their labels
-  - Match true positives (scipy optimization)
-  - Starting with the first instance of a predicted identity that is a true positive, calculate associative score (once per trajectory)
-
+  - If model is significantly better, annotate 400 more images
   
 - Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
 
+- 3D segmentations
+    - use for tracking (size, shape, etc.)
+    - could even use a custom algorithm for detecting cell based on object shape
 
+- Kasra segmentations - since cells are only inside tubes, use tube segmentations to mark areas for prediction?
 
+- - -
+
+*Secondary items*
+
+- Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment. Also, try things out quickly in the console
 
 - Reg R-RCNN
 
-- Dimension reduction methods
+- Create `make` commands for json, train, test, etc.
+
+- Logging, multithread/multiprocessing, learn tensorboard better
+
+- Packages for 3D visualization
 
 - Pixel intensity histograms of all files
     - Compare those for which the equalization works well with those for which it doesn't work as well
@@ -58,20 +65,6 @@
     - Or Silja's method of gradients
     - Investigate cell intensity, why is it so low?
 
-- 3D segmentations
-    - use for tracking (size, shape, etc.)
-    - could even use a custom algorithm for detecting cell based on object shape
-
-- Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
-
-- Create `make` commands for json, train, test, etc.
-
-- Logging, multithread/multiprocessing, learn tensorboard better
-
-- Packages for 3D visualization
-
-- Kasra segmentations
-
 - Make contribution to aicsimageio: warn user when a datafile from the same path has been created multiple times
 
 - Submit bug report to AICSImageIO GitHub regarding memory leakage
@@ -79,6 +72,11 @@
 - - -
 
 *Done*
+
+- Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
+  - Construct evaluation version of tracked_centroids from their labels
+  - Match true positives (scipy optimization)
+  - Starting with the first instance of a predicted identity that is a true positive, calculate associative score (once per trajectory)
 
 - Rename eval_track.py and .sh to output_tracks.py and .sh (and change script name inside .sh)
 
