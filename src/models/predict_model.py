@@ -332,7 +332,8 @@ def prepare_model_input(timepoint, device):
 
 
 def predict_file(load, device, model,
-                 output_dir, name, time_range=None, accept_range=(0, 1)):
+                 output_dir, name, time_range=None, accept_range=(0, 1),
+                 save_pred=True, load_pred=False):
 
     if load:  # use old (saved) predictions
         centroids = pickle.load(
@@ -347,7 +348,8 @@ def predict_file(load, device, model,
             time_range = range(time_start, time_end)
 
         centroids = predict(data, time_range, accept_range,
-                            device, model, output_dir)
+                            device, model, output_dir,
+                            save_pred, load_pred)
         try:
             data.close()
             print(f'File {name} closed successfully.')
@@ -372,7 +374,8 @@ def save_tracks(name, output_dir, time_start, time_end,
         osp.join(output_dir, 'centroids_save.pkl'), 'wb'))
 
     np.savetxt(
-        osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'), centroids_np)
+        osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'),
+        centroids_np)
 
     pickle.dump(tracked_centroids,
                 open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
@@ -391,6 +394,8 @@ if __name__ == '__main__':
     experiment_name = 'pred_1'
     accept_range = (0.91, 1)
     model_id = c.MODEL_STR
+    save_pred = True
+    load_pred = False
 
     utils.set_cwd(__file__)
     # Running on CUDA?
@@ -420,7 +425,8 @@ if __name__ == '__main__':
         utils.make_dir(output_dir)
         predict_file(load, device,
                      model, output_dir, name,
-                     time_range, accept_range)
+                     time_range, accept_range,
+                     save_pred, load_pred)
         print('done.')
         # break
 
