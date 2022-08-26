@@ -29,6 +29,8 @@ Loops have unique pixel intensities in each 3D image.
   - Get outer contour of B
   - Approximate loop by sampling from its coordinates
   - Find if contour intersects plane inside of a loop
+    - If, for some loop, we cannot find two opposing coordinates in the loop for which at least one of the cell coordinates are not between them, then the cell is probably inside that loop.
+      - If the cell is between two opposing coordinates, then, if we take the difference between loop coords 1 and cell coords, and then loop coords 2 and cell coords, then the sign of these two differences is going to be different.
 
 **Debug locally** by using available tif file (made sparse on HPC)
     - 
