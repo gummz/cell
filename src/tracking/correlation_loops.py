@@ -6,24 +6,41 @@ import os
 import src.tracking.eval_track as evtr
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+import src.data.utils.utils as utils
+
+
+def set_paths(experiment_name):
+    if osp.exists(c.RAW_DATA_DIR):  # on DTU HPC cluster
+        root_dir = c.RAW_DATA_DIR
+        pred_path = osp.join(c.PROJECT_DATA_DIR, 'pred', experiment_name)
+        loops_path = osp.join(root_dir, 'results')
+    else:  # on local machine
+        root_dir = c.PROJECT_DATA_DIR
+        pred_path = osp.join(root_dir, 'pred', experiment_name)
+        loops_path = osp.join(root_dir, 'loops')
+    return pred_path, loops_path
 
 
 def get_loop_files(loops_path, pred_dirs, draft_file,
                    filter_prefix, file_ext):
     pred_dirs_noext = [osp.splitext(file)[0]
                        for file in pred_dirs]
-    loop_dirs = sorted(osp.join(loops_path, file)
-                       for file in os.listdir(loops_path))
+
     loop_files = {}
-    for loop_dir in loop_dirs:
+    for folders, subfolders, files in os.walk(loops_path):
         # only fetch tif files for which there exist
         # corresponding predictions
-        loop_dir_base = osp.basename(loop_dir)
-        if loop_dir_base in pred_dirs_noext and loop_dir_base == draft_file:
-            loop_file = [file for file in os.listdir(loop_dir)
-                         if filter_prefix in file
-                         and file.endswith(file_ext)][0]
-            loop_files[loop_dir_base] = osp.join(loop_dir, loop_file)
+        dir_folders = [folder for folder in subfolders
+                       if 'LI' in folder]
+        for folder in dir_folders:
+            if (folder in pred_dirs_noext
+                    and folder == draft_file):
+                loop_file = [file
+                             for file in os.listdir(osp.join(folders, folder))
+                             if filter_prefix in file
+                             and file.endswith(file_ext)][0]
+                loop_files[folder] = osp.join(folders, folder, loop_file)
 
     return loop_files
 
@@ -33,10 +50,9 @@ def matrix_to_terse(frames, loops):
     Condense loops into a terse representation.
     '''
     loops_terse = []
-    loops_slice = []
-    for frame in frames:
+    for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_slice = []
-        for j, z_slice in enumerate(loops[frame]):
+        for j, z_slice in tqdm(enumerate(loops[frame]), desc='Z-slice'):
             unique = np.unique(z_slice.compute())[1:]
             if any(unique):
                 loop_idx = np.argwhere(
@@ -58,7 +74,9 @@ def matrix_to_terse(frames, loops):
 
 def get_loops(loop_path, frames, save=False, load=False):
     if load:
-        return pd.read_csv(osp.join(loop_path, 'loops.csv'))
+        fr_min, fr_max = min(frames), max(frames)
+        csv_name = f'loops_t{fr_min}-{fr_max}.csv'
+        return pd.read_csv(osp.join(osp.dirname(loop_path), csv_name))
     else:
         loop_file = AICSImage(loop_path)
         # get raw loops
@@ -68,14 +86,77 @@ def get_loops(loop_path, frames, save=False, load=False):
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
 
         if save:
-            orig_name = osp.splitext(osp.basename(loop_path))[0]
-            fr_min, fr_max = min(frames), max(frames)
-            name = f'{orig_name}_t{fr_min}-{fr_max}.csv'
-            loops.to_csv(osp.join(osp.dirname(loop_path), name))
+            loops_to_disk(loop_path, frames, loops)
     return loops
 
 
-def loop_analysis(loops):
+def loops_to_disk(loop_path, frames, loops):
+    orig_name = osp.splitext(osp.basename(loop_path))[0]
+    fr_min, fr_max = min(frames), max(frames)
+    name = f'{orig_name}_t{fr_min}-{fr_max}.csv'
+    loops.astype(int).to_csv(osp.join(osp.dirname(loop_path), name),
+                             index=False)
+
+
+def loop_analysis(frames, pr_trajs, loops):
+    return inside_loop(frames, pr_trajs, loops)
+
+
+def inside_loop(frames, pr_trajs, loops):
+    '''
+    Determine if a particle is inside a loop.
+
+    Input
+    ----------
+    pr_trajs : pandas.DataFrame
+        Particle trajectories.
+    loops : pandas.DataFrame
+        Loops.
+
+    Output
+    ----------
+    np.ndarray
+    '''
+    dist_loop = np.zeros((len(pr_trajs), 2))
+    excluded_p = []  # particles found inside a previous loop are excluded
+    # iterate over all loops
+    for loop in loops.groupby([['timepoint', 'loop_id']]):
+        for row in pr_trajs.groupby('frame').iterrows():
+            particle = row[['x', 'y', 'z', 'particle']]
+            # find if particle is inside loop
+            if particle not in excluded_p and p_in_loop(particle, loop):
+                dist_loop[i] = True, dist_to_loop(particle, loop)
+                excluded_p.append(particle.particle)
+            else:
+                dist_loop[i] = False, dist_to_loop(particle,
+                                                   nearest_loop(particle, loops))
+    return dist_loop
+
+
+def p_in_loop(row, loop):
+    pass
+
+
+def dist_to_loop(row, loop):
+    '''
+    Calculates the distance to a loop.
+    Loop can be indexed to select a subset of
+    the loop's coordinates.
+    '''
+    pass
+
+
+def nearest_loop(row, loops):
+    '''
+    Find the nearest loop to a particle.
+
+    Algorithm:
+    1. Sample one coordinate from all loops.
+    2. Keep the four loops with the smallest
+        distance to the sample.
+    3. Take many coordinate samples and return the loop
+        with the smallest distance to the particle.
+    '''
     pass
 
 
@@ -83,22 +164,24 @@ if __name__ == '__main__':
     mode = 'test'
     experiment_name = 'pred_1'
     draft_file = 'LI_2019-02-05_emb5_pos4'
+    save_loops = False  # save condensed loops to disk
+    load_loops = True  # load condensed loops from disk
+    # redundant to save loaded loops to disk
+    save_loops = False if load_loops else save_loops
 
+    np.random.seed(42)
+    utils.set_cwd(__file__)
     filter_prefix = 'cyctpy15'
     file_ext = 'tif'
     tic = time()
-    root_dir = c.DATA_DIR if osp.exists(
-        c.DATA_DIR) else c.PROJECT_DATA_DIR_FULL
+    pred_path, loops_path = set_paths(experiment_name)
 
-    pred_path = osp.join(root_dir, 'pred', experiment_name)
     pred_dirs = sorted(os.listdir(pred_path))
-
-    loops_path = osp.join(root_dir, 'loops', 'test')
     loop_files = get_loop_files(loops_path, pred_dirs, draft_file,
                                 filter_prefix, file_ext)
 
     results_tot = {}
-    for pred_dir in pred_dirs:
+    for pred_dir in tqdm(pred_dirs, desc='Prediction'):
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
@@ -108,10 +191,15 @@ if __name__ == '__main__':
             time_range = range(half_tp, half_tp + 10 + 1)
 
             loop_path = loop_files[osp.splitext(pred_dir)[0]]
-            loops = get_loops(loop_path, frames, save=True)
+            loops = get_loops(loop_path, frames,
+                              save=save_loops, load=load_loops)
 
-            results = loop_analysis(loops)
-            results_tot[pred_dir] = results
+            pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
+                                                               pr_trajs, loops)
+
+            csv_path = osp.join(pred_path, pred_dir,
+                                'tracked_centroids_loops.csv')
+            pr_trajs.to_csv(csv_path, index=False)
 
     # I can include segmentations in the dataframe that trackpy
     # receives as input
