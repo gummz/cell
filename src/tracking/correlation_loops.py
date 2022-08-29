@@ -120,20 +120,36 @@ def inside_loop(frames, pr_trajs, loops):
     dist_loop = np.zeros((len(pr_trajs), 2))
     excluded_p = []  # particles found inside a previous loop are excluded
     # iterate over all loops
-    for loop in loops.groupby([['timepoint', 'loop_id']]):
-        for row in pr_trajs.groupby('frame').iterrows():
+    tp_tmp = np.inf  # keep track of when current timepoint changes
+    for (tp, _), loop in loops.groupby(['timepoint', 'loop_id']):
+        # only filter trajectories if timepoint changes
+        if tp > tp_tmp or tp_tmp == np.inf:
+            trajs_frame = pr_trajs[pr_trajs.frame == tp]
+            tp_tmp = tp
+        for _, row in trajs_frame.iterrows():
             particle = row[['x', 'y', 'z', 'particle']]
+
+            # find particle's index in pr_trajs
+            # (for accurate assignment to dist_loop)
+            eq_tp = pr_trajs.frame == tp
+            eq_p = pr_trajs.particle == particle.particle
+            p_select = int(pr_trajs.index[eq_tp & eq_p].values)
+
             # find if particle is inside loop
-            if particle not in excluded_p and p_in_loop(particle, loop):
-                dist_loop[i] = True, dist_to_loop(particle, loop)
+            if (particle.particle not in excluded_p
+                    and p_in_loop(particle, loop)):
+
+                dist_loop[p_select] = True, dist_to_loop(particle, loop)
                 excluded_p.append(particle.particle)
             else:
-                dist_loop[i] = False, dist_to_loop(particle,
-                                                   nearest_loop(particle, loops))
+                dist_loop[p_select] = False, dist_to_loop(particle,
+                                                          nearest_loop(particle, loops))
     return dist_loop
 
 
 def p_in_loop(row, loop):
+    # sample, interpolate, and calculate intersection
+    # of interpolated line segment with particle
     pass
 
 
@@ -203,3 +219,4 @@ if __name__ == '__main__':
 
     # I can include segmentations in the dataframe that trackpy
     # receives as input
+    # It can also be terse like loops.csv
