@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
-from scipy import ndimage
 from scipy.spatial import Delaunay
 
 '''
@@ -77,16 +76,22 @@ def matrix_to_terse(frames, loops):
             if any(unique):
                 # loop_idx = np.argwhere(
                 #     z_slice == unique[:, None, None, None])[:, :3].compute()
-                argwhere = np.nonzero(z_slice.compute())
-                loop_id = z_slice.compute()[argwhere]
+                z_slice_comp = z_slice.compute()
+                nonzero = np.nonzero(z_slice_comp)
+                loop_id = z_slice_comp[nonzero]
                 # for val1, val2 in zip(np.unique(loop_idx[:, 0]), unique):
                 #     loop_idx[loop_idx[:, 0] == val1, 0] = val2
 
                 loop_final = np.zeros((len(loop_id), 5), dtype=np.float32)
                 loop_final[:, 0] = frame
                 loop_final[:, 1] = loop_id
-                loop_final[:, 2:4] = np.row_stack(argwhere[:2]).T
+                loop_final[:, 2:4] = np.row_stack(nonzero[:2]).T
                 loop_final[:, 4] = j
+
+                argwhere_raw = np.argwhere(z_slice_comp).shape[0]
+                argwhere_final = loop_final.shape[0]
+                assert argwhere_raw == argwhere_final, \
+                    f'{argwhere_raw} != {argwhere_final}'
 
                 loops_slice.append(loop_final)
 
@@ -95,11 +100,12 @@ def matrix_to_terse(frames, loops):
     return np.row_stack(loops_terse)
 
 
-def get_loops(loop_path, frames, save=False, load=False):
+def get_loops(loop_path, frames, load=True):
     if load:
         fr_min, fr_max = min(frames), max(frames)
         csv_name = f'loops_t{fr_min}-{fr_max}.csv'
-        return pd.read_csv(osp.join(osp.dirname(loop_path), csv_name))
+        loops = pd.read_csv(osp.join(osp.dirname(loop_path), csv_name))
+        return loops
     else:
         loop_file = AICSImage(loop_path)
         # get raw loops
@@ -107,10 +113,7 @@ def get_loops(loop_path, frames, save=False, load=False):
         columns = ['timepoint', 'loop_id', 'x', 'y', 'z']
         # condense loops into terse representation
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
-
-        if save:
-            loops_to_disk(loop_path, frames, loops)
-    return loops
+        return loops
 
 
 def loops_to_disk(loop_path, frames, loops):
@@ -222,7 +225,7 @@ if __name__ == '__main__':
     mode = 'test'
     experiment_name = 'pred_1'
     draft_file = 'LI_2019-02-05_emb5_pos4'
-    save_loops = False  # save condensed loops to disk
+    save_loops = True  # save condensed loops to disk
     load_loops = False  # load condensed loops from disk
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
@@ -243,14 +246,16 @@ if __name__ == '__main__':
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')]
+            frames = [item[0] for item in pr_trajs.groupby('frame')][:3]
             n_timepoints = len(frames)
             half_tp = n_timepoints // 2
             time_range = range(half_tp, half_tp + 10 + 1)
 
             loop_path = loop_files[osp.splitext(pred_dir)[0]]
-            loops = get_loops(loop_path, frames,
-                              save=save_loops, load=load_loops)
+            loops = get_loops(loop_path, frames, load_loops)
+            if save_loops:
+                utils.mkdir(pred_dir_path)
+                loops_to_disk(pred_dir_path, frames, loops)
 
             # enable comparison between cells and loop interiors
             # by filling in each loop;
@@ -260,7 +265,7 @@ if __name__ == '__main__':
             # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
             #                                                    pr_trajs, loops)
 
-            csv_path = osp.join(pred_path, pred_dir,
+            csv_path = osp.join(pred_dir_path,
                                 'tracked_centroids_loops.csv')
             pr_trajs.to_csv(csv_path, index=False)
 
