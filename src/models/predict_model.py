@@ -243,7 +243,7 @@ def predict_timepoint(data, device, model, output_dir,
     # BetaCellDataset class
     timepoint = prepare_model_input(timepoint_raw, device)
 
-    preds = handle_predictions(device, model, output_dir,
+    preds = handle_predictions(device, model, osp.join(output_dir, 'raw_pred'),
                                save_pred, load_pred, t, timepoint,
                                accept_range=accept_range)
 
@@ -283,7 +283,7 @@ def handle_predictions(device, model, output_dir, save_pred,
     if load_pred:
         # load predictions from disk
         preds = pickle.load(
-            open(osp.osp.join(output_dir, f'preds_{t}.pkl'), 'rb'))
+            open(osp.join(output_dir, f'preds_{t}.pkl'), 'rb'))
     else:
         preds = get_predictions(
             model, device, timepoint, accept_range=accept_range)
@@ -297,7 +297,7 @@ def save_predictions(preds, output_dir, t):
     '''
     Saves predictions to file.
     '''
-    with open(osp.osp.join(output_dir, f'predictions_t{t}.pkl'), 'wb') as f:
+    with open(osp.join(output_dir, f'predictions_t{t}.pkl'), 'wb') as f:
         pickle.dump(preds, f)
 
 
@@ -380,7 +380,7 @@ def save_tracks(name, output_dir, time_start, time_end,
     pickle.dump(tracked_centroids,
                 open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
 
-    tracked_centroids.to_csv(osp.osp.join(
+    tracked_centroids.to_csv(osp.join(
         output_dir, 'tracked_centroids.csv'), sep=';')
 
     location = osp.join(output_dir, 'timepoints')
@@ -391,7 +391,7 @@ def save_tracks(name, output_dir, time_start, time_end,
 if __name__ == '__main__':
     mode = 'val'
     load = False
-    experiment_name = 'pred_1'
+    experiment_name = 'pred_2'
     accept_range = (0.91, 1)
     model_id = c.MODEL_STR
     save_pred = True
@@ -420,7 +420,7 @@ if __name__ == '__main__':
     for i, name in enumerate(files):
         print('Predicting file', name,
               f'(file {i + 1}/{len_files})...', end='')
-        output_dir = osp.osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+        output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
                                   experiment_name, name)
         utils.make_dir(output_dir)
         predict_file(load, device,
