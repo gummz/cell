@@ -4,12 +4,13 @@ import math
 
 class CenterLink():
 
-    def __init__(self, center: tuple, intensity: float):
+    def __init__(self, center: tuple, intensity: float, mask: np.ndarray):
         self.chain = None
         self.next = None
         self.prev = None
         self.center = center
         self.intensity = intensity
+        self.mask = mask
 
     def __sub__(self, other):
         x, y, _ = self.get_center()
@@ -46,6 +47,9 @@ class CenterLink():
 
     def get_intensity(self):
         return self.intensity
+
+    def get_mask(self):
+        return self.mask
 
 
 class CenterChain():
@@ -85,6 +89,8 @@ class CenterChain():
                    for link in links]
         intensities = [link.get_intensity()
                        for link in links]
+        masks = [link.get_mask()
+                 for link in links]
 
         center_mean = np.round(np.mean(centers, axis=0), 2)
         intensity = np.round(np.mean(intensities, axis=0), 10)
@@ -118,6 +124,7 @@ class CenterChain():
             link.chain = self
         self.intensity = intensity
         self.links = links
+        self.masks = masks
 
     def __len__(self):
         return len(self.links)
@@ -274,18 +281,11 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
             region = z_slice[mask_nonzero].detach().cpu()
 
             # Calculate average pixel intensity
-            # TODO: average intensity: take only pixels above
-            # a certain threshold
             intensity = np.mean(region.numpy())
-            # if intensity == np.nan or math.isnan(intensity):
-            #     print('\n\n\nintensity nan')
-            #     print('region shape', region.shape)
-            #     print('unique region', np.unique(region, return_counts=True))
-            #     print('masknonzero shape', mask_nonzero.shape)
-            #     print('masknonzero unique', np.unique(
-            #         mask_nonzero.cpu(), return_counts=True))
+            if intensity == np.nan or math.isnan(intensity):
+                pass
 
-            center_link = CenterLink(center, intensity)
+            center_link = CenterLink(center, intensity, mask_nonzero)
             centers.append(center_link)
 
         centers_tot.append(centers)
