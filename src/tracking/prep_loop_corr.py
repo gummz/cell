@@ -8,6 +8,25 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
+from scipy import ndimage
+from scipy.spatial import Delaunay
+
+'''
+This script:
+1. Loads the loops from disk.
+2. Computes a terse representation of the loops.
+    - Saves to disk.
+    - Option to save or load terse representation from disk.
+3. Fills in loops so that a direct, pixel-by-pixel comparison
+    between cells and loops can be made (i.e. cell == loop)
+4. Adds a column to trajectory (pr_trajs) file that indicates
+    whether a cell is in a loop or not.    
+    - Saves modified version to disk.
+5. Performs intensity analysis on cell trajectories and determines
+    whether a cell has turned on at a given timepoint or not.
+    - Adds a column to trajectory (pr_trajs) file that indicates
+    whether a cell is on or off at a given timepoint.
+'''
 
 
 def set_paths(experiment_name):
@@ -49,6 +68,7 @@ def matrix_to_terse(frames, loops):
     '''
     Condense loops into a terse representation.
     '''
+
     loops_terse = []
     for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_slice = []
@@ -56,7 +76,7 @@ def matrix_to_terse(frames, loops):
             unique = np.unique(z_slice.compute())[1:]
             if any(unique):
                 loop_idx = np.argwhere(
-                    np.max(z_slice.compute(), axis=2) == unique[:, None, None])
+                    z_slice == unique[:, None, None, None])[:, :3].compute()
                 for val1, val2 in zip(np.unique(loop_idx[:, 0]), unique):
                     loop_idx[loop_idx[:, 0] == val1, 0] = val2
 
@@ -147,6 +167,25 @@ def inside_loop(frames, pr_trajs, loops):
     return dist_loop
 
 
+def fill_loops(loops):
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
+    # ^ right approach
+    interp = []
+    for (tp, _), loop in loops:
+        interp_loop = interpolate_3d(loop)
+        interp.append(interp_loop)
+    return pd.DataFrame(np.row_stack(interp), columns=loops.columns)
+
+
+def interpolate_3d(loop):
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
+    # ndimage.binary_fill_holes(loop[['x', 'y', 'z']])
+    # .find_simplex(loop[['x', 'y', 'z']])
+    loop[['x', 'y', 'z']] = Delaunay(loop[['x', 'y', 'z']])
+
+    return loop
+
+
 def p_in_loop(row, loop):
     # sample, interpolate, and calculate intersection
     # of interpolated line segment with particle
@@ -180,8 +219,8 @@ if __name__ == '__main__':
     mode = 'test'
     experiment_name = 'pred_1'
     draft_file = 'LI_2019-02-05_emb5_pos4'
-    save_loops = False  # save condensed loops to disk
-    load_loops = True  # load condensed loops from disk
+    save_loops = True  # save condensed loops to disk
+    load_loops = False  # load condensed loops from disk
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
 
@@ -201,7 +240,7 @@ if __name__ == '__main__':
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')]
+            frames = [item[0] for item in pr_trajs.groupby('frame')][100:102]
             n_timepoints = len(frames)
             half_tp = n_timepoints // 2
             time_range = range(half_tp, half_tp + 10 + 1)
@@ -210,8 +249,13 @@ if __name__ == '__main__':
             loops = get_loops(loop_path, frames,
                               save=save_loops, load=load_loops)
 
-            pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
-                                                               pr_trajs, loops)
+            # enable comparison between cells and loop interiors
+            # by filling in each loop;
+            # so we can see if cell is inside loop with a simple 'cell == loop'
+            # loops = fill_loops(loops.groupby(['timepoint', 'loop_id']))
+
+            # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
+            #                                                    pr_trajs, loops)
 
             csv_path = osp.join(pred_path, pred_dir,
                                 'tracked_centroids_loops.csv')
