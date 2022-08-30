@@ -72,11 +72,13 @@ def matrix_to_terse(frames, loops):
     for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_slice = []
         for j, z_slice in tqdm(enumerate(loops[frame]), desc='Z-slice'):
-            unique = np.unique(z_slice.compute())[1:]
+            z_slice_comp = z_slice.compute()
+            unique, counts = np.unique(z_slice_comp, return_counts=True)
+            unique, counts = unique[1:], counts[1:]
             if any(unique):
                 # loop_idx = np.argwhere(
                 #     z_slice == unique[:, None, None, None])[:, :3].compute()
-                z_slice_comp = z_slice.compute()
+
                 nonzero = np.nonzero(z_slice_comp)
                 loop_id = z_slice_comp[nonzero]
                 # for val1, val2 in zip(np.unique(loop_idx[:, 0]), unique):
@@ -93,6 +95,13 @@ def matrix_to_terse(frames, loops):
                 assert argwhere_raw == argwhere_final, \
                     f'{argwhere_raw} != {argwhere_final}'
 
+                unique_final, unique_counts_final = np.unique(loop_final[:, 1],
+                                                              return_counts=True)
+                assert np.all(unique == unique_final), \
+                    f'{unique} != {unique_final}'
+                assert np.all(counts == unique_counts_final), \
+                    f'{counts} != {unique_counts_final}'
+
                 loops_slice.append(loop_final)
 
         loops_terse.append(np.row_stack(loops_slice))
@@ -100,13 +109,12 @@ def matrix_to_terse(frames, loops):
     return np.row_stack(loops_terse)
 
 
-def get_loops(loop_path, frames, load=True):
+def get_loops(loop_path, pred_path, frames, load=True):
     if load:
-        orig_name = osp.splitext(osp.basename(loop_path))[0]
+        raw_file = osp.splitext(osp.basename(pred_path))[0]
         fr_min, fr_max = min(frames), max(frames)
-        name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
-        loops = pd.read_csv(osp.join(osp.dirname(loop_path), name))
-        return loops
+        name = f'loops_{raw_file}_t{fr_min}-{fr_max}.csv'
+        loops = pd.read_csv(osp.join(osp.dirname(pred_path), raw_file, name))
     else:
         loop_file = AICSImage(loop_path)
         # get raw loops
@@ -114,7 +122,8 @@ def get_loops(loop_path, frames, load=True):
         columns = ['timepoint', 'loop_id', 'x', 'y', 'z']
         # condense loops into terse representation
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
-        return loops
+
+    return loops
 
 
 def loops_to_disk(loop_path, frames, loops):
@@ -188,9 +197,23 @@ def interpolate_3d(loop):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
     # ndimage.binary_fill_holes(loop[['x', 'y', 'z']])
     # .find_simplex(loop[['x', 'y', 'z']])
-    loop[['x', 'y', 'z']] = Delaunay(loop[['x', 'y', 'z']])
+    coord_cols = ['x', 'y', 'z']
+    exclude_coord = np.zeros((len(loop), 3))
+    first_coord, sec_coord = get_first_coords(loop, coord_cols)
+    exclude_coord[0] = first_coord
+    exclude_coord[1] = sec_coord
+    # loop[['x', 'y', 'z']] = Delaunay(loop[['x', 'y', 'z']])
 
     return loop
+
+
+def get_first_coords(loop, coord_cols):
+    coord_idx = np.random.choice(range(len(loop)))
+    first_coord = loop.iloc[coord_idx][coord_cols]
+    norms = np.argsort(np.linalg.norm(
+        loop[coord_cols] - first_coord, axis=1))
+    sec_coord = loop.iloc[norms[1]][coord_cols]
+    return first_coord, sec_coord
 
 
 def p_in_loop(row, loop):
@@ -226,8 +249,8 @@ if __name__ == '__main__':
     mode = 'test'
     experiment_name = 'pred_1'
     draft_file = 'LI_2019-02-05_emb5_pos4'
-    save_loops = True  # save condensed loops to disk
-    load_loops = False  # load condensed loops from disk
+    save_loops = False  # save condensed loops to disk
+    load_loops = True  # load condensed loops from disk
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
 
@@ -254,7 +277,7 @@ if __name__ == '__main__':
             time_range = range(half_tp, half_tp + 10 + 1)
 
             loop_path = loop_files[osp.splitext(pred_dir)[0]]
-            loops = get_loops(loop_path, frames, load_loops)
+            loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
             if save_loops:
                 utils.make_dir(pred_dir_path)
                 loops_to_disk(pred_dir_path, frames, loops)
@@ -262,7 +285,7 @@ if __name__ == '__main__':
             # enable comparison between cells and loop interiors
             # by filling in each loop;
             # so we can see if cell is inside loop with a simple 'cell == loop'
-            # loops = fill_loops(loops.groupby(['timepoint', 'loop_id']))
+            loops = fill_loops(loops.groupby(['timepoint', 'loop_id']))
 
             # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
             #                                                    pr_trajs, loops)
