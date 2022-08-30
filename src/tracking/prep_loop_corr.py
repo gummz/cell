@@ -237,16 +237,17 @@ if __name__ == '__main__':
     tic = time()
     pred_path, loops_path = set_paths(experiment_name)
 
-    pred_dirs = sorted(os.listdir(pred_path))
-    loop_files = get_loop_files(loops_path, pred_dirs, draft_file,
+    # can choose only predicted dirs, or all files in /raw_data/
+    select_dirs = sorted(os.listdir(pred_path))
+    loop_files = get_loop_files(loops_path, select_dirs, draft_file,
                                 filter_prefix, file_ext)
 
     results_tot = {}
-    for pred_dir in tqdm(pred_dirs, desc='Prediction'):
+    for pred_dir in tqdm(select_dirs, desc='Prediction'):
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')][:3]
+            frames = [item[0] for item in pr_trajs.groupby('frame')][0:1]
             n_timepoints = len(frames)
             half_tp = n_timepoints // 2
             time_range = range(half_tp, half_tp + 10 + 1)
@@ -254,7 +255,7 @@ if __name__ == '__main__':
             loop_path = loop_files[osp.splitext(pred_dir)[0]]
             loops = get_loops(loop_path, frames, load_loops)
             if save_loops:
-                utils.mkdir(pred_dir_path)
+                utils.make_dir(pred_dir_path)
                 loops_to_disk(pred_dir_path, frames, loops)
 
             # enable comparison between cells and loop interiors
