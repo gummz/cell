@@ -31,7 +31,7 @@ This script:
 
 def set_paths(experiment_name):
     if osp.exists(c.RAW_DATA_DIR):  # on DTU HPC cluster
-        root_dir = c.RAW_DATA_DIR
+        root_dir = osp.join(c.RAW_DATA_DIR, '..')
         pred_path = osp.join(c.PROJECT_DATA_DIR, 'pred', experiment_name)
         loops_path = osp.join(root_dir, 'results')
     else:  # on local machine
@@ -47,6 +47,7 @@ def get_loop_files(loops_path, pred_dirs, draft_file,
                        for file in pred_dirs]
 
     loop_files = {}
+
     for folders, subfolders, files in os.walk(loops_path):
         # only fetch tif files for which there exist
         # corresponding predictions
@@ -60,7 +61,6 @@ def get_loop_files(loops_path, pred_dirs, draft_file,
                              if filter_prefix in file
                              and file.endswith(file_ext)][0]
                 loop_files[folder] = osp.join(folders, folder, loop_file)
-
     return loop_files
 
 
@@ -240,7 +240,7 @@ if __name__ == '__main__':
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')][100:102]
+            frames = [item[0] for item in pr_trajs.groupby('frame')]
             n_timepoints = len(frames)
             half_tp = n_timepoints // 2
             time_range = range(half_tp, half_tp + 10 + 1)
