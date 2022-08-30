@@ -102,9 +102,10 @@ def matrix_to_terse(frames, loops):
 
 def get_loops(loop_path, frames, load=True):
     if load:
+        orig_name = osp.splitext(osp.basename(loop_path))[0]
         fr_min, fr_max = min(frames), max(frames)
-        csv_name = f'loops_t{fr_min}-{fr_max}.csv'
-        loops = pd.read_csv(osp.join(osp.dirname(loop_path), csv_name))
+        name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
+        loops = pd.read_csv(osp.join(osp.dirname(loop_path), name))
         return loops
     else:
         loop_file = AICSImage(loop_path)
@@ -119,7 +120,7 @@ def get_loops(loop_path, frames, load=True):
 def loops_to_disk(loop_path, frames, loops):
     orig_name = osp.splitext(osp.basename(loop_path))[0]
     fr_min, fr_max = min(frames), max(frames)
-    name = f'{orig_name}_t{fr_min}-{fr_max}.csv'
+    name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
     loops.astype(int).to_csv(osp.join(osp.dirname(loop_path), name),
                              index=False)
 
@@ -247,7 +248,7 @@ if __name__ == '__main__':
         if osp.splitext(pred_dir)[0] == draft_file:
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')][0:1]
+            frames = [item[0] for item in pr_trajs.groupby('frame')]
             n_timepoints = len(frames)
             half_tp = n_timepoints // 2
             time_range = range(half_tp, half_tp + 10 + 1)
