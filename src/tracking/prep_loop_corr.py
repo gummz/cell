@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
-from scipy.spatial import Delaunay
+import matplotlib.pyplot as plt
 
 '''
 This script:
@@ -186,34 +186,81 @@ def inside_loop(frames, pr_trajs, loops):
 def fill_loops(loops):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
     # ^ right approach
-    interp = []
+    filled = []
     for (tp, _), loop in loops:
-        interp_loop = interpolate_3d(loop)
-        interp.append(interp_loop)
-    return pd.DataFrame(np.row_stack(interp), columns=loops.columns)
+        filled_loop = fill_loop(loop)
+        filled.append(filled_loop)
+    return pd.DataFrame(np.row_stack(filled), columns=loops.columns)
 
 
-def interpolate_3d(loop):
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
-    # ndimage.binary_fill_holes(loop[['x', 'y', 'z']])
-    # .find_simplex(loop[['x', 'y', 'z']])
+def fill_loop(loop):
     coord_cols = ['x', 'y', 'z']
-    exclude_coord = np.zeros((len(loop), 3))
-    first_coord, sec_coord = get_first_coords(loop, coord_cols)
-    exclude_coord[0] = first_coord
-    exclude_coord[1] = sec_coord
-    # loop[['x', 'y', 'z']] = Delaunay(loop[['x', 'y', 'z']])
 
-    return loop
-
-
-def get_first_coords(loop, coord_cols):
     coord_idx = np.random.choice(range(len(loop)))
     first_coord = loop.iloc[coord_idx][coord_cols]
-    norms = np.argsort(np.linalg.norm(
-        loop[coord_cols] - first_coord, axis=1))
-    sec_coord = loop.iloc[norms[1]][coord_cols]
-    return first_coord, sec_coord
+    norms = np.linalg.norm(
+        loop[coord_cols] - first_coord, axis=1)
+    argnorms = np.argsort(norms)
+    sec_coord = loop.iloc[argnorms[1]][coord_cols]
+    first_set = loop.iloc[argnorms[2::2]]
+    sec_set = loop.iloc[argnorms[3::2]]
+    line_segments = get_line_segments(coord_cols, first_set, sec_set)
+    filled_loop = floodfill(line_segments)
+
+    return filled_loop
+
+
+def get_line_segments(coord_cols, first_set, sec_set):
+    len_first, len_sec = len(first_set), len(sec_set)
+    line_segments = np.zeros(
+        (max(len_first, len_sec), 10), dtype=np.int16)
+    line_segments[:len_first, :3] = first_set[coord_cols]
+    line_segments[:len_sec, 3:6] = sec_set[coord_cols]
+    line_segments[:, 6:9] = line_segments[:, 3:6] - line_segments[:, :3]
+    seg_norms = np.linalg.norm(line_segments[:, 6:9], axis=1)
+    line_segments[:, 9] = np.ceil(seg_norms)
+    return line_segments
+
+
+def floodfill(line_segments):
+    '''Performs the floodfill algorithm for a 3D system.'''
+    filled_loop = []
+    for coord in line_segments:
+        # if np.all(coord[4:6] == (422, 24)) and coord[9] == 5:
+        #     test = 0
+        coord_zero = np.all((coord[:3] == 0) | (coord[3:6] == 0))
+        if coord[9] == 1 or coord_zero:
+            continue
+        # size of increment needs to be such that we will fill
+        # all boxes along the way
+        increment = np.round(1 / coord[9], 4)
+        filled_seg = []
+        # fill in the first coordinate along the segment
+        fill = np.round(coord[:3] + increment * coord[6:9])
+        if np.any(fill != coord[3:6]):
+            filled_seg.append(fill)
+
+        mult = 1
+        # as long as we're not at the end of the segment
+        while np.any(fill != coord[3:6]):
+            filled_seg.append(fill)
+            fill = np.round(coord[:3] + increment * mult * coord[6:9])
+            # if mult * increment > 1:
+            #     test = 0
+            mult += 1
+
+        if filled_seg:
+            filled_loop.append(filled_seg)
+
+    filled_loop = np.row_stack(filled_loop)
+    filled_loop = np.int16(np.row_stack((line_segments[:, :3],
+                                         line_segments[:, 3:6],
+                                         filled_loop)))
+    img = np.zeros((1024, 1024))
+    img[filled_loop[:, 0], filled_loop[:, 1]] = 1
+    plt.imshow(img)
+    plt.savefig(f'debug_{coord[0]}_{coord[9]}.png')
+    return np.unique(filled_loop, axis=0)
 
 
 def p_in_loop(row, loop):
