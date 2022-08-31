@@ -19,7 +19,7 @@ This script:
 3. Fills in loops so that a direct, pixel-by-pixel comparison
     between cells and loops can be made (i.e. cell == loop)
 4. Adds a column to trajectory (pr_trajs) file that indicates
-    whether a cell is in a loop or not.    
+    whether a cell is in a loop or not.
     - Saves modified version to disk.
 5. Performs intensity analysis on cell trajectories and determines
     whether a cell has turned on at a given timepoint or not.
@@ -115,6 +115,7 @@ def get_loops(loop_path, pred_path, frames, load=True):
         fr_min, fr_max = min(frames), max(frames)
         name = f'loops_{raw_file}_t{fr_min}-{fr_max}.csv'
         loops = pd.read_csv(osp.join(osp.dirname(pred_path), raw_file, name))
+        loops = loops[loops.timepoint.isin(frames)]
     else:
         loop_file = AICSImage(loop_path)
         # get raw loops
@@ -126,12 +127,34 @@ def get_loops(loop_path, pred_path, frames, load=True):
     return loops
 
 
-def loops_to_disk(loop_path, frames, loops):
-    orig_name = osp.splitext(osp.basename(loop_path))[0]
-    fr_min, fr_max = min(frames), max(frames)
-    name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
-    loops.astype(int).to_csv(osp.join(osp.dirname(loop_path), name),
-                             index=False)
+def get_filled(loops, pred_path, frames, load=True):
+    if load:
+        raw_file = osp.splitext(osp.basename(pred_path))[0]
+        fr_min, fr_max = min(frames), max(frames)
+        name = f'{load}_{raw_file}_t{fr_min}-{fr_max}.csv'
+        filled = pd.read_csv(osp.join(osp.dirname(pred_path), raw_file, name))
+        filled = filled[filled.timepoint.isin(frames)]
+    else:
+        # enable comparison between cells and loop interiors
+        # by filling in each loop;
+        # so we can see if cell is inside loop with a simple 'cell == loop'
+        filled = fill_loops(loops.groupby(['timepoint', 'loop_id']))
+
+    return filled
+
+
+def terse_to_disk(save_path, frames, loops):
+    # orig_name = osp.splitext(osp.basename(loop_path))[0]
+    # fr_min, fr_max = min(frames), max(frames)
+    # name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
+    loops.astype(int).to_csv(save_path, index=False)
+
+
+def filled_to_disk(save_path, frames, filled):
+    # orig_name = osp.splitext(osp.basename(loop_path))[0]
+    # fr_min, fr_max = min(frames), max(frames)
+    # name = f'loops_filled_{orig_name}_t{fr_min}-{fr_max}.csv'
+    filled.astype(int).to_csv(save_path, index=False)
 
 
 def loop_analysis(frames, pr_trajs, loops):
@@ -187,10 +210,14 @@ def fill_loops(loops):
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.griddata.html#scipy.interpolate.griddata
     # ^ right approach
     filled = []
-    for (tp, _), loop in loops:
+    for (tp, _), loop in tqdm(loops, desc='Filling loops'):
         filled_loop = fill_loop(loop)
-        filled.append(filled_loop)
-    return pd.DataFrame(np.row_stack(filled), columns=loops.columns)
+        len_loop = len(filled_loop)
+        filled.append(np.column_stack(((tp,)*len_loop,
+                                      (loop.loop_id.iloc[0],)*len_loop,
+                                      filled_loop)))
+
+    return pd.DataFrame(np.row_stack(filled), columns=loops.obj.columns)
 
 
 def fill_loop(loop):
@@ -296,10 +323,15 @@ if __name__ == '__main__':
     mode = 'test'
     experiment_name = 'pred_1'
     draft_file = 'LI_2019-02-05_emb5_pos4'
+
     save_loops = False  # save condensed loops to disk
     load_loops = True  # load condensed loops from disk
+    save_filled = True  # save filled loops to disk
+    load_filled = False  # load filled loops from disk
+
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
+    save_filled = False if load_filled else save_filled
 
     np.random.seed(42)
     utils.set_cwd(__file__)
@@ -319,27 +351,34 @@ if __name__ == '__main__':
             pred_dir_path = osp.join(pred_path, pred_dir)
             pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
             frames = [item[0] for item in pr_trajs.groupby('frame')]
-            n_timepoints = len(frames)
-            half_tp = n_timepoints // 2
-            time_range = range(half_tp, half_tp + 10 + 1)
+            fr_min, fr_max = min(frames), max(frames)
 
+            name_loops = f'loops_{pred_dir}_t{fr_min}-{fr_max}.csv'
+            name_filled = f'loops_filled_{pred_dir}_t{fr_min}-{fr_max}.csv'
+            saved_path_loops = osp.join(pred_dir_path, name_loops)
+            saved_path_fill = osp.join(pred_dir_path, name_filled)
+            # check for existing loops and filled loops
+            if osp.exists(saved_path_loops) and osp.exists(saved_path_fill):
+                continue
+
+            # get loop boundaries
             loop_path = loop_files[osp.splitext(pred_dir)[0]]
             loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
             if save_loops:
                 utils.make_dir(pred_dir_path)
-                loops_to_disk(pred_dir_path, frames, loops)
+                terse_to_disk(saved_path_loops, frames, loops)
 
-            # enable comparison between cells and loop interiors
-            # by filling in each loop;
-            # so we can see if cell is inside loop with a simple 'cell == loop'
-            loops = fill_loops(loops.groupby(['timepoint', 'loop_id']))
+            # get filled loops
+            filled = get_filled(loops, pred_dir_path, frames, load_filled)
+            if save_filled:
+                filled_to_disk(saved_path_fill, frames, loops)
 
             # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
-            #                                                    pr_trajs, loops)
+            #                                                    pr_trajs, filled)
 
-            csv_path = osp.join(pred_dir_path,
-                                'tracked_centroids_loops.csv')
-            pr_trajs.to_csv(csv_path, index=False)
+            # csv_path = osp.join(pred_dir_path,
+            #                     'tracked_centroids_loops.csv')
+            # pr_trajs.to_csv(csv_path, index=False)
 
     # I can include segmentations in the dataframe that trackpy
     # receives as input
