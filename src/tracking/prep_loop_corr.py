@@ -10,6 +10,7 @@ from tqdm import tqdm
 import src.data.utils.utils as utils
 import matplotlib.pyplot as plt
 
+
 '''
 This script:
 1. Loads the loops from disk.
@@ -76,15 +77,10 @@ def matrix_to_terse(frames, loops):
             unique, counts = np.unique(z_slice_comp, return_counts=True)
             unique, counts = unique[1:], counts[1:]
             if any(unique):
-                # loop_idx = np.argwhere(
-                #     z_slice == unique[:, None, None, None])[:, :3].compute()
-
                 nonzero = np.nonzero(z_slice_comp)
                 loop_id = z_slice_comp[nonzero]
-                # for val1, val2 in zip(np.unique(loop_idx[:, 0]), unique):
-                #     loop_idx[loop_idx[:, 0] == val1, 0] = val2
 
-                loop_final = np.zeros((len(loop_id), 5), dtype=np.float32)
+                loop_final = np.zeros((len(loop_id), 5), dtype=np.int16)
                 loop_final[:, 0] = frame
                 loop_final[:, 1] = loop_id
                 loop_final[:, 2:4] = np.row_stack(nonzero[:2]).T
@@ -127,11 +123,11 @@ def get_loops(loop_path, pred_path, frames, load=True):
     return loops
 
 
-def get_filled(loops, pred_path, frames, load=True):
+def get_filled(pred_path, frames, loops=None, load=True):
     if load:
         raw_file = osp.splitext(osp.basename(pred_path))[0]
         fr_min, fr_max = min(frames), max(frames)
-        name = f'{load}_{raw_file}_t{fr_min}-{fr_max}.csv'
+        name = f'loops_filled_{raw_file}_t{fr_min}-{fr_max}.csv'
         filled = pd.read_csv(osp.join(osp.dirname(pred_path), raw_file, name))
         filled = filled[filled.timepoint.isin(frames)]
     else:
@@ -163,7 +159,7 @@ def loop_analysis(frames, pr_trajs, loops):
 
 def inside_loop(frames, pr_trajs, loops):
     '''
-    Determine if a particle is inside a loop.
+    Determine if a list of particles is inside a loop.
 
     Input
     ----------
@@ -211,6 +207,8 @@ def fill_loops(loops):
     # ^ right approach
     filled = []
     for (tp, _), loop in tqdm(loops, desc='Filling loops'):
+        # if tp != 106 or np.all(loop.loop_id != 94):
+        #     continue
         filled_loop = fill_loop(loop)
         len_loop = len(filled_loop)
         filled.append(np.column_stack(((tp,)*len_loop,
@@ -227,12 +225,14 @@ def fill_loop(loop):
     first_coord = loop.iloc[coord_idx][coord_cols]
     norms = np.linalg.norm(
         loop[coord_cols] - first_coord, axis=1)
+    if len(norms) < 3:  # check for degenerate loop
+        return loop[coord_cols]
     argnorms = np.argsort(norms)
     sec_coord = loop.iloc[argnorms[1]][coord_cols]
     first_set = loop.iloc[argnorms[2::2]]
     sec_set = loop.iloc[argnorms[3::2]]
     line_segments = get_line_segments(coord_cols, first_set, sec_set)
-    filled_loop = floodfill(line_segments)
+    filled_loop = floodfill(loop, line_segments)
 
     return filled_loop
 
@@ -252,41 +252,54 @@ def get_line_segments(coord_cols, first_set, sec_set):
 def floodfill(line_segments):
     '''Performs the floodfill algorithm for a 3D system.'''
     filled_loop = []
+    # if loop.timepoint.iloc[0] == 106 and loop.loop_id.iloc[0] == 94:
+    #     test = 0
     for coord in line_segments:
-        # if np.all(coord[4:6] == (422, 24)) and coord[9] == 5:
-        #     test = 0
         coord_zero = np.all((coord[:3] == 0) | (coord[3:6] == 0))
         if coord[9] == 1 or coord_zero:
             continue
         # size of increment needs to be such that we will fill
         # all boxes along the way
-        increment = np.round(1 / coord[9], 4)
+        increment = round(1 / coord[9], 4)
         filled_seg = []
         # fill in the first coordinate along the segment
         fill = np.round(coord[:3] + increment * coord[6:9])
-        if np.any(fill != coord[3:6]):
-            filled_seg.append(fill)
 
         mult = 1
         # as long as we're not at the end of the segment
         while np.any(fill != coord[3:6]):
             filled_seg.append(fill)
-            fill = np.round(coord[:3] + increment * mult * coord[6:9])
-            # if mult * increment > 1:
-            #     test = 0
+            t = round(increment * mult, 4)
+            # avoid situation in which the line segment
+            # narrowly misses the mark (i.e. misses coord[3:6])
+            # and continues to infinity
+            if t > 1:
+                t = 1
+                fill = np.round(coord[:3] + t * coord[6:9])
+                filled_seg.append(fill)
+                break
+
+            fill = np.round(coord[:3] + t * coord[6:9])
             mult += 1
 
         if filled_seg:
             filled_loop.append(filled_seg)
 
+    if not filled_loop:  # no filling was performed
+        return_loop = np.row_stack(np.split(line_segments, (3, 6), axis=1)[:2])
+        rows_without_zeros = return_loop[~np.all(return_loop == 0, axis=1)]
+        return np.int16(rows_without_zeros)
+
     filled_loop = np.row_stack(filled_loop)
     filled_loop = np.int16(np.row_stack((line_segments[:, :3],
                                          line_segments[:, 3:6],
                                          filled_loop)))
-    img = np.zeros((1024, 1024))
-    img[filled_loop[:, 0], filled_loop[:, 1]] = 1
-    plt.imshow(img)
-    plt.savefig(f'debug_{coord[0]}_{coord[9]}.png')
+    # img = np.zeros((1024, 1024))
+    # img[filled_loop[:, 0], filled_loop[:, 1]] = 1
+    # plt.imshow(img)
+    # plt.title(f't{loop.timepoint.iloc[0]}, id{loop.loop_id.iloc[0]}\n z: {np.unique(loop.z)}')
+    # plt.savefig(f'debug_{loop.timepoint.iloc[0]}_{loop.loop_id.iloc[0]}.png')
+    # plt.close()
     return np.unique(filled_loop, axis=0)
 
 
@@ -326,8 +339,8 @@ if __name__ == '__main__':
 
     save_loops = False  # save condensed loops to disk
     load_loops = True  # load condensed loops from disk
-    save_filled = True  # save filled loops to disk
-    load_filled = False  # load filled loops from disk
+    save_filled = False  # save filled loops to disk
+    load_filled = True  # load filled loops from disk
 
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
@@ -358,23 +371,28 @@ if __name__ == '__main__':
             saved_path_loops = osp.join(pred_dir_path, name_loops)
             saved_path_fill = osp.join(pred_dir_path, name_filled)
             # check for existing loops and filled loops
-            if osp.exists(saved_path_loops) and osp.exists(saved_path_fill):
-                continue
+            # disabled while debugging
+            # if osp.exists(saved_path_loops) and osp.exists(saved_path_fill):
+            #     continue
 
-            # get loop boundaries
-            loop_path = loop_files[osp.splitext(pred_dir)[0]]
-            loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
-            if save_loops:
-                utils.make_dir(pred_dir_path)
-                terse_to_disk(saved_path_loops, frames, loops)
+            if not load_filled:
+                # get loop boundaries
+                loop_path = loop_files[osp.splitext(pred_dir)[0]]
+                loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
+                if save_loops:
+                    utils.make_dir(pred_dir_path)
+                    terse_to_disk(saved_path_loops, frames, loops)
 
-            # get filled loops
-            filled = get_filled(loops, pred_dir_path, frames, load_filled)
+                # get filled loops
+                filled = get_filled(pred_dir_path, frames, loops, load_filled)
+            else:
+                filled = get_filled(pred_dir_path, frames, None, load_filled)
+
             if save_filled:
-                filled_to_disk(saved_path_fill, frames, loops)
+                filled_to_disk(saved_path_fill, frames, filled)
 
-            # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
-            #                                                    pr_trajs, filled)
+            pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
+                                                               pr_trajs, filled)
 
             # csv_path = osp.join(pred_dir_path,
             #                     'tracked_centroids_loops.csv')
