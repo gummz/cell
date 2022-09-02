@@ -73,7 +73,7 @@ def matrix_to_terse(frames, loops):
     for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_slice = []
         for j, z_slice in tqdm(enumerate(loops[frame]), desc='Z-slice'):
-            z_slice_comp = z_slice.compute()
+            z_slice_comp = z_slice[:, :, 0].compute()
             unique, counts = np.unique(z_slice_comp, return_counts=True)
             unique, counts = unique[1:], counts[1:]
             if any(unique):
