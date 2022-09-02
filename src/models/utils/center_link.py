@@ -139,13 +139,17 @@ class CenterChain():
     def get_intensity(self):
         return self.intensity
 
+    def get_masks(self):
+        return self.masks
+
     def get_links(self):
         return self.links
 
     def get_state(self):
         x, y, z = self.get_center()
         intensity = self.get_intensity()
-        return x, y, z, intensity
+        mask = self.get_mask()
+        return x, y, z, intensity, mask
 
     def set_center(self, center):
         self.center = center
