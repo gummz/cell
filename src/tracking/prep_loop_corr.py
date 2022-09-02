@@ -32,7 +32,7 @@ This script:
 def set_paths(experiment_name):
     if osp.exists(c.RAW_DATA_DIR):  # on DTU HPC cluster
         root_dir = osp.join(c.RAW_DATA_DIR, '..')
-        pred_path = osp.join(c.PROJECT_DATA_DIR, 'pred', experiment_name)
+        pred_path = osp.join(c.DATA_DIR, 'pred', experiment_name)
         loops_path = osp.join(root_dir, 'results')
     else:  # on local machine
         root_dir = c.PROJECT_DATA_DIR
