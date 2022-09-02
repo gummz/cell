@@ -86,7 +86,7 @@ def threshold_masks(masks, threshold=0.8):
     '''
     Thresholds masks to make more concise
     segmentations (i.e., model has to be more certain
-    in its predictions).
+    in its mask predictions).
     '''
     dtype, device = masks.dtype, masks.device
     threshold = torch.tensor(threshold, dtype=dtype,
@@ -248,8 +248,8 @@ def predict_timepoint(data, device, model, output_dir,
                                accept_range=accept_range)
 
     # draw bounding boxes on slice for debugging
-    viz.output_sample(osp.join(output_dir, 'debug'), t,
-                      timepoint_raw, preds, 1024, device)
+    # viz.output_sample(osp.join(output_dir, 'debug'), t,
+    #                   timepoint_raw, preds, 1024, device)
 
     # adjust slices from being model inputs to being
     # inputs to get_chains
@@ -296,6 +296,14 @@ def handle_predictions(device, model, output_dir, save_pred,
 def save_predictions(preds, output_dir, t):
     '''
     Saves predictions to file.
+
+    Inputs:
+        preds: list(torch.Tensor) - list of predictions
+        output_dir: str - directory to save predictions to
+        t: int - timepoint to save predictions for
+
+    Outputs:
+        None
     '''
     with open(osp.join(output_dir, f'predictions_t{t}.pkl'), 'wb') as f:
         pickle.dump(preds, f)
@@ -307,9 +315,13 @@ def prepare_model_input(timepoint, device):
     class is not being used.
 
     Inputs:
-        array: the data to be prepared for the Mask R-CNN.
+        timepoint: the data to be prepared for the Mask R-CNN.
         This array can contain individual slices, an entire
         timepoint, or multiple timepoints.
+        device: torch.device - device to predict on
+
+    Output:
+        list(torch.Tensor) - list of tensors to predict on
     '''
 
     timepoint = utils.normalize(np.int16(timepoint), 0, 1, cv2.CV_32F, device)
@@ -383,13 +395,13 @@ def save_tracks(name, output_dir, time_start, time_end,
     tracked_centroids.to_csv(osp.join(
         output_dir, 'tracked_centroids.csv'), sep=';')
 
-    location = osp.join(output_dir, 'timepoints')
-    plot.save_figures(tracked_centroids, location)
-    utils.png_to_movie(time_range, location)
+    # location = osp.join(output_dir, 'timepoints')
+    # plot.save_figures(tracked_centroids, location)
+    # utils.png_to_movie(time_range, location)
 
 
 if __name__ == '__main__':
-    mode = 'val'
+    mode = 'test'
     load = False
     experiment_name = 'pred_2'
     accept_range = (0.91, 1)
@@ -415,13 +427,15 @@ if __name__ == '__main__':
     # names = [name for name in names if '.czi' not in name]
     files = c.RAW_FILES[mode].keys()
     files = utils.add_ext(files)
+    # development purposes:
+    files = [file for file in files if '2019-02-05_emb5_pos4' in file]
     len_files = len(files)
 
     for i, name in enumerate(files):
         print('Predicting file', name,
               f'(file {i + 1}/{len_files})...', end='')
         output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
-                                  experiment_name, name)
+                              experiment_name, name)
         utils.make_dir(output_dir)
         predict_file(load, device,
                      model, output_dir, name,
