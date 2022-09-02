@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
+import scipy
 import matplotlib.pyplot as plt
 
 
@@ -219,22 +220,70 @@ def fill_loops(loops):
 
 
 def fill_loop(loop):
-    coord_cols = ['x', 'y', 'z']
+    # coord_cols = ['x', 'y', 'z']
 
-    coord_idx = np.random.choice(range(len(loop)))
-    first_coord = loop.iloc[coord_idx][coord_cols]
-    norms = np.linalg.norm(
-        loop[coord_cols] - first_coord, axis=1)
-    if len(norms) < 3:  # check for degenerate loop
-        return loop[coord_cols]
-    argnorms = np.argsort(norms)
-    sec_coord = loop.iloc[argnorms[1]][coord_cols]
-    first_set = loop.iloc[argnorms[2::2]]
-    sec_set = loop.iloc[argnorms[3::2]]
-    line_segments = get_line_segments(coord_cols, first_set, sec_set)
-    filled_loop = floodfill(loop, line_segments)
+    # coord_idx = np.random.choice(range(len(loop)))
+    # first_coord = loop.iloc[coord_idx][coord_cols]
+    # norms = np.linalg.norm(
+    #     loop[coord_cols] - first_coord, axis=1)
+    # if len(norms) < 3:  # check for degenerate loop
+    #     return loop[coord_cols]
+    # argnorms = np.argsort(norms)
+    # sec_coord = loop.iloc[argnorms[1]][coord_cols]
+    # first_set = loop.iloc[argnorms[2::2]]
+    # sec_set = loop.iloc[argnorms[3::2]]
+    # line_segments = get_line_segments(coord_cols, first_set, sec_set)
+    # filled_loop = floodfill(loop, line_segments)
+    image = np.zeros((1024,)*3, dtype=bool)
+    image[loop.x, loop.y, loop.z] = True
+    img_filled = fill_hull(image)
+    filled_loop = np.argwhere(img_filled)
+    if len(filled_loop > 100):
+        plt.imshow(img_filled)
+        plt.close()
+        exit()
 
     return filled_loop
+
+
+def fill_hull(image):
+    """
+    Compute the convex hull of the given binary image and
+    return a mask of the filled hull.
+    
+    Adapted from:
+    https://stackoverflow.com/a/46314485/162094
+    This version is slightly (~40%) faster for 3D volumes,
+    by being a little more stingy with RAM.
+
+    Taken from:
+    https://gist.github.com/stuarteberg/8982d8e0419bea308326933860ecce30
+    """
+    # (The variable names below assume 3D input,
+    # but this would still work in 4D, etc.)
+
+    assert (np.array(image.shape) <= np.iinfo(np.int16).max).all(), \
+        f"This function assumes your image is smaller than {2**15} in each dimension"
+
+    points = np.argwhere(image).astype(np.int16)
+    hull = scipy.spatial.ConvexHull(points)
+    deln = scipy.spatial.Delaunay(points[hull.vertices])
+
+    # Instead of allocating a giant array for all indices in the volume,
+    # just iterate over the slices one at a time.
+    idx_2d = np.indices(image.shape[1:], np.int16)
+    idx_2d = np.moveaxis(idx_2d, 0, -1)
+
+    idx_3d = np.zeros((*image.shape[1:], image.ndim), np.int16)
+    idx_3d[:, :, 1:] = idx_2d
+
+    mask = np.zeros_like(image, dtype=bool)
+    for z in range(len(image)):
+        idx_3d[:, :, 0] = z
+        s = deln.find_simplex(idx_3d)
+        mask[z, (s != -1)] = 1
+
+    return mask
 
 
 def get_line_segments(coord_cols, first_set, sec_set):
@@ -339,8 +388,8 @@ if __name__ == '__main__':
 
     save_loops = False  # save condensed loops to disk
     load_loops = True  # load condensed loops from disk
-    save_filled = False  # save filled loops to disk
-    load_filled = True  # load filled loops from disk
+    save_filled = True  # save filled loops to disk
+    load_filled = False  # load filled loops from disk
 
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
