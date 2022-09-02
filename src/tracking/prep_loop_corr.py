@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
 import matplotlib.pyplot as plt
-
+import scipy
 
 '''
 This script:
@@ -237,14 +237,23 @@ def fill_loop(loop):
     # sec_set = loop.iloc[argnorms[3::2]]
     # line_segments = get_line_segments(coord_cols, first_set, sec_set)
     # filled_loop = floodfill(loop, line_segments)
-    image = np.zeros((1024,)*3, dtype=bool)
-    image[loop.x, loop.y, loop.z] = True
+    image = np.zeros((1024, 1024, 1024), dtype=bool)
+    image[loop.x, loop.y, loop.z] = 1
     img_filled = fill_hull(image)
     filled_loop = np.argwhere(img_filled)
-    if len(filled_loop > 100):
-        plt.imshow(img_filled)
-        plt.close()
-        exit()
+    # if len(filled_loop) > 1000:
+    #     print('filled_loop > 1000')
+    #     print(filled_loop.shape)
+    #     plt.imshow(np.max(img_filled, axis=0))
+    #     plt.savefig('convex_hull0.png')
+    #     plt.close()
+    #     plt.imshow(np.max(img_filled, axis=1))
+    #     plt.savefig('convex_hull1.png')
+    #     plt.close()
+    #     plt.imshow(np.max(img_filled, axis=2))
+    #     plt.savefig('convex_hull2.png')
+    #     plt.close()
+    #     exit()
 
     return filled_loop
 
@@ -265,8 +274,8 @@ def fill_hull(image):
     # (The variable names below assume 3D input,
     # but this would still work in 4D, etc.)
 
-    assert (np.array(image.shape) <= np.iinfo(np.int16).max).all(), \
-        f"This function assumes your image is smaller than {2**15} in each dimension"
+    if (np.array(image.shape) > np.iinfo(np.int16).max).all():
+        raise ValueError(f"This function assumes your image is smaller than {2**15} in each dimension")
 
     points = np.argwhere(image).astype(np.int16)
     hull = scipy.spatial.ConvexHull(points)
