@@ -238,12 +238,12 @@ def fill_loop(loop):
     image[loop.x, loop.y, loop.z] = True
     img_filled = fill_hull(image)
     filled_loop = np.argwhere(img_filled)
-    if len(filled_loop > 100):
-        plt.imshow(img_filled)
-        plt.close()
-        exit()
 
     return filled_loop
+
+
+def points_in_hull(p, hull, tol=1e-12):
+    return np.all(hull.equations[:, :-1] @ p.T + np.repeat(hull.equations[:, -1][None, :], len(p), axis=0).T <= tol, 0)
 
 
 def fill_hull(image):
