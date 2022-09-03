@@ -83,8 +83,8 @@ def matrix_to_terse(frames, loops):
                 loop_final = np.zeros((len(loop_id), 5), dtype=np.int16)
                 loop_final[:, 0] = frame
                 loop_final[:, 1] = loop_id
-                loop_final[:, 2:4] = np.row_stack(nonzero[:2]).T
-                loop_final[:, 4] = j
+                loop_final[:, 2] = j
+                loop_final[:, 3:] = np.row_stack(nonzero[:2]).T
 
                 # shape_check(z_slice_comp, unique, counts, loop_final)
 
@@ -99,14 +99,14 @@ def shape_check(z_slice_comp, unique, counts, loop_final):
     argwhere_raw = np.argwhere(z_slice_comp).shape[0]
     argwhere_final = loop_final.shape[0]
     assert argwhere_raw == argwhere_final, \
-                    f'{argwhere_raw} != {argwhere_final}'
+        f'{argwhere_raw} != {argwhere_final}'
 
     unique_final, unique_counts_final = np.unique(loop_final[:, 1],
-                                                              return_counts=True)
+                                                  return_counts=True)
     assert np.all(unique == unique_final), \
-                    f'{unique} != {unique_final}'
+        f'{unique} != {unique_final}'
     assert np.all(counts == unique_counts_final), \
-                    f'{counts} != {unique_counts_final}'
+        f'{counts} != {unique_counts_final}'
 
 
 def get_loops(loop_path, pred_path, frames, load=True):
@@ -120,7 +120,7 @@ def get_loops(loop_path, pred_path, frames, load=True):
         loop_file = AICSImage(loop_path)
         # get raw loops
         loops = np.moveaxis(loop_file.get_image_dask_data('CZYXS'), 1, 0)
-        columns = ['timepoint', 'loop_id', 'x', 'y', 'z']
+        columns = ['timepoint', 'loop_id', 'z', 'y', 'x']
         # condense loops into terse representation
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
 
@@ -262,7 +262,7 @@ def fill_hull(image):
     """
     Compute the convex hull of the given binary image and
     return a mask of the filled hull.
-    
+
     Adapted from:
     https://stackoverflow.com/a/46314485/162094
     This version is slightly (~40%) faster for 3D volumes,
@@ -275,7 +275,8 @@ def fill_hull(image):
     # but this would still work in 4D, etc.)
 
     if (np.array(image.shape) > np.iinfo(np.int16).max).all():
-        raise ValueError(f"This function assumes your image is smaller than {2**15} in each dimension")
+        raise ValueError(
+            f"This function assumes your image is smaller than {2**15} in each dimension")
 
     points = np.argwhere(image).astype(np.int16)
     hull = scipy.spatial.ConvexHull(points)
