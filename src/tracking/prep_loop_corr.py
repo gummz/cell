@@ -9,6 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
 import matplotlib.pyplot as plt
+import cc3d
 import scipy
 
 '''
@@ -71,7 +72,10 @@ def matrix_to_terse(frames, loops):
 
     loops_terse = []
     for frame in tqdm(frames, desc='Condensing loops: frame'):
-        loops_slice = []
+        loops_slices = []
+        labels_out = cc3d.connected_components(
+            loops[frame, :, :, :, 0].compute())
+        print(labels_out), exit()
         for j, z_slice in tqdm(enumerate(loops[frame, :, :, :, 0]), desc='Z-slice'):
             z_slice_comp = z_slice.compute()
             unique, counts = np.unique(z_slice_comp, return_counts=True)
@@ -88,9 +92,9 @@ def matrix_to_terse(frames, loops):
 
                 # shape_check(z_slice_comp, unique, counts, loop_final)
 
-                loops_slice.append(loop_final)
+                loops_slices.append(loop_final)
 
-        loops_terse.append(np.row_stack(loops_slice))
+        loops_terse.append(np.row_stack(loops_slices))
 
     return np.row_stack(loops_terse)
 
@@ -241,21 +245,12 @@ def fill_loop(loop):
     image[loop.x, loop.y, loop.z] = 1
     img_filled = fill_hull(image)
     filled_loop = np.argwhere(img_filled)
-    # if len(filled_loop) > 1000:
-    #     print('filled_loop > 1000')
-    #     print(filled_loop.shape)
-    #     plt.imshow(np.max(img_filled, axis=0))
-    #     plt.savefig('convex_hull0.png')
-    #     plt.close()
-    #     plt.imshow(np.max(img_filled, axis=1))
-    #     plt.savefig('convex_hull1.png')
-    #     plt.close()
-    #     plt.imshow(np.max(img_filled, axis=2))
-    #     plt.savefig('convex_hull2.png')
-    #     plt.close()
-    #     exit()
 
     return filled_loop
+
+
+def points_in_hull(p, hull, tol=1e-12):
+    return np.all(hull.equations[:, :-1] @ p.T + np.repeat(hull.equations[:, -1][None, :], len(p), axis=0).T <= tol, 0)
 
 
 def fill_hull(image):
@@ -399,7 +394,7 @@ if __name__ == '__main__':
     draft_file = 'LI_2019-02-05_emb5_pos4'
 
     save_loops = False  # save condensed loops to disk
-    load_loops = True  # load condensed loops from disk
+    load_loops = False  # load condensed loops from disk
     save_filled = True  # save filled loops to disk
     load_filled = False  # load filled loops from disk
 
