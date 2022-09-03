@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import src.data.utils.utils as utils
-import scipy
 import matplotlib.pyplot as plt
 
 
@@ -73,8 +72,8 @@ def matrix_to_terse(frames, loops):
     loops_terse = []
     for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_slice = []
-        for j, z_slice in tqdm(enumerate(loops[frame]), desc='Z-slice'):
-            z_slice_comp = z_slice[:, :, 0].compute()
+        for j, z_slice in tqdm(enumerate(loops[frame, :, :, :, 0]), desc='Z-slice'):
+            z_slice_comp = z_slice.compute()
             unique, counts = np.unique(z_slice_comp, return_counts=True)
             unique, counts = unique[1:], counts[1:]
             if any(unique):
@@ -87,23 +86,27 @@ def matrix_to_terse(frames, loops):
                 loop_final[:, 2:4] = np.row_stack(nonzero[:2]).T
                 loop_final[:, 4] = j
 
-                argwhere_raw = np.argwhere(z_slice_comp).shape[0]
-                argwhere_final = loop_final.shape[0]
-                assert argwhere_raw == argwhere_final, \
-                    f'{argwhere_raw} != {argwhere_final}'
-
-                unique_final, unique_counts_final = np.unique(loop_final[:, 1],
-                                                              return_counts=True)
-                assert np.all(unique == unique_final), \
-                    f'{unique} != {unique_final}'
-                assert np.all(counts == unique_counts_final), \
-                    f'{counts} != {unique_counts_final}'
+                # shape_check(z_slice_comp, unique, counts, loop_final)
 
                 loops_slice.append(loop_final)
 
         loops_terse.append(np.row_stack(loops_slice))
 
     return np.row_stack(loops_terse)
+
+
+def shape_check(z_slice_comp, unique, counts, loop_final):
+    argwhere_raw = np.argwhere(z_slice_comp).shape[0]
+    argwhere_final = loop_final.shape[0]
+    assert argwhere_raw == argwhere_final, \
+                    f'{argwhere_raw} != {argwhere_final}'
+
+    unique_final, unique_counts_final = np.unique(loop_final[:, 1],
+                                                              return_counts=True)
+    assert np.all(unique == unique_final), \
+                    f'{unique} != {unique_final}'
+    assert np.all(counts == unique_counts_final), \
+                    f'{counts} != {unique_counts_final}'
 
 
 def get_loops(loop_path, pred_path, frames, load=True):
@@ -301,8 +304,7 @@ def get_line_segments(coord_cols, first_set, sec_set):
 def floodfill(line_segments):
     '''Performs the floodfill algorithm for a 3D system.'''
     filled_loop = []
-    # if loop.timepoint.iloc[0] == 106 and loop.loop_id.iloc[0] == 94:
-    #     test = 0
+
     for coord in line_segments:
         coord_zero = np.all((coord[:3] == 0) | (coord[3:6] == 0))
         if coord[9] == 1 or coord_zero:
@@ -382,8 +384,8 @@ def nearest_loop(row, loops):
 
 
 if __name__ == '__main__':
-    mode = 'test'
-    experiment_name = 'pred_1'
+    # mode = 'test'
+    experiment_name = 'pred_2'
     draft_file = 'LI_2019-02-05_emb5_pos4'
 
     save_loops = False  # save condensed loops to disk
@@ -395,6 +397,7 @@ if __name__ == '__main__':
     save_loops = False if load_loops else save_loops
     save_filled = False if load_filled else save_filled
 
+    tic = time()
     np.random.seed(42)
     utils.set_cwd(__file__)
     filter_prefix = 'cyctpy15'
@@ -450,3 +453,5 @@ if __name__ == '__main__':
     # I can include segmentations in the dataframe that trackpy
     # receives as input
     # It can also be terse like loops.csv
+
+    print(f'prep_loop_corr: Time elapsed: {utils.time_report(tic, time())}.')
