@@ -11,6 +11,7 @@ import src.data.utils.utils as utils
 import matplotlib.pyplot as plt
 import cc3d
 import scipy
+import random
 
 '''
 This script:
@@ -69,32 +70,118 @@ def matrix_to_terse(frames, loops):
     '''
     Condense loops into a terse representation.
     '''
-
     loops_terse = []
     for frame in tqdm(frames, desc='Condensing loops: frame'):
-        loops_slices = []
-        labels_out = cc3d.connected_components(
-            loops[frame, :, :, :, 0].compute())
-        print(labels_out), exit()
-        for j, z_slice in tqdm(enumerate(loops[frame, :, :, :, 0]), desc='Z-slice'):
-            z_slice_comp = z_slice.compute()
-            unique, counts = np.unique(z_slice_comp, return_counts=True)
-            unique, counts = unique[1:], counts[1:]
-            if any(unique):
-                nonzero = np.nonzero(z_slice_comp)
-                loop_id = z_slice_comp[nonzero]
 
-                loop_final = np.zeros((len(loop_id), 5), dtype=np.int16)
-                loop_final[:, 0] = frame
-                loop_final[:, 1] = loop_id
-                loop_final[:, 2] = j
-                loop_final[:, 3:] = np.row_stack(nonzero[:2]).T
+        loops_comp = loops[frame, :, :, :, 0].compute()
 
-                # shape_check(z_slice_comp, unique, counts, loop_final)
+        # print(loops_comp[33, 656, 446])
+        # print(labels_out[33, 656, 446])
+        # maybe different ids is good enough
+        # TODO: check if algorithm works correctly
+        unique, counts = np.unique(loops_comp, return_counts=True)
+        unique, counts = unique[1:], counts[1:]
+        if any(unique):
+            labels_out = cc3d.dust(
+                cc3d.connected_components(loops_comp), threshold=5)
+            # loops_argw = np.argwhere(loops)
+            # labels_argw = np.argwhere(labels_out)
+            # set_diff = np.setdiff1d(loops_argw, labels_argw)
+            # print('loops_argw before', loops_argw.shape)
+            # loops[set_diff] = 0
+            # print('loops_argw after', np.argwhere(loops).shape)
+            # loops_argw = labels_argw = set_diff = None
 
-                loops_slices.append(loop_final)
+            # u_loops, c_loops = np.unique(loops_comp, return_counts=True)
+            # u_loops, c_loops = u_loops[1:], c_loops[1:]
+            # u_lab, c_lab = np.unique(labels_out, return_counts=True)
+            # u_lab, c_lab = u_lab[1:], c_lab[1:]
 
-        loops_terse.append(np.row_stack(loops_slices))
+            # print('unique loops', u_loops, len(u_loops))
+            # print('loops count', c_loops)
+            # print('unique labels', u_lab, len(u_lab))
+            # print('labels count', c_lab)
+            # print('loops in labels', np.isin(c_loops, c_lab))
+            # print('labels in loops', np.isin(c_lab, c_loops))
+
+            nonzero = np.nonzero(labels_out)
+            loop_id = labels_out[nonzero]
+            len_ids = len(loop_id)
+            len_un_ids = len(np.unique(loop_id))
+            assert 255 - len_un_ids > 0, \
+                'Too many loops to assign ids from 0 to 255'
+
+            loops_frame = np.zeros((len_ids, 5), dtype=np.int16)
+            loops_frame[:, 0] = frame
+
+            add = 50 if len_un_ids <= 205 else 255 - len_un_ids
+            loops_frame[:, 1] = loop_id + add
+            print('frame', frame,
+                  'len_ids', len_ids,
+                  'len_un_ids', len_un_ids,
+                  'add', add)
+
+            loops_frame[:, 2:] = np.column_stack(nonzero)
+
+        #     nonzero = loop_id = loops_comp = None
+
+        #     # iterable = zip(loops_final)
+        #     # loop_ids = np.unique(loops_final[:, 1])
+        #     print('for loop')
+        #     for label, image in cc3d.each(labels_out, binary=False, in_place=True):
+        #         print(label, np.argwhere(image).shape)
+        #         label_argw = np.argwhere(label)
+        #         label_nonzero = np.nonzero(image)
+        #         lab_u, _ = np.sort(np.unique(
+        #             loops[label_nonzero], return_counts=True), axis=1)
+        #         loop_id = lab_u[-1]
+
+        #         label_nonzero = lab_u = None
+
+        #         loop_argw = np.argwhere(
+        #             loops_final[loops_final[:, 1] == loop_id][:, 2:])
+        #         label_in_loop = np.isin(label_argw, loop_argw)
+        #         loop_in_label = np.isin(loop_argw, label_argw)
+        #         print('before np.all and not np.all')
+        #         if np.all(label_in_loop) and not np.all(loop_in_label):
+        #             loop_in_label = None
+        #             print('label in loop')
+        #             # loop_sans_label = np.delete(
+        #             #     loop_argw, np.argwhere(loop_in_label), axis=0)
+
+        #             # double-check this statement... wrong?
+        #             label_sans_loop = np.delete(
+        #                 label_argw, loop_in_label, axis=0)
+
+        #             new_label = random.choice(
+        #                 list(set([x for x in range(50, 255)]) - set(unique)))
+        #             print('loops_final labels before', unique)
+        #             loops_final[label_argw][:, 1] = new_label  # was label_sans_loop instead of label_argw
+        #             print('loops_final labels after',
+        #                   np.unique(loops_final[:, 1]))
+        # print(f'Time elapsed: {utils.time_elapsed(tic, time())}')
+        # print('\nProgram exited\n')
+        # exit()
+
+        # for j, z_slice in tqdm(enumerate(loops[frame, :, :, :, 0]), desc='Z-slice'):
+        #     z_slice_comp = z_slice.compute()
+        #     unique, counts = np.unique(z_slice_comp, return_counts=True)
+        #     unique, counts = unique[1:], counts[1:]
+        #     if any(unique):
+        #         nonzero = np.nonzero(z_slice_comp)
+        #         loop_id = z_slice_comp[nonzero]
+
+        #         loop_final = np.zeros((len(loop_id), 5), dtype=np.int16)
+        #         loop_final[:, 0] = frame
+        #         loop_final[:, 1] = loop_id
+        #         loop_final[:, 2] = j
+        #         loop_final[:, 3:] = np.row_stack(nonzero[:2]).T
+
+        #         # shape_check(z_slice_comp, unique, counts, loop_final)
+
+        #         loops_slices.append(loop_final)
+
+        loops_terse.append(loops_frame)
 
     return np.row_stack(loops_terse)
 
@@ -151,14 +238,18 @@ def terse_to_disk(save_path, frames, loops):
     # orig_name = osp.splitext(osp.basename(loop_path))[0]
     # fr_min, fr_max = min(frames), max(frames)
     # name = f'loops_{orig_name}_t{fr_min}-{fr_max}.csv'
-    loops.astype(int).to_csv(save_path, index=False)
+    (loops.astype(int)
+     .sort_values(['timepoint', 'loop_id'], ignore_index=True)
+     .to_csv(save_path, index=False))
 
 
 def filled_to_disk(save_path, frames, filled):
     # orig_name = osp.splitext(osp.basename(loop_path))[0]
     # fr_min, fr_max = min(frames), max(frames)
     # name = f'loops_filled_{orig_name}_t{fr_min}-{fr_max}.csv'
-    filled.astype(int).to_csv(save_path, index=False)
+    (filled.astype(int)
+     .sort_values(['timepoint', 'loop_id'], ignore_index=True)
+     .to_csv(save_path, index=False))
 
 
 def loop_analysis(frames, pr_trajs, loops):
@@ -180,34 +271,46 @@ def inside_loop(frames, pr_trajs, loops):
     ----------
     np.ndarray
     '''
-    dist_loop = np.zeros((len(pr_trajs), 2))
-    excluded_p = []  # particles found inside a previous loop are excluded
-    # iterate over all loops
-    tp_tmp = np.inf  # keep track of when current timepoint changes
-    for (tp, _), loop in loops.groupby(['timepoint', 'loop_id']):
+    # dist_loop = np.zeros((len(pr_trajs), 2))
+    # excluded_p = []  # particles found inside a previous loop are excluded
+    # # iterate over all loops
+    # tp_tmp = np.inf  # keep track of when current timepoint changes
+    in_loop = np.zeros(len(pr_trajs), dtype=np.bool)
+
+    for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']), desc='Analysis per loop'):
         # only filter trajectories if timepoint changes
-        if tp > tp_tmp or tp_tmp == np.inf:
-            trajs_frame = pr_trajs[pr_trajs.frame == tp]
-            tp_tmp = tp
-        for _, row in trajs_frame.iterrows():
-            particle = row[['x', 'y', 'z', 'particle']]
+        # if tp > tp_tmp or tp_tmp == np.inf:
+        select_tp = pr_trajs.frame == tp
+        masks_frame = pr_trajs[select_tp].mask
+        # tp_tmp = tp
 
-            # find particle's index in pr_trajs
-            # (for accurate assignment to dist_loop)
-            eq_tp = pr_trajs.frame == tp
-            eq_p = pr_trajs.particle == particle.particle
-            p_select = int(pr_trajs.index[eq_tp & eq_p].values)
+        # += so I can check afterwards if some columns have more than 1 ...
+        # then something doesn't work correctly
+        # but: each entry gets a score for how much of it is in a loop
+        # (i.e., how many mask coordinates of that cell are in a loop)
+        in_loop[select_tp] += points_in_hull(masks_frame, loop)
 
-            # find if particle is inside loop
-            if (particle.particle not in excluded_p
-                    and p_in_loop(particle, loop)):
+        # need to be a bit careful... how should the returned data format be?
 
-                dist_loop[p_select] = True, dist_to_loop(particle, loop)
-                excluded_p.append(particle.particle)
-            else:
-                dist_loop[p_select] = False, dist_to_loop(particle,
-                                                          nearest_loop(particle, loops))
-    return dist_loop
+        # for _, row in trajs_frame.iterrows():
+        #     particle = row[['x', 'y', 'z', 'particle']]
+
+        #     # find particle's index in pr_trajs
+        #     # (for accurate assignment to dist_loop)
+        #     eq_tp = pr_trajs.frame == tp
+        #     eq_p = pr_trajs.particle == particle.particle
+        #     p_select = int(pr_trajs.index[eq_tp & eq_p].values)
+
+        #     # find if particle is inside loop
+        #     if (particle.particle not in excluded_p
+        #             and p_in_loop(particle, loop)):
+
+        #         dist_loop[p_select] = True, dist_to_loop(particle, loop)
+        #         excluded_p.append(particle.particle)
+        #     else:
+        #         dist_loop[p_select] = False, dist_to_loop(particle,
+        #                                                   nearest_loop(particle, loops))
+    return in_loop
 
 
 def fill_loops(loops):
@@ -388,26 +491,48 @@ def nearest_loop(row, loops):
     pass
 
 
-if __name__ == '__main__':
-    # mode = 'test'
-    experiment_name = 'pred_2'
-    draft_file = 'LI_2019-02-05_emb5_pos4'
+def prep_file(draft_file, save_loops, load_loops,
+              save_filled, load_filled, pred_path,
+              loop_files, pred_dir):
+    if osp.splitext(pred_dir)[0] == draft_file:
+        pred_dir_path = osp.join(pred_path, pred_dir)
+        pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
+        frames = [item[0] for item in pr_trajs.groupby('frame')]
+        fr_min, fr_max = min(frames), max(frames)
 
-    save_loops = False  # save condensed loops to disk
-    load_loops = False  # load condensed loops from disk
-    save_filled = True  # save filled loops to disk
-    load_filled = False  # load filled loops from disk
+        name_loops = f'loops_{pred_dir}_t{fr_min}-{fr_max}.csv'
+        name_filled = f'loops_filled_{pred_dir}_t{fr_min}-{fr_max}.csv'
+        saved_path_loops = osp.join(pred_dir_path, name_loops)
+        saved_path_fill = osp.join(pred_dir_path, name_filled)
+        # check for existing loops and filled loops
+        # disabled while debugging
+        # if osp.exists(saved_path_loops) and osp.exists(saved_path_fill):
+        #     continue
 
-    # redundant to save loaded loops to disk
-    save_loops = False if load_loops else save_loops
-    save_filled = False if load_filled else save_filled
+        if not load_filled:
+            # get loop boundaries
+            loop_path = loop_files[osp.splitext(pred_dir)[0]]
+            loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
+            if save_loops:
+                utils.make_dir(pred_dir_path)
+                terse_to_disk(saved_path_loops, frames, loops)
 
-    tic = time()
-    np.random.seed(42)
-    utils.set_cwd(__file__)
+                # get filled loops
+        #     filled = get_filled(pred_dir_path, frames, loops, load_filled)
+        # else:
+        #     filled = get_filled(pred_dir_path, frames, None, load_filled)
+
+        # if save_filled:
+        #     filled_to_disk(saved_path_fill, frames, filled)
+
+        # pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
+        #                                                    pr_trajs, filled)
+
+
+def prepare_loops(experiment_name, draft_file, save_loops, load_loops,
+                  save_filled, load_filled):
     filter_prefix = 'cyctpy15'
     file_ext = 'tif'
-    tic = time()
     pred_path, loops_path = set_paths(experiment_name)
 
     # can choose only predicted dirs, or all files in /raw_data/
@@ -417,43 +542,34 @@ if __name__ == '__main__':
 
     results_tot = {}
     for pred_dir in tqdm(select_dirs, desc='Prediction'):
-        if osp.splitext(pred_dir)[0] == draft_file:
-            pred_dir_path = osp.join(pred_path, pred_dir)
-            pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-            frames = [item[0] for item in pr_trajs.groupby('frame')]
-            fr_min, fr_max = min(frames), max(frames)
+        prep_file(draft_file, save_loops, load_loops,
+                  save_filled, load_filled, pred_path,
+                  loop_files, pred_dir)
 
-            name_loops = f'loops_{pred_dir}_t{fr_min}-{fr_max}.csv'
-            name_filled = f'loops_filled_{pred_dir}_t{fr_min}-{fr_max}.csv'
-            saved_path_loops = osp.join(pred_dir_path, name_loops)
-            saved_path_fill = osp.join(pred_dir_path, name_filled)
-            # check for existing loops and filled loops
-            # disabled while debugging
-            # if osp.exists(saved_path_loops) and osp.exists(saved_path_fill):
-            #     continue
 
-            if not load_filled:
-                # get loop boundaries
-                loop_path = loop_files[osp.splitext(pred_dir)[0]]
-                loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
-                if save_loops:
-                    utils.make_dir(pred_dir_path)
-                    terse_to_disk(saved_path_loops, frames, loops)
+if __name__ == '__main__':
+    # mode = 'test'
+    experiment_name = 'pred_2'
+    draft_file = 'LI_2019-02-05_emb5_pos4'
 
-                # get filled loops
-                filled = get_filled(pred_dir_path, frames, loops, load_filled)
-            else:
-                filled = get_filled(pred_dir_path, frames, None, load_filled)
+    save_loops = True  # save condensed loops to disk
+    load_loops = False  # load condensed loops from disk
+    save_filled = False  # save filled loops to disk
+    load_filled = False  # load filled loops from disk
 
-            if save_filled:
-                filled_to_disk(saved_path_fill, frames, filled)
+    # redundant to save loaded loops to disk
+    save_loops = False if load_loops else save_loops
+    save_filled = False if load_filled else save_filled
 
-            pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(frames,
-                                                               pr_trajs, filled)
+    tic = time()
+    np.random.seed(42)
+    utils.set_cwd(__file__)
+    prepare_loops(experiment_name, draft_file, save_loops, load_loops,
+                  save_filled, load_filled)
 
-            # csv_path = osp.join(pred_dir_path,
-            #                     'tracked_centroids_loops.csv')
-            # pr_trajs.to_csv(csv_path, index=False)
+    # csv_path = osp.join(pred_dir_path,
+    #                     'tracked_centroids_loops.csv')
+    # pr_trajs.to_csv(csv_path, index=False)
 
     # I can include segmentations in the dataframe that trackpy
     # receives as input
