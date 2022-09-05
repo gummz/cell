@@ -48,4 +48,4 @@ source ../venv_1/bin/activate
 ###python3 -m pip --disable-pip-version-check install pycocotools
 
 # Run file
-python3 -m cProfile -s tottime ../src/models/predict_model.py > pyout_predict
+python3 ../src/models/predict_model.py > pyout_predict
