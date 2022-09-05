@@ -182,125 +182,15 @@ def points_in_hull(p, hull, tol=1e-12):
     return np.all(hull.equations[:, :-1] @ p.T + np.repeat(hull.equations[:, -1][None, :], len(p), axis=0).T <= tol, 0)
 
 
-def fill_hull(image):
-    """
-    Compute the convex hull of the given binary image and
-    return a mask of the filled hull.
-
-    Adapted from:
-    https://stackoverflow.com/a/46314485/162094
-    This version is slightly (~40%) faster for 3D volumes,
-    by being a little more stingy with RAM.
-
-    Taken from:
-    https://gist.github.com/stuarteberg/8982d8e0419bea308326933860ecce30
-    """
-    # (The variable names below assume 3D input,
-    # but this would still work in 4D, etc.)
-
-    if (np.array(image.shape) > np.iinfo(np.int16).max).all():
-        raise ValueError(
-            f"This function assumes your image is smaller than {2**15} in each dimension")
-
-    points = np.argwhere(image).astype(np.int16)
-    hull = scipy.spatial.ConvexHull(points)
-    deln = scipy.spatial.Delaunay(points[hull.vertices])
-
-    # Instead of allocating a giant array for all indices in the volume,
-    # just iterate over the slices one at a time.
-    idx_2d = np.indices(image.shape[1:], np.int16)
-    idx_2d = np.moveaxis(idx_2d, 0, -1)
-
-    idx_3d = np.zeros((*image.shape[1:], image.ndim), np.int16)
-    idx_3d[:, :, 1:] = idx_2d
-
-    mask = np.zeros_like(image, dtype=bool)
-    for z in range(len(image)):
-        idx_3d[:, :, 0] = z
-        s = deln.find_simplex(idx_3d)
-        mask[z, (s != -1)] = 1
-
-    return mask
-
-
-def get_line_segments(coord_cols, first_set, sec_set):
-    len_first, len_sec = len(first_set), len(sec_set)
-    line_segments = np.zeros(
-        (max(len_first, len_sec), 10), dtype=np.int16)
-    line_segments[:len_first, :3] = first_set[coord_cols]
-    line_segments[:len_sec, 3:6] = sec_set[coord_cols]
-    line_segments[:, 6:9] = line_segments[:, 3:6] - line_segments[:, :3]
-    seg_norms = np.linalg.norm(line_segments[:, 6:9], axis=1)
-    line_segments[:, 9] = np.ceil(seg_norms)
-    return line_segments
-
-
-def floodfill(line_segments):
-    '''Performs the floodfill algorithm for a 3D system.'''
-    filled_loop = []
-
-    for coord in line_segments:
-        coord_zero = np.all((coord[:3] == 0) | (coord[3:6] == 0))
-        if coord[9] == 1 or coord_zero:
-            continue
-        # size of increment needs to be such that we will fill
-        # all boxes along the way
-        increment = round(1 / coord[9], 4)
-        filled_seg = []
-        # fill in the first coordinate along the segment
-        fill = np.round(coord[:3] + increment * coord[6:9])
-
-        mult = 1
-        # as long as we're not at the end of the segment
-        while np.any(fill != coord[3:6]):
-            filled_seg.append(fill)
-            t = round(increment * mult, 4)
-            # avoid situation in which the line segment
-            # narrowly misses the mark (i.e. misses coord[3:6])
-            # and continues to infinity
-            if t > 1:
-                t = 1
-                fill = np.round(coord[:3] + t * coord[6:9])
-                filled_seg.append(fill)
-                break
-
-            fill = np.round(coord[:3] + t * coord[6:9])
-            mult += 1
-
-        if filled_seg:
-            filled_loop.append(filled_seg)
-
-    if not filled_loop:  # no filling was performed
-        return_loop = np.row_stack(np.split(line_segments, (3, 6), axis=1)[:2])
-        rows_without_zeros = return_loop[~np.all(return_loop == 0, axis=1)]
-        return np.int16(rows_without_zeros)
-
-    filled_loop = np.row_stack(filled_loop)
-    filled_loop = np.int16(np.row_stack((line_segments[:, :3],
-                                         line_segments[:, 3:6],
-                                         filled_loop)))
-    # img = np.zeros((1024, 1024))
-    # img[filled_loop[:, 0], filled_loop[:, 1]] = 1
-    # plt.imshow(img)
-    # plt.title(f't{loop.timepoint.iloc[0]}, id{loop.loop_id.iloc[0]}\n z: {np.unique(loop.z)}')
-    # plt.savefig(f'debug_{loop.timepoint.iloc[0]}_{loop.loop_id.iloc[0]}.png')
-    # plt.close()
-    return np.unique(filled_loop, axis=0)
-
-
-def p_in_loop(row, loop):
-    # sample, interpolate, and calculate intersection
-    # of interpolated line segment with particle
-    pass
-
-
-def dist_to_loop(row, loop):
+def dist_to_loop(frames, pr_trajs, loops):
     '''
     Calculates the distance to a loop.
     Loop can be indexed to select a subset of
     the loop's coordinates.
     '''
-    pass
+    dist = scipy.spatial.distance_matrix(pr_trajs[['x', 'y', 'z']].values,
+                                         loops[['x', 'y', 'z']].values)
+    return dist.min(axis=1)
 
 
 def nearest_loop(row, loops):
