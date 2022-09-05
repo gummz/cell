@@ -166,25 +166,27 @@ def inside_loop(frames, pr_trajs, loops):
 
     for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']), desc='Analysis per loop'):
         # only filter trajectories if timepoint changes
-        select_tp = pr_trajs.frame == tp
-        masks_frame = pr_trajs[select_tp].mask
 
-        # += so I can check afterwards if some columns have more than 1 ...
-        # then something doesn't work correctly
-        # but: each entry gets a score for how much of it is in a loop
-        # (i.e., how many mask coordinates of that cell are in a loop)
-        in_loop[select_tp] += points_in_hull(masks_frame, loop)
+        for cell in pr_trajs[pr_trajs.frame == tp].iterrows():
+            select_tp = (pr_trajs.frame == tp) and (pr_trajs.particle == cell.particle)
+            hull = scipy.spatial.ConvexHull(loop)
+            pr_trajs['in_loop'][select_tp] = points_in_hull(cell.mask.values, hull)
 
     return in_loop
 
 
-def points_in_hull(p, hull, tol=1e-12):
-    return np.all(hull.equations[:, :-1] @ p.T + np.repeat(hull.equations[:, -1][None, :], len(p), axis=0).T <= tol, 0)
+def points_in_hull(points, hull, tol=1e-12):
+    '''
+    Returns the ratio of overlap between a cell and 
+    the convex hull of a loop boundary.
+    '''
+    return np.sum(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol, 0) / len(points)
 
 
 def dist_to_loop(frames, pr_trajs, loops):
     '''
-    Calculates the distance to a loop.
+    Calculates the distance matrix between cell centers and loop coordinates.
+    Every loop coordinate is used, while only the center is used for a cell.
     Loop can be indexed to select a subset of
     the loop's coordinates.
     '''
