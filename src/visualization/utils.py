@@ -49,21 +49,21 @@ def output_sample(output_dir: str, t: int, timepoint_raw, preds,
         # temporarily
         z_slice = torch.tensor(z_slice, device=mask.device,
                                dtype=mask.dtype).unsqueeze(0)
-        zero = torch.tensor(0, device=mask.device, dtype=mask.dtype)
+        thresh = torch.tensor(0.9, device=mask.device, dtype=mask.dtype)
 
         assert z_slice.shape == mask.shape, \
             'Shapes of slice and mask must match'
         assert z_slice.dtype == mask.dtype, \
             'Dtypes of slice and mask must match'
 
-        masked_img = torch.where(mask > zero, mask, z_slice)
+        masked_img = torch.where(mask > thresh, mask, z_slice)
 
         bboxed_img = draw_bounding_boxes(masked_img.cpu(), boxes.cpu())[0]
 
         assert bboxed_img.shape == z_slice.squeeze().shape, \
             'Bounding box image and slice image shapes must match'
 
-        images = (bboxed_img, z_slice.squeeze().cpu())
+        images = (bboxed_img, np.int16(z_slice.squeeze().cpu()*255))
         titles = ('Prediction', 'Ground Truth')
         grid = (1, 2)
         draw_output(images, titles, grid,
