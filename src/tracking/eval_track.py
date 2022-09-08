@@ -15,6 +15,7 @@ import ast
 
 def find_json_files(gt_dir_path):
     iterable = os.walk(osp.join(gt_dir_path))
+    json_files = None
     for folders, subfolders, files in iterable:
         json_files = sorted([file for file in files
                              if file.endswith('.json')])
@@ -24,6 +25,9 @@ def find_json_files(gt_dir_path):
             break
     else:
         cell_images = False
+    if not json_files:
+        raise FileNotFoundError((f'The ground truth directory at {gt_dir_path} '
+                                'was not found.'))
     return json_files, cell_images
 
 
@@ -60,9 +64,10 @@ def get_timepoints(png_files, cell_images):
     return timepoints
 
 
-def evaluate(pred_dir_path, json_files, cell_images,
-             timepoints, threshold=80):
-    pred_trajs = get_pr_trajs(pred_dir_path, timepoints)
+def eval_file(pred_dir_path, json_files, cell_images,
+              timepoints, threshold=80):
+    pred_trajs = get_pr_trajs(pred_dir_path, timepoints, 
+                              columns=['frame', 'x', 'y', 'z', 'particle'])
     gt_trajs = get_gt_trajs(json_files if json_files else None,
                             cell_images)
     # TODO: do not return traj_score_matrix from match_trajs,
@@ -84,12 +89,17 @@ def evaluate(pred_dir_path, json_files, cell_images,
 
 
 def get_pr_trajs(pred_dir_path, timepoints=None,
-                 groupby='particle'):
+                 groupby='particle', columns=None):
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
-    tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
-    tracked_centroids['mask'] = (tracked_centroids['mask']
-                                 .apply(ast.literal_eval)
-                                 .apply(np.asarray))
+    if columns:
+        tracked_centroids = pd.read_csv(track_path, header=0,
+                                        sep=';', names=columns)
+    else:
+        tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
+    if 'mask' in columns:
+        tracked_centroids['mask'] = (tracked_centroids['mask']
+                                    .apply(ast.literal_eval)
+                                    .apply(np.asarray))
     if timepoints:
         time_range = range(min(timepoints), max(timepoints) + 1)
         tc_filter = tracked_centroids[tracked_centroids['frame'].isin(
@@ -326,15 +336,12 @@ def compute_dist_matrix(pred_frame, gt_frame):
     return dist_matrix
 
 
-if __name__ == '__main__':
-    mode = 'val'
-    experiment_name = 'pred_2'
-
-    tic = time()
+def evaluate(mode, experiment_name):
     root_dir = c.DATA_DIR if osp.exists(
         c.DATA_DIR) else c.PROJECT_DATA_DIR_FULL
     groundtruth_path = osp.join(root_dir, 'pred', 'eval', 'track_2D', mode)
-    gt_dirs = sorted(os.listdir(groundtruth_path))
+    gt_dirs = sorted(osp.splitext(gtdir)[0]
+                     for gtdir in os.listdir(groundtruth_path))
     pred_path = osp.join(root_dir, 'pred', experiment_name)
     pred_dirs = os.listdir(pred_path)
 
@@ -353,12 +360,21 @@ if __name__ == '__main__':
 
             timepoints = get_timepoints(png_files, cell_images)
 
-            score = evaluate(pred_dir_path, json_files, cell_images,
-                             timepoints, threshold)
+            score = eval_file(pred_dir_path, json_files, cell_images,
+                              timepoints, threshold)
 
             score_alpha[gt_dir] = score
 
         score_tot[round(alpha, 2)] = score_alpha
+    return score_tot
+
+
+if __name__ == '__main__':
+    mode = 'val'
+    experiment_name = 'pred_1'
+
+    tic = time()
+    score_tot = evaluate(mode, experiment_name)
 
     print(f'eval_track completed in {utils.time_report(tic, time())}.')
     print('Scores:\n')
