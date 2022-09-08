@@ -87,7 +87,9 @@ def get_pr_trajs(pred_dir_path, timepoints=None,
                  groupby='particle'):
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
     tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
-    tracked_centroids['mask'] = tracked_centroids['mask'].apply(ast.literal_eval)
+    tracked_centroids['mask'] = (tracked_centroids['mask']
+                                 .apply(ast.literal_eval)
+                                 .apply(np.asarray))
     if timepoints:
         time_range = range(min(timepoints), max(timepoints) + 1)
         tc_filter = tracked_centroids[tracked_centroids['frame'].isin(
