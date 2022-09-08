@@ -60,7 +60,7 @@ def create_movie(location, time_range=None):
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
-    _, X, Y, Z, I, P, _ = [array[0]
+    _, X, Y, Z, I, _, P = [array[0]
                            for array in np.split(points.T, 7)]
     return (X, Y, Z, I,
             np.array(P, dtype=int), get_cmap())
@@ -107,7 +107,7 @@ def save_figures(centroids, save):
         ax.set_zlabel('Y dimension')
         ax.set_title(f'File: {file}\nTimepoint: {j}')
 
-        X, Y, Z, I, P = prepare_3d(frame)
+        X, Y, Z, I, P, _ = prepare_3d(frame)
         marker = 'x'
         for x, y, z, i, p in zip(X, Y, Z, I, P):
             # if i < c.ACTIVE_THRESHOLD:
