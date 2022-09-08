@@ -396,9 +396,10 @@ def save_tracks(name, output_dir, time_start, time_end,
      .to_csv(osp.join(
          output_dir, 'tracked_centroids.csv'), sep=';', index=False))
 
-    # location = osp.join(output_dir, 'timepoints')
-    # plot.save_figures(tracked_centroids, location)
-    # utils.png_to_movie(time_range, location)
+    location = osp.join(output_dir, 'timepoints')
+    time_range = range(time_start, time_end) if time_end else None
+    plot.save_figures(tracked_centroids, location)
+    utils.png_to_movie(time_range, location)
 
 
 def start_predict(mode, load, experiment_name, accept_range, model_id,
@@ -420,13 +421,14 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
     files = utils.add_ext(files)
     # development purposes:
     files = [file for file in files if '2019-02-05_emb5_pos4' in file]
+    
     len_files = len(files)
 
     for i, name in enumerate(files):
         print('Predicting', name,
               f'(file {i + 1}/{len_files})...', end='')
         output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
-                              experiment_name, name)
+                              experiment_name, osp.splitext(name)[0])
         utils.make_dir(output_dir)
         predict_file(load, device,
                      model, output_dir, name,
@@ -452,8 +454,8 @@ if __name__ == '__main__':
 
     # choose time range
     # endpoint excluded
-    time_start = 20
-    time_end = None  # Set to None to predict on all timepoints
+    time_start = 0
+    time_end = None  # Set to None to predict from time_start to final timepoint
 
     tic = time()
     start_predict(mode, load, experiment_name, accept_range,
