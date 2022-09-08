@@ -10,6 +10,7 @@ import numpy as np
 import scipy.optimize as sciopt
 import glob
 from time import time
+import ast
 
 
 def find_json_files(gt_dir_path):
@@ -82,9 +83,13 @@ def evaluate(pred_dir_path, json_files, cell_images,
     return score
 
 
-def get_pr_trajs(pred_dir_path, timepoints=None, groupby='particle'):
+def get_pr_trajs(pred_dir_path, timepoints=None,
+                 groupby='particle'):
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
-    tracked_centroids = pd.read_csv(track_path, header=0)
+    tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
+    tracked_centroids['mask'] = (tracked_centroids['mask']
+                                 .apply(ast.literal_eval)
+                                 .apply(np.asarray))
     if timepoints:
         time_range = range(min(timepoints), max(timepoints) + 1)
         tc_filter = tracked_centroids[tracked_centroids['frame'].isin(
@@ -322,8 +327,8 @@ def compute_dist_matrix(pred_frame, gt_frame):
 
 
 if __name__ == '__main__':
-    mode = 'test'
-    experiment_name = 'pred_1'
+    mode = 'val'
+    experiment_name = 'pred_2'
 
     tic = time()
     root_dir = c.DATA_DIR if osp.exists(
@@ -336,7 +341,7 @@ if __name__ == '__main__':
     score_tot = {}
     # approximate the HOTA integral (Luiten et al. p. 8)
     # by averaging over different localization thresholds
-    for alpha in (80,):  # np.linspace(5, 100, 5):
+    for alpha in np.linspace(5, 100, 5):
         threshold = alpha
         score_alpha = {}
         for gt_dir in gt_dirs:
@@ -353,7 +358,7 @@ if __name__ == '__main__':
 
             score_alpha[gt_dir] = score
 
-        score_tot[np.round(alpha, 2)] = score_alpha
+        score_tot[round(alpha, 2)] = score_alpha
 
     print(f'eval_track completed in {utils.time_report(tic, time())}.')
     print('Scores:\n')
