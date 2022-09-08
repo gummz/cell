@@ -30,9 +30,9 @@ if __name__ == '__main__':
                     for t, timepoint in enumerate(centroids)
                     for centroid in timepoint]
 
-                n_particles = tuple((len(frame[1]) for frame in frames))
-                len_traj = tuple((len(particle[1]) for particle in particles))
-                mean_len_traj = np.mean(len_traj)
+    n_particles = tuple((len(frame[1]) for frame in frames))
+    len_traj = tuple((len(particle[1]) for particle in particles))
+    mean_len_traj = np.mean(len_traj)
     iter_radius = enumerate(range(5, 105, 5))
     len_radius = len(tuple(iter_radius))
     iter_memory = enumerate(range(0, 6))
@@ -56,11 +56,11 @@ if __name__ == '__main__':
                 to_append = (
                     track_radius,
                     memory,
-                    thresh, 
-                    n_particles, 
+                    thresh,
+                    n_particles,
                     mean_len_traj, mean_diff,
                     track_metric
-                    )
+                )
 
                 radius_track.append(to_append)
 
