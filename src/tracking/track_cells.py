@@ -20,10 +20,6 @@ def track(chains: list, track_radius: int = c.TRACK_RADIUS,
     filtered.reset_index(drop=True, inplace=True)
 
     return filtered
-    """
-    Need to find the constant velocity of the tissue first,
-    by looking at the embryo in question over timepoints.
-    """
 
 
 def calc_turnon(tracked_centroids: pd.DataFrame) -> dict:
@@ -38,7 +34,3 @@ def calc_turnon(tracked_centroids: pd.DataFrame) -> dict:
         # maximum and minimum intensity
         max_val, min_val = np.max(I), np.min(I)
         diff = max_val - min_val
-
-
-if __name__ == "__main__":
-    pass
