@@ -10,6 +10,7 @@ from tqdm import tqdm
 import src.data.utils.utils as utils
 import cc3d
 import scipy
+import skimage as ski
 
 
 '''
@@ -71,30 +72,31 @@ def matrix_to_terse(frames, loops):
     '''
     loops_terse = []
     for frame in tqdm(frames, desc='Condensing loops: frame'):
+
         loops_comp = loops[frame, :, :, :, 0].compute()
 
         unique, counts = np.unique(loops_comp, return_counts=True)
         unique, counts = unique[1:], counts[1:]
         if any(unique):
             labels_out = cc3d.dust(
-                cc3d.connected_components(loops_comp), threshold=5)
+                cc3d.connected_components(loops_comp), threshold=30)
 
             nonzero = np.nonzero(labels_out)
             loop_id = labels_out[nonzero]
             len_ids = len(loop_id)
             len_un_ids = len(np.unique(loop_id))
-            assert 255 - len_un_ids > 0, \
-                'Too many loops to assign ids from 0 to 255'
 
             loops_frame = np.zeros((len_ids, 5), dtype=np.int16)
             loops_frame[:, 0] = frame
 
             add = 50 if len_un_ids <= 205 else 255 - len_un_ids
             loops_frame[:, 1] = loop_id + add
-            print('frame', frame,
-                  'len_ids', len_ids,
-                  'len_un_ids', len_un_ids,
-                  'add', add)
+            # print('frame', frame,
+            #       'len_ids', len_ids,
+            #       'len_un_ids', len_un_ids,
+            #       'add', add)
+            assert 255 - len_un_ids > 0, \
+                'Too many loops to assign ids from 0 to 255'
 
             loops_frame[:, 2:] = np.column_stack(nonzero)
 
@@ -117,13 +119,16 @@ def shape_check(z_slice_comp, unique, counts, loop_final):
         f'{counts} != {unique_counts_final}'
 
 
-def get_loops(loop_path, pred_path, frames, load=True):
+def get_loops(loop_path, name,
+              frames=None, load=True):
     if load:
-        raw_file = osp.splitext(osp.basename(pred_path))[0]
-        fr_min, fr_max = min(frames), max(frames)
-        name = f'loops_{raw_file}_t{fr_min}-{fr_max}.csv'
-        loops = pd.read_csv(osp.join(osp.dirname(pred_path), raw_file, name))
-        loops = loops[loops.timepoint.isin(frames)]
+        # raw_file = osp.splitext(osp.basename(pred_path))[0]
+        # fr_min, fr_max = min(frames), max(frames)
+        # name = f'loops_{raw_file}_t{fr_min}-{fr_max}.csv'
+        # print()
+        loops = pd.read_csv(name)
+        if frames:
+            loops = loops[loops.timepoint.isin(frames)]
     else:
         loop_file = AICSImage(loop_path)
         # get raw loops
@@ -141,7 +146,7 @@ def terse_to_disk(save_path, frames, loops):
      .to_csv(save_path, index=False))
 
 
-def loop_analysis(frames, pr_trajs, loops):
+def process_loops(frames, pr_trajs, loops):
     in_loop = inside_loop(frames, pr_trajs, loops)
     dist_loop = dist_to_loop(frames, pr_trajs, loops)
     return in_loop, dist_loop
@@ -162,25 +167,133 @@ def inside_loop(frames, pr_trajs, loops):
     ----------
     np.ndarray
     '''
-    in_loop = np.zeros(len(pr_trajs), dtype=np.bool)
+    coord_col = ['x', 'y', 'z']
+    in_loop = np.zeros(len(pr_trajs), dtype=np.float32)
 
-    for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']), desc='Analysis per loop'):
-        # only filter trajectories if timepoint changes
+    for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']),
+                              desc='Analysis per loop'):
+        loop_coord = loop[coord_col].values
 
-        for cell in pr_trajs[pr_trajs.frame == tp].iterrows():
-            select_tp = (pr_trajs.frame == tp) and (pr_trajs.particle == cell.particle)
-            hull = scipy.spatial.ConvexHull(loop)
-            pr_trajs['in_loop'][select_tp] = points_in_hull(cell.mask.values, hull)
+        # check if loop is 3-dimensional
+        if not loop_3d_check(loop):
+            # loop is not 3-dimensional since for at least one of
+            # x, y, or z, there is only one unique value
+            # so we cannot create a convex hull'
+
+            # so we perform a 3D dilation
+            loop_coord = dilate_3d(loop_coord)
+
+        # loop is 3-dimensional
+        # this can be further vectorized
+        # by splitting the in_loop array correctly (row-wise)
+        # and then dividing by the number of mask coordinates for each cell
+        for idx, cell in tqdm(pr_trajs[pr_trajs.frame == tp].iterrows(),
+                              desc='Analysis per cell'):
+            hull = scipy.spatial.ConvexHull(loop_coord)
+            overlap = overlap_hull(cell['mask'], hull)
+            # in the unlikely event of a cell being inside two hulls,
+            # we take the one with the largest overlap
+            if overlap > in_loop.iloc[idx]:
+                in_loop.iloc[idx] = round(overlap, 4)
 
     return in_loop
 
 
-def points_in_hull(points, hull, tol=1e-12):
+def dilate_3d(loop_coord):
+    '''
+    Dilate a 2D loop to a 3D loop.
+    '''
+    loop_img = np.zeros((1024, 1024, 1024), dtype=np.bool)
+    loop_img[loop_coord[:, 0], loop_coord[:, 1], loop_coord[:, 2]] = 1
+    dilated = ski.morphology.binary_dilation(
+        loop_img, ski.morphology.ball(radius=30)
+    )
+    loop_coord = np.argwhere(dilated)
+    return loop_coord
+
+
+def loop_3d_check(loop):
+    '''
+    Check if a loop is 3-dimensional.
+
+    Input
+    ----------
+    loop : pandas.DataFrame
+        A loop.
+
+    Output
+    ----------
+    bool
+        If true, loop is 3-dimensional.
+        If false, loop is not 3-dimensional.
+    '''
+    coord_col = ['x', 'y', 'z']
+    return all(len(loop[c].unique()) > 1 for c in coord_col)
+
+
+def overlap_hull(points, hull, tol=1e-12):
     '''
     Returns the ratio of overlap between a cell and 
     the convex hull of a loop boundary.
+
+    Input
+    ----------
+    points : np.ndarray
+        Cell mask.
+    hull : scipy.spatial.ConvexHull
+        Convex hull of loop boundary.
+
+    Output
+    ----------
+    float
+        Overlap between cell mask and loop's convex hull.
+        Between 0 and 1 (inclusive).
     '''
     return np.sum(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol, 0) / len(points)
+
+
+def overlap_hull2(points, hull, tol=1e-12):
+    '''
+    Returns the ratio of overlap between a cell and 
+    the convex hull of a loop boundary.
+
+    Input
+    ----------
+    points : np.ndarray
+        Cell mask.
+    hull : scipy.spatial.ConvexHull
+        Convex hull of loop boundary.
+    tol : float
+        Tolerance for numerical errors.
+
+    Output
+    ----------
+    float
+        Ratio of overlap between cell and convex hull.
+    '''
+    # check if cell is completely inside loop
+    if hull.find_simplex(points, tol=tol) >= 0:
+        return 1
+
+    # check if cell is completely outside loop
+    if hull.find_simplex(points[0], tol=tol) < 0:
+        return 0
+
+    # cell overlaps with loop
+    # get the convex hull of the cell
+    cell_hull = scipy.spatial.ConvexHull(points)
+
+    # get the volume of the convex hull
+    cell_vol = cell_hull.volume
+
+    # get the volume of the intersection of the cell and loop
+    # the intersection is the convex hull of the intersection of the points
+    # of the cell and the points of the loop
+    pts = np.concatenate([points, hull.points])
+    inter_hull = scipy.spatial.ConvexHull(pts)
+    inter_vol = inter_hull.volume
+
+    return inter_vol / cell_vol
 
 
 def dist_to_loop(frames, pr_trajs, loops):
@@ -226,12 +339,12 @@ def prep_file(draft_file, save_loops, load_loops,
 
         # get loop boundaries
         loop_path = loop_files[osp.splitext(pred_dir)[0]]
-        loops = get_loops(loop_path, pred_dir_path, frames, load_loops)
+        loops = get_loops(loop_path, saved_path_loops, frames, load_loops)
         if save_loops:
             utils.make_dir(pred_dir_path)
             terse_to_disk(saved_path_loops, frames, loops)
 
-        pr_trajs[['in_loop', 'dist_loop']] = loop_analysis(
+        pr_trajs[['in_loop', 'dist_loop']] = process_loops(
             frames, pr_trajs, loops)
 
         return pr_trajs
@@ -251,32 +364,26 @@ def prep_cells_w_loops(experiment_name, draft_file, save_loops, load_loops):
         pr_trajs = prep_file(draft_file, save_loops, load_loops,
                              pred_path, loop_files, pred_dir)
 
-        csv_path = osp.join(pred_path, pred_dir,
-                            'tracked_centroids_loops.csv')
-        pr_trajs.to_csv(csv_path, index=False)
+        if pr_trajs:
+            csv_path = osp.join(pred_path, pred_dir,
+                                'tracked_centroids_loops.csv')
+            pr_trajs.to_csv(csv_path, index=False)
 
 
 if __name__ == '__main__':
     experiment_name = 'pred_2'
     draft_file = 'LI_2019-02-05_emb5_pos4'
 
-    save_loops = True  # save condensed loops to disk
-    load_loops = False  # load condensed loops from disk
-    save_filled = False  # save filled loops to disk
-    load_filled = False  # load filled loops from disk
+    save_loops = False  # save condensed loops to disk
+    load_loops = True  # load condensed loops from disk
 
     # redundant to save loaded loops to disk
     save_loops = False if load_loops else save_loops
-    save_filled = False if load_filled else save_filled
 
     tic = time()
     np.random.seed(42)
     utils.set_cwd(__file__)
     pr_trajs = prep_cells_w_loops(
         experiment_name, draft_file, save_loops, load_loops)
-
-    # I can include segmentations in the dataframe that trackpy
-    # receives as input
-    # It can also be terse like loops.csv
 
     print(f'prep_loop_corr: Time elapsed: {utils.time_report(tic, time())}.')
