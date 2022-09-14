@@ -172,37 +172,62 @@ def inside_loop(frames, pr_trajs, loops):
 
     for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']),
                               desc='Analysis per loop'):
+        if tp != 0 or _ != 84:
+            continue
         loop_coord = loop[coord_col].values
 
         # check if loop is 3-dimensional
+        if not loop_3d_check(loop_coord):
         if not loop_3d_check(loop):
             # loop is not 3-dimensional since for at least one of
             # x, y, or z, there is only one unique value
             # so we cannot create a convex hull'
 
-            # so we perform a 3D dilation
-            loop_coord = dilate_3d(loop_coord)
+            # so we perform a 2D-to-3D stretch of the loop
+            loop_coord = stretch_to_3d(loop_coord)
 
         # loop is 3-dimensional
         # this can be further vectorized
         # by splitting the in_loop array correctly (row-wise)
         # and then dividing by the number of mask coordinates for each cell
-        for idx, cell in tqdm(pr_trajs[pr_trajs.frame == tp].iterrows(),
-                              desc='Analysis per cell'):
+        for idx, cell in pr_trajs[pr_trajs.frame == tp].iterrows():
             hull = scipy.spatial.ConvexHull(loop_coord)
             overlap = overlap_hull(cell['mask'], hull)
             # in the unlikely event of a cell being inside two hulls,
             # we take the one with the largest overlap
-            if overlap > in_loop.iloc[idx]:
-                in_loop.iloc[idx] = round(overlap, 4)
+
+            if overlap > in_loop[idx]:
+                in_loop[idx] = round(overlap, 4)
 
     return in_loop
 
 
-def dilate_3d(loop_coord):
+def stretch_to_3d(loop_coord):
     '''
-    Dilate a 2D loop to a 3D loop.
+    Turn a 2D loop into a 3D loop by stretching the missing dimension.
+    I.e. if the loop only has x and y dimension (z is constant),
+    then we copy the shape for a few values of z.
+    Circle becomes cylinder, square becomes cube, etc.
     '''
+    print(loop_coord.shape)
+    n_coord = len(loop_coord)
+    # number of copies to make of the loop
+    # along the missing dimension
+    # i.e.: if the loop is a 2D circle, then make
+    #  n_stretch  number of copies of it to make a cylinder
+    # which has depth of  n_stretch .
+    n_stretch = 30 // 2 * 2  # ensure n_stretch is even
+    for dim in range(3):
+        unique = np.unique(loop_coord[:, dim])
+        if len(unique) == 1:
+            print('dim missing:', dim, 'len:', len(np.unique(loop_coord[:, dim])))
+            copies = np.repeat(loop_coord[:, :2], n_stretch, axis=0)
+            low, high = unique + np.array([-1, 1]) * n_stretch // 2
+            stretch = np.repeat(np.arange(low, high + 1), n_stretch)
+            stretched = np.empty((len(stretch), 3))
+            stretched[:, :2] = copies
+            stretched[:, 2] = stretch
+            loop_coord = stretched
     loop_img = np.zeros((1024, 1024, 1024), dtype=np.bool)
     loop_img[loop_coord[:, 0], loop_coord[:, 1], loop_coord[:, 2]] = 1
     dilated = ski.morphology.binary_dilation(
@@ -227,8 +252,7 @@ def loop_3d_check(loop):
         If true, loop is 3-dimensional.
         If false, loop is not 3-dimensional.
     '''
-    coord_col = ['x', 'y', 'z']
-    return all(len(loop[c].unique()) > 1 for c in coord_col)
+    return all(len(np.unique(loop[:, d])) > 1 for d in range(3))
 
 
 def overlap_hull(points, hull, tol=1e-12):
@@ -249,7 +273,7 @@ def overlap_hull(points, hull, tol=1e-12):
         Overlap between cell mask and loop's convex hull.
         Between 0 and 1 (inclusive).
     '''
-    return np.sum(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol, 0) / len(points)
+    return np.sum(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol) / len(points)
 
 
 def overlap_hull2(points, hull, tol=1e-12):
