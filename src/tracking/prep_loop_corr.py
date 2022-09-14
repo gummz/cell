@@ -178,7 +178,6 @@ def inside_loop(frames, pr_trajs, loops):
 
         # check if loop is 3-dimensional
         if not loop_3d_check(loop_coord):
-        if not loop_3d_check(loop):
             # loop is not 3-dimensional since for at least one of
             # x, y, or z, there is only one unique value
             # so we cannot create a convex hull'
@@ -221,19 +220,11 @@ def stretch_to_3d(loop_coord):
         unique = np.unique(loop_coord[:, dim])
         if len(unique) == 1:
             print('dim missing:', dim, 'len:', len(np.unique(loop_coord[:, dim])))
-            copies = np.repeat(loop_coord[:, :2], n_stretch, axis=0)
             low, high = unique + np.array([-1, 1]) * n_stretch // 2
+            copies = np.repeat(loop_coord[:, :2], n_stretch, axis=0)
             stretch = np.repeat(np.arange(low, high + 1), n_stretch)
-            stretched = np.empty((len(stretch), 3))
-            stretched[:, :2] = copies
-            stretched[:, 2] = stretch
-            loop_coord = stretched
-    loop_img = np.zeros((1024, 1024, 1024), dtype=np.bool)
-    loop_img[loop_coord[:, 0], loop_coord[:, 1], loop_coord[:, 2]] = 1
-    dilated = ski.morphology.binary_dilation(
-        loop_img, ski.morphology.ball(radius=30)
-    )
-    loop_coord = np.argwhere(dilated)
+            loop_coord = np.column_stack((copies, stretch))
+
     return loop_coord
 
 
@@ -381,6 +372,7 @@ def prep_cells_w_loops(experiment_name, draft_file, save_loops, load_loops):
 
     # can choose only predicted dirs, or all files in /raw_data/
     select_dirs = sorted(os.listdir(pred_path))
+    select_dirs = [file for file in select_dirs if draft_file in file]
     loop_files = get_loop_files(loops_path, select_dirs, draft_file,
                                 filter_prefix, file_ext)
 
