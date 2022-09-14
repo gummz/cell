@@ -25,9 +25,7 @@ def find_json_files(gt_dir_path):
             break
     else:
         cell_images = False
-    if not json_files:
-        raise FileNotFoundError((f'The ground truth directory at {gt_dir_path} '
-                                'was not found.'))
+
     return json_files, cell_images
 
 
@@ -66,7 +64,7 @@ def get_timepoints(png_files, cell_images):
 
 def eval_file(pred_dir_path, json_files, cell_images,
               timepoints, threshold=80):
-    pred_trajs = get_pr_trajs(pred_dir_path, timepoints, 
+    pred_trajs = get_pr_trajs(pred_dir_path, timepoints,
                               columns=['frame', 'x', 'y', 'z', 'particle'])
     gt_trajs = get_gt_trajs(json_files if json_files else None,
                             cell_images)
@@ -93,13 +91,14 @@ def get_pr_trajs(pred_dir_path, timepoints=None,
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
     if columns:
         tracked_centroids = pd.read_csv(track_path, header=0,
-                                        sep=';', names=columns)
+                                        sep=';', usecols=columns)
+        if 'mask' in columns:
+            tracked_centroids['mask'] = (tracked_centroids['mask']
+                                         .apply(ast.literal_eval)
+                                         .apply(np.asarray))
     else:
         tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
-    if 'mask' in columns:
-        tracked_centroids['mask'] = (tracked_centroids['mask']
-                                    .apply(ast.literal_eval)
-                                    .apply(np.asarray))
+
     if timepoints:
         time_range = range(min(timepoints), max(timepoints) + 1)
         tc_filter = tracked_centroids[tracked_centroids['frame'].isin(
@@ -153,6 +152,8 @@ def compute_traj_matrix(frames, pr_trajs, gt_trajs, threshold=80):
     traj_matrix = pd.DataFrame(index=range(len(pr_trajs.groups)),
                                columns=range(len(gt_trajs.groups)),
                                dtype=object)
+    for i, (_, pr_traj) in enumerate(pr_trajs):
+        for j, (_, gt_traj) in enumerate(gt_trajs):
     for i, pr_label in enumerate(pr_trajs.groups):
         pr_traj = pr_trajs.get_group(pr_label)[columns]
         for j, gt_label in enumerate(gt_trajs.groups):
@@ -283,20 +284,23 @@ def compute_score(row_ind, col_ind, traj_score_matrix,
     Compute HOTA score.
     '''
     # associative score
-    AssA = 0
+    AssA, AssPr, AssRe = 0, 0, 0
     for i, j in zip(row_ind, col_ind):
         tp_idx, fn_idx, fp_idx = traj_matrix.iloc[i, j]
         TPA = np.sum(tp_idx)
         FNA = np.sum(fn_idx)
         FPA = np.sum(fp_idx)
         AssA += TPA / (TPA + FNA + FPA)
+        AssPr += TPA / (TPA + FPA)
+        AssRe += TPA / (TPA + FNA)
 
     # detection score
     pred_frames = pred_trajs.obj.groupby('frame')
     gt_frames = gt_trajs.obj.groupby('frame')
-    DetA = compute_DetA(pred_frames, gt_frames, threshold)
+    DetA, DetPr, DetRe = compute_DetA(pred_frames, gt_frames, threshold)
 
-    return np.sqrt(AssA * DetA)
+    return (np.sqrt(AssA * DetA), AssA, AssPr, AssRe,
+            DetA, DetPr, DetRe)
 
 
 def compute_DetA(pred_frames, gt_frames, threshold):
@@ -320,12 +324,21 @@ def compute_DetA(pred_frames, gt_frames, threshold):
             fp_tot += np.sum(matrix_thresh == 0)
 
         DetA = 1 / (tp_tot + fn_tot + fp_tot)
+        DetPr = tp_tot / (tp_tot + fp_tot)
+        DetRe = tp_tot / (tp_tot + fn_tot)
     elif not pred_frames and gt_frames:
         DetA = 1 / len(gt_frames)
+        DetPr = 0
+        DetRe = 0
     elif pred_frames and not gt_frames:
         DetA = 1 / len(pred_frames)
+        DetPr = 0
+        DetRe = 1
+    elif not pred_frames and not gt_frames:
+        DetA = 1
+        DetPr = DetRe = DetA
 
-    return DetA
+    return DetA, DetPr, DetRe
 
 
 def compute_dist_matrix(pred_frame, gt_frame):
@@ -348,10 +361,12 @@ def evaluate(mode, experiment_name):
     score_tot = {}
     # approximate the HOTA integral (Luiten et al. p. 8)
     # by averaging over different localization thresholds
-    for alpha in np.linspace(5, 100, 5):
+    for alpha in np.linspace(30, 200, 5):
         threshold = alpha
         score_alpha = {}
         for gt_dir in gt_dirs:
+            if 'LI_2018-11-20_emb6_pos2' in gt_dir:
+                test = 0
             gt_dir_path = osp.join(groundtruth_path, gt_dir)
             pred_dir_path = osp.join(pred_path, gt_dir)
 
@@ -366,7 +381,10 @@ def evaluate(mode, experiment_name):
             score_alpha[gt_dir] = score
 
         score_tot[round(alpha, 2)] = score_alpha
-    return score_tot
+
+    score_per_alpha = [np.mean(list(value.values()))
+                       for key, value in score_tot.items()]
+    return np.mean(score_per_alpha)
 
 
 if __name__ == '__main__':
