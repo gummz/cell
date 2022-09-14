@@ -388,13 +388,13 @@ def save_tracks(name, output_dir, time_start, time_end,
     #     osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'),
     #     centroids_np)
 
+    name = f'tracked_centroids_t{time_start}_{time_end}'
     pickle.dump(tracked_centroids,
-                open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
+                open(osp.join(output_dir, f'{name}.pkl'), 'wb'))
 
-    (tracked_centroids
-     .sort_values(['frame', 'particle'])
-     .to_csv(osp.join(
-         output_dir, 'tracked_centroids.csv'), sep=';', index=False))
+    utils.to_csv(tracked_centroids.sort_values(['frame', 'particle']),
+                 osp.join(output_dir, f'{name}.csv'),
+                 sep=';')
 
     location = osp.join(output_dir, 'timepoints')
     time_range = range(time_start, time_end) if time_end else None
@@ -420,8 +420,11 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
     files = c.RAW_FILES[mode].keys()
     files = utils.add_ext(files)
     # development purposes:
-    files = [file for file in files if '2019-02-05_emb5_pos4' in file]
-    
+    files = [file for file in files
+             if 'LI_2019-11-08_emb3_pos2' in file
+             or 'LI_2019-09-19_emb1_pos3' in file]
+    # '2019-02-05_emb5_pos4'
+
     len_files = len(files)
 
     for i, name in enumerate(files):
