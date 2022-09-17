@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 import pickle
 import os.path as osp
@@ -391,15 +392,21 @@ def save_tracks(name, output_dir, time_start, time_end,
     name = f'tracked_centroids_t{time_start}_{time_end}'
     pickle.dump(tracked_centroids,
                 open(osp.join(output_dir, f'{name}.pkl'), 'wb'))
+    tracked_centroids = tracked_centroids.sort_values(['frame', 'particle'])
 
-    utils.to_csv(tracked_centroids.sort_values(['frame', 'particle']),
-                 osp.join(output_dir, f'{name}.csv'),
+    utils.to_csv(tracked_centroids,
+                 osp.join(output_dir, f'{name}_withmask.csv'),
+                 sep=';')
+                 
+    cols_nomask = [col for col in tracked_centroids.columns if col != 'mask']
+    utils.to_csv(tracked_centroids[cols_nomask],
+                 osp.join(output_dir, f'{name}_nomask.csv'),
                  sep=';')
 
-    location = osp.join(output_dir, 'timepoints')
-    time_range = range(time_start, time_end) if time_end else None
-    plot.save_figures(tracked_centroids, location)
-    utils.png_to_movie(time_range, location)
+    # location = osp.join(output_dir, 'timepoints')
+    # time_range = range(time_start, time_end) if time_end else None
+    # plot.save_figures(tracked_centroids, location)
+    # utils.png_to_movie(time_range, location)
 
 
 def start_predict(mode, load, experiment_name, accept_range, model_id,
@@ -417,12 +424,16 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
     # 1. Choose raw data file(s)
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    files = c.RAW_FILES[mode].keys()
-    files = utils.add_ext(files)
-    # development purposes:
+    if mode != 'all':
+        files = c.RAW_FILES[mode].keys()
+        files = utils.add_ext(files)
+    else:
+        files = os.listdir(c.RAW_DATA_DIR)
+        
+    # remove files that have already been processed
+    output_dir = osp.join(c.DATA_DIR, c.PRED_DIR, experiment_name)
     files = [file for file in files
-             if 'LI_2019-11-08_emb3_pos2' in file
-             or 'LI_2019-09-19_emb1_pos3' in file]
+             if not osp.exists(osp.join(output_dir, osp.splitext(file)[0]))]
     # '2019-02-05_emb5_pos4'
 
     len_files = len(files)
@@ -430,18 +441,20 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
     for i, name in enumerate(files):
         print('Predicting', name,
               f'(file {i + 1}/{len_files})...', end='')
-        output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
-                              experiment_name, osp.splitext(name)[0])
-        utils.make_dir(output_dir)
+        output_path = osp.join(output_dir, osp.splitext(name)[0])
+        utils.make_dir(output_path)
         predict_file(load, device,
-                     model, output_dir, name,
+                     model, output_path, name,
                      time_range, accept_range,
                      save_pred, load_pred)
         print('done.')
 
 
 if __name__ == '__main__':
-    mode = 'test'  # for which embryos to predict
+    # set mode = 'all' to predict all files
+    # set mode = 'test' to predict test files
+    #   and so on for train and val files
+    mode = 'all'  # for which embryos to predict
     load = False  # load complete tracks? useful for reproducing figures and movie
     experiment_name = 'pred_2'  # name of folder to save predictions to
     accept_range = (0.91, 1)  # how certain the model should be
