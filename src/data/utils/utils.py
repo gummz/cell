@@ -112,6 +112,19 @@ def get_data_dir():
             return osp.join('..', c.PROJECT_DATA_DIR)
 
 
+def get_dir_size(path='.', recursive=False):
+    total = 0
+    if not osp.exists(path):
+        return total
+    with os.scandir(path) as it:
+        for entry in it:
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir() and recursive:
+                total += get_dir_size(entry.path)
+    return total
+
+
 def get_mask(output):
     '''Consolidates the masks into one mask.'''
     if type(output) == dict:  # `output` is direct output of model (from one image)
