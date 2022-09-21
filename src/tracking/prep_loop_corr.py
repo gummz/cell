@@ -189,12 +189,15 @@ def inside_loop(frames, pr_trajs, loops):
         # this can be further vectorized
         # by splitting the in_loop array correctly (row-wise)
         # and then dividing by the number of mask coordinates for each cell
+        # so only one call to overlap_hull would be needed,
+        # for the entire pr_trajs array
+
+        hull = scipy.spatial.ConvexHull(loop_coord, qhull_options='QJ')
+
         for idx, cell in pr_trajs[pr_trajs.frame == tp].iterrows():
-            hull = scipy.spatial.ConvexHull(loop_coord)
             overlap = overlap_hull(cell['mask'], hull)
             # in the unlikely event of a cell being inside two hulls,
             # we take the one with the largest overlap
-
             if overlap > in_loop[idx]:
                 in_loop[idx] = round(overlap, 4)
 
