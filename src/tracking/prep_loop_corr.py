@@ -122,8 +122,15 @@ def get_loops(loop_path, name,
         # fr_min, fr_max = min(frames), max(frames)
         # name = f'loops_{raw_file}_t{fr_min}-{fr_max}.csv'
         # print()
-        loops = pd.read_csv(name)
-        if frames:
+        if osp.exists(name):
+            loops = pd.read_csv(name)
+            print(f'Loaded loops file from {name}.')
+        else:
+            print(
+                f'Loop file not found: {name} (check for typos).\nGenerating new loops file.')
+            loops, frames = get_loops(loop_path, name,
+                                      frames, load=False)
+        if frames is not None:
             loops = loops[loops.timepoint.isin(frames)]
     else:
         loop_file = AICSImage(loop_path)
@@ -134,7 +141,7 @@ def get_loops(loop_path, name,
         # condense loops into terse representation
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
 
-    return loops
+    return loops, frames
 
 
 def terse_to_disk(save_path, frames, loops):
