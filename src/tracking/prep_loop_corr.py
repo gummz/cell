@@ -343,10 +343,76 @@ def dist_to_loop(frames, pr_trajs, loops):
     Every loop coordinate is used, while only the center is used for a cell.
     Loop can be indexed to select a subset of
     the loop's coordinates.
+
+    Inputs
+    ----------
+    frames : pandas.DataFrame
+        Frame data.
+    pr_trajs : pandas.DataFrame
+        Trajectory data.
+    loops : pandas.DataFrame
+        Loop data.
+
+    Outputs
+    ----------
+    loop_dist : np.ndarray
+        Distance array between cell centers and nearest loop coordinate.
     '''
-    dist = scipy.spatial.distance_matrix(pr_trajs[['x', 'y', 'z']].values,
-                                         loops[['x', 'y', 'z']].values)
-    return dist.min(axis=1)
+    coord_col = ['x', 'y', 'z']
+    loop_dist = np.zeros(len(pr_trajs))
+    for tp in tqdm(frames, desc='Add dist_loop column'):
+        cells_tp = pr_trajs[pr_trajs.frame == tp]
+        loops_tp = loops[loops.timepoint == tp]
+        if cells_tp.empty or loops_tp.empty:  # no data for this timepoint
+            continue
+        dist = scipy.spatial.distance.cdist(
+            cells_tp[coord_col].values, loops_tp[coord_col].values)
+        loop_dist[cells_tp.index] = np.min(dist, axis=1)
+
+    return loop_dist
+
+
+def is_beta_cell(frames, pr_trajs):
+    '''
+    Returns whether a cell is a beta cell.
+
+    Inputs
+    ----------
+    frames : pandas.DataFrame
+        Frame data.
+    pr_trajs : pandas.DataFrame
+        Trajectory data.
+
+    Outputs
+    ----------
+    is_beta : np.ndarray
+        Whether a cell is a beta cell.
+    '''
+    threshold = 0.07
+    grad_thresh = 0.55
+    risen_thresh = 0.5
+    particles = [item[1] for item in pr_trajs.groupby('particle')]
+
+    dim_to_bright = np.full(len(particles), False)
+    for i, cell in tqdm(enumerate(particles), desc='Add "is beta cell?" column'):
+        intensity = cell.intensity.values
+
+        # skip tracks that were present at the start
+        if np.all(frames[:3] == range(3)) and np.all(intensity[:3] > threshold / 2):
+            continue
+
+        grad = np.gradient(intensity)
+        ascending = np.sum(grad > 0) / len(grad) > grad_thresh
+        risen = np.sum(intensity > threshold) / len(intensity) > risen_thresh
+        reach = np.max(intensity) > threshold
+        if any((ascending, risen, reach)):
+            dim_to_bright[i] = True
+
+    dim_to_bright_id = [np.unique(cell.particle)[0]
+                        for cell, idxbool in zip(particles, dim_to_bright)
+                        if idxbool]
+
+    return pr_trajs.particle.isin(dim_to_bright_id)
 
 
 def nearest_loop(row, loops):
