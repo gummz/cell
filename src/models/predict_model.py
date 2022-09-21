@@ -431,9 +431,7 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
         files = os.listdir(c.RAW_DATA_DIR)
 
     output_dir = osp.join(c.DATA_DIR, c.PRED_DIR, experiment_name)
-    files = [file for file in files
-             if not osp.exists(osp.join(output_dir, osp.splitext(file)[0]))]
-    # '2019-02-05_emb5_pos4'
+    files = filter_files(output_dir, files)
 
     len_files = len(files)
     for i, name in enumerate(files):
@@ -448,7 +446,22 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
         print('done.\n')
 
 
-        print('done.')
+def filter_files(output_dir, files):
+    # remove files from consideration that have already been processed
+    # files below 50000 bytes are considered empty and therefore
+    # will be removed from consideration
+    tmp_files = files.copy()
+    files = [file for file in files
+             if utils.get_dir_size(osp.join(output_dir, osp.splitext(file)[0])) < 50000]
+    print('\nPredictions for the following files were found:')
+    print('\n'.join([file for file in tmp_files if file not in files]))
+    print('Predictions will therefore not be made for these files.\n')
+    # remove files with .czi extension
+    print('Removing files with .czi extension:')
+    tmp_files = files.copy()
+    files = [file for file in files if '.czi' not in file]
+    print('\n'.join([file for file in tmp_files if file not in files]), '\n')
+    return files
 
 
 if __name__ == '__main__':
