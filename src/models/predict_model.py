@@ -251,8 +251,8 @@ def predict_timepoint(data, device, model, output_dir,
                                accept_range=accept_range)
 
     # draw bounding boxes on slice for debugging
-    viz.output_sample(osp.join(output_dir, 'debug'), t,
-                      timepoint_raw, preds, 1024, device)
+    # viz.output_sample(osp.join(output_dir, 'debug'), t,
+    #                   timepoint_raw, preds, 1024, device)
 
     # adjust slices from being model inputs to being
     # inputs to get_chains
@@ -397,7 +397,7 @@ def save_tracks(name, output_dir, time_start, time_end,
     utils.to_csv(tracked_centroids,
                  osp.join(output_dir, f'{name}_withmask.csv'),
                  sep=';')
-                 
+
     cols_nomask = [col for col in tracked_centroids.columns if col != 'mask']
     utils.to_csv(tracked_centroids[cols_nomask],
                  osp.join(output_dir, f'{name}_nomask.csv'),
@@ -429,24 +429,25 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
         files = utils.add_ext(files)
     else:
         files = os.listdir(c.RAW_DATA_DIR)
-        
-    # remove files that have already been processed
+
     output_dir = osp.join(c.DATA_DIR, c.PRED_DIR, experiment_name)
     files = [file for file in files
              if not osp.exists(osp.join(output_dir, osp.splitext(file)[0]))]
     # '2019-02-05_emb5_pos4'
 
     len_files = len(files)
-
     for i, name in enumerate(files):
         print('Predicting', name,
-              f'(file {i + 1}/{len_files})...', end='')
+              f'(file {i + 1}/{len_files})...')
         output_path = osp.join(output_dir, osp.splitext(name)[0])
         utils.make_dir(output_path)
         predict_file(load, device,
                      model, output_path, name,
                      time_range, accept_range,
                      save_pred, load_pred)
+        print('done.\n')
+
+
         print('done.')
 
 
