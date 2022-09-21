@@ -130,6 +130,7 @@ def get_loops(loop_path, name,
         # get raw loops
         loops = np.moveaxis(loop_file.get_image_dask_data('CZYXS'), 1, 0)
         columns = ['timepoint', 'loop_id', 'z', 'y', 'x']
+        frames = np.arange(loops.shape[0], dtype=np.int16)
         # condense loops into terse representation
         loops = pd.DataFrame(matrix_to_terse(frames, loops), columns=columns)
 
