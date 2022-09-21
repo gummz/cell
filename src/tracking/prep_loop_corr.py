@@ -77,8 +77,8 @@ def matrix_to_terse(frames, loops):
         unique, counts = np.unique(loops_comp, return_counts=True)
         unique, counts = unique[1:], counts[1:]
         if any(unique):
-            labels_out = cc3d.dust(
-                cc3d.connected_components(loops_comp), threshold=30)
+            labels_out = cc3d.dust(cc3d.connected_components(loops_comp),
+                                   threshold=5)
 
             nonzero = np.nonzero(labels_out)
             loop_id = labels_out[nonzero]
@@ -90,12 +90,9 @@ def matrix_to_terse(frames, loops):
 
             add = 50 if len_un_ids <= 205 else 255 - len_un_ids
             loops_frame[:, 1] = loop_id + add
-            # print('frame', frame,
-            #       'len_ids', len_ids,
-            #       'len_un_ids', len_un_ids,
-            #       'add', add)
-            assert 255 - len_un_ids > 0, \
-                'Too many loops to assign ids from 0 to 255'
+
+            # assert 255 - len_un_ids > 0, \
+            #     'Too many loops to assign ids from 0 to 255'
 
             loops_frame[:, 2:] = np.column_stack(nonzero)
 
