@@ -198,6 +198,32 @@ def inside_loop(frames, pr_trajs, loops):
             if overlap > in_loop[idx]:
                 in_loop[idx] = round(overlap, 4)
 
+        # TODO: alternative, faster, vectorized version
+        # (UNFINISHED)
+        # cells_tp = pr_trajs[pr_trajs.frame == tp]
+        # masks = cells_tp['mask']
+        # overlap = overlap_hull3(np.row_stack(masks.values), hull)
+        # mask_lens = masks.apply(len)
+        # cumsum = np.cumsum(mask_lens)  # indices to separate `overlap` vector
+        # vectors = np.split(overlap, cumsum[:-1])
+        # overlaps = vectors / mask_lens
+        # print('pr_trajs', pr_trajs.shape)
+        # print('masks', masks.shape)
+        # print('mask_lens', mask_lens.shape)
+        # print('cumsum', cumsum.shape)
+        # print('vectors', len(vectors))
+        # print('overlaps', len(overlaps))
+        # print('cells_tp.index', cells_tp.index.values)
+        # print('in_loop[cells_tp.index]', in_loop[cells_tp.index.values].shape)
+
+        # overlaps_gt = np.greater(overlaps, in_loop[cells_tp.index.values])
+        # in_loop2[cells_tp.index[overlaps_gt].values] = overlaps
+        # assert not np.sum(in_loop != in_loop2), 'in_loop != in_loop2'
+        # print('assert passed')
+        # print(overlaps.shape)
+        # print(overlaps)
+        # exit()
+
     return in_loop
 
 
