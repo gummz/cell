@@ -243,24 +243,44 @@ def stretch_to_3d(loop_coord):
     I.e. if the loop only has x and y dimension (z is constant),
     then we copy the shape for a few values of z.
     Circle becomes cylinder, square becomes cube, etc.
+
+    Input
+    ----------
+    loop_coord : np.ndarray
+        Loop coordinates.
+
+    Output
+    ----------
+    np.ndarray
+        Stretched loop coordinates.
     '''
-    print(loop_coord.shape)
-    n_coord = len(loop_coord)
     # number of copies to make of the loop
     # along the missing dimension
     # i.e.: if the loop is a 2D circle, then make
     #  n_stretch  number of copies of it to make a cylinder
     # which has depth of  n_stretch .
-    n_stretch = 30 // 2 * 2  # ensure n_stretch is even
-    for dim in range(3):
+    # loop is stretched by n_stretch * 2
+    # in all dimensions which are missing
+    n_stretch = (100, 100, 5)
+    dim_range = range(3)
+    for dim in dim_range:
+        n_coord = len(loop_coord)
         unique = np.unique(loop_coord[:, dim])
         if len(unique) == 1:
-            print('dim missing:', dim, 'len:', len(np.unique(loop_coord[:, dim])))
-            low, high = unique + np.array([-1, 1]) * n_stretch // 2
-            copies = np.repeat(loop_coord[:, :2], n_stretch, axis=0)
-            stretch = np.repeat(np.arange(low, high + 1), n_stretch)
-            loop_coord = np.column_stack((copies, stretch))
+            select = [x for x in dim_range if x != dim]
+            copies = np.repeat(
+                loop_coord[:, select], n_stretch[dim] * 2, axis=0)
+            low, high = unique + np.array([-1, 1]) * n_stretch[dim]
+            if low < 0:
+                high = -low + high
+                low = 0
 
+            stretch = np.repeat(np.arange(low, high), n_coord)
+            loop_coord = np.column_stack((copies, stretch))
+            if dim == 0:
+                loop_coord = loop_coord[:, (2, 0, 1)]
+            elif dim == 1:
+                loop_coord = loop_coord[:, (0, 2, 1)]
     return loop_coord
 
 
