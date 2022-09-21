@@ -151,9 +151,12 @@ def terse_to_disk(save_path, frames, loops):
 
 
 def process_loops(frames, pr_trajs, loops):
+    pr_trajs = pr_trajs[pr_trajs.frame.isin(frames)]
     in_loop = inside_loop(frames, pr_trajs, loops)
     dist_loop = dist_to_loop(frames, pr_trajs, loops)
-    return in_loop, dist_loop
+    is_beta = is_beta_cell(frames, pr_trajs)
+    return (np.round(in_loop, 4), np.round(dist_loop, 4),
+            is_beta)
 
 
 def inside_loop(frames, pr_trajs, loops):
