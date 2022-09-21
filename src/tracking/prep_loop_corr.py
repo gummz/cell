@@ -43,7 +43,7 @@ def set_paths(experiment_name):
     return pred_path, loops_path
 
 
-def get_loop_files(loops_path, pred_dirs, draft_file,
+def get_loop_files(loops_path, pred_dirs,
                    filter_prefix, file_ext):
     pred_dirs_noext = [osp.splitext(file)[0]
                        for file in pred_dirs]
@@ -56,8 +56,7 @@ def get_loop_files(loops_path, pred_dirs, draft_file,
         dir_folders = [folder for folder in subfolders
                        if 'LI' in folder]
         for folder in dir_folders:
-            if (folder in pred_dirs_noext
-                    and folder == draft_file):
+            if folder in pred_dirs_noext:
                 loop_file = [file
                              for file in os.listdir(osp.join(folders, folder))
                              if filter_prefix in file
