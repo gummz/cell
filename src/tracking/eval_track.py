@@ -75,15 +75,15 @@ def eval_file(pred_dir_path, json_files, cell_images,
 
     # NB: sum of traj_score_matrix[row_ind, col_ind]
     # are the AssA scores
-    score = compute_score(row_ind, col_ind, traj_score_matrix,
-                          traj_matrix, pred_trajs, gt_trajs,
-                          threshold)
+    scores = compute_score(row_ind, col_ind, traj_score_matrix,
+                           traj_matrix, pred_trajs, gt_trajs,
+                           threshold)
 
     # precision
 
     # recall
 
-    return score
+    return scores
 
 
 def get_pr_trajs(pred_dir_path, timepoints=None,
@@ -293,6 +293,10 @@ def compute_score(row_ind, col_ind, traj_score_matrix,
         AssA += TPA / (TPA + FNA + FPA)
         AssPr += TPA / (TPA + FPA)
         AssRe += TPA / (TPA + FNA)
+    len_rows = np.max((1, len(row_ind)))
+    AssA /= len_rows
+    AssPr /= len_rows
+    AssRe /= len_rows
 
     # detection score
     pred_frames = pred_trajs.obj.groupby('frame')
@@ -323,7 +327,7 @@ def compute_DetA(pred_frames, gt_frames, threshold):
             fp_tot += dist_matrix.shape[0] - len(row_ind)
             fp_tot += np.sum(matrix_thresh == 0)
 
-        DetA = 1 / (tp_tot + fn_tot + fp_tot)
+        DetA = tp_tot / (tp_tot + fn_tot + fp_tot)
         DetPr = tp_tot / (tp_tot + fp_tot)
         DetRe = tp_tot / (tp_tot + fn_tot)
     elif not pred_frames and gt_frames:
@@ -380,11 +384,9 @@ def evaluate(mode, experiment_name):
 
             score_alpha[gt_dir] = score
 
-        score_tot[round(alpha, 2)] = score_alpha
-
-    score_per_alpha = [np.mean(list(value.values()))
-                       for key, value in score_tot.items()]
-    return np.mean(score_per_alpha)
+    return pd.DataFrame(score_tot, columns=['filename', 'alpha', 'HOTA',
+                                            'AssA', 'AssPr', 'AssRe',
+                                            'DetA', 'DetPr', 'DetRe'])
 
 
 if __name__ == '__main__':
