@@ -506,43 +506,81 @@ def nearest_loop(row, loops):
     pass
 
 
-def prep_file(draft_file, save_loops, load_loops,
+def prep_file(save_loops, load_loops,
               pred_path, loop_files, pred_dir):
-    if osp.splitext(pred_dir)[0] == draft_file:
-        pred_dir_path = osp.join(pred_path, pred_dir)
-        pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
-        frames = [item[0] for item in pr_trajs.groupby('frame')]
-        fr_min, fr_max = min(frames), max(frames)
+    '''
+    Prepares the data for the analysis.
 
-        name_loops = f'loops_{pred_dir}_t{fr_min}-{fr_max}.csv'
-        saved_path_loops = osp.join(pred_dir_path, name_loops)
-        # check for existing loops and filled loops
-        # disabled while debugging
-        # if osp.exists(saved_path_loops):
-        #     continue
+    Inputs
+    ----------
+    save_loops : bool
+        If true, save the loops to a file.
+    load_loops : bool
+        If true, load the loops from a file.
+    pred_path : str
+        Path to the prediction file.
+    loop_files : list of str
+        List of paths to the loop files.
+    pred_dir : str
+        Path to the directory containing the predictions.
 
-        # get loop boundaries
-        loop_path = loop_files[osp.splitext(pred_dir)[0]]
-        loops = get_loops(loop_path, saved_path_loops, frames, load_loops)
-        if save_loops:
-            utils.make_dir(pred_dir_path)
-            terse_to_disk(saved_path_loops, frames, loops)
+    Outputs
+    ----------
+    pr_trajs : pandas.DataFrame
+        Predictions.
+    loops : pandas.DataFrame
+        Loops.
+    '''
+    # check if loop file is available in /dtu-compute/tubes/results
+    # LI_2015-07-12_emb5_pos1 is at least not available
+    if pred_dir not in loop_files:
+        print(f'Loop file {pred_dir} not available in /dtu-compute/tubes/results.',
+              'Skipping.\n')
+        return
 
-        pr_trajs[['in_loop', 'dist_loop']] = process_loops(
-            frames, pr_trajs, loops)
+    # load predictions
+    pred_dir_path = osp.join(pred_path, pred_dir)
+    pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
+    frames = np.unique(pr_trajs.frame.values)
+    fr_min, fr_max = min(frames), max(frames)
 
-        return pr_trajs
+    name_loops = f'loops_{pred_dir}_t{fr_min}-{fr_max}.csv'
+    saved_path_loops = osp.join(pred_dir_path, '../..', 'loops', name_loops)
+    # check for existing loops and filled loops
+    # disabled while debugging
+    # if osp.exists(saved_path_loops):
+    #     continue
+
+    # get loop boundaries
+    loop_path = loop_files[osp.splitext(pred_dir)[0]]
+    loops, frames = get_loops(loop_path, saved_path_loops, frames, load_loops)
+    if save_loops:
+        terse_to_disk(saved_path_loops, frames, loops)
+
+    pr_trajs = pr_trajs[pr_trajs.frame.isin(frames)]
+    in_loop, dist_loop, beta = process_loops(
+        frames, pr_trajs, loops)
+    pr_trajs['in_loop'] = in_loop
+    pr_trajs['dist_loop'] = dist_loop
+    pr_trajs['beta'] = beta
+
+    return pr_trajs
 
 
-def prep_cells_w_loops(experiment_name, draft_file, save_loops, load_loops):
+def prep_cells_w_loops(experiment_name, save_loops, load_loops):
     filter_prefix = 'cyctpy15'
     file_ext = 'tif'
     pred_path, loops_path = set_paths(experiment_name)
+    utils.make_dir(osp.join(pred_path, 'loops'))
 
     # can choose only predicted dirs, or all files in /raw_data/
     select_dirs = sorted(os.listdir(pred_path))
-    select_dirs = [file for file in select_dirs if draft_file in file]
-    loop_files = get_loop_files(loops_path, select_dirs, draft_file,
+    # skip incomplete or missing predictions
+    select_dirs = [folder for folder in select_dirs
+                   if utils.get_dir_size(osp.join(pred_path,
+                                                  osp.splitext(folder)[0])) > 50000]
+
+    loop_files = get_loop_files(loops_path, select_dirs,
                                 filter_prefix, file_ext)
 
     for pred_dir in tqdm(select_dirs, desc='Prediction'):
