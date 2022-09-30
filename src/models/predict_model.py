@@ -392,7 +392,7 @@ def save_tracks(name, output_dir, time_start, time_end,
     name = f'tracked_centroids_t{time_start}_{time_end}'
     pickle.dump(tracked_centroids,
                 open(osp.join(output_dir, f'{name}.pkl'), 'wb'))
-    tracked_centroids = tracked_centroids.sort_values(['frame', 'particle'])
+    tracked_centroids = tracked_centroids.sort_values(['frame', 'id'])
 
     utils.to_csv(tracked_centroids,
                  osp.join(output_dir, f'{name}_withmask.csv'),

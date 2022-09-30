@@ -8,7 +8,7 @@ def track(chains: list, track_radius: int = c.TRACK_RADIUS,
           memory: int = 5,
           threshold: int = 0,
           adaptive_step: float = 0.8) -> pd.DataFrame:
-    columns = ['frame', 'x', 'y', 'z', 'intensity', 'mask']
+    columns = ['frame', 'x', 'y', 'z', 'mean_intensity', 'mask']
     df_chains = pd.DataFrame(
         chains, columns=columns, dtype=float
     )
@@ -18,7 +18,8 @@ def track(chains: list, track_radius: int = c.TRACK_RADIUS,
                       adaptive_stop=10)
     filtered = trackpy.filtering.filter_stubs(tr, threshold=threshold)
     filtered.reset_index(drop=True, inplace=True)
-
+    filtered = filtered.rename(columns={'particle': 'id'})[columns + ['id']]
+    filtered = filtered[['frame', 'id', 'x', 'y', 'z', 'mean_intensity', 'mask']]
     return filtered
     """
     Need to find the constant velocity of the tissue first,
