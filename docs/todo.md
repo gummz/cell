@@ -1,6 +1,6 @@
 *To-do list - primary items*
 
-- Review mean pixel intensity calculation
+- Take only 50 best matches per slice?
 
 - Make code that compares loops and cells
   - Add turn-on point for each cell based on steepest ascent of intensity. In `X, Y, P, I, O` where `O` is a dictionary with cell number as key, and frame in which cell turned on as value.
@@ -23,10 +23,6 @@
   - If model is significantly better, annotate 400 more images
   
 - Remember - sometimes it's better to conduct experiments manually than to write code for a single experiment
-
-- 3D segmentations
-    - use for tracking (size, shape, etc.)
-    - could even use a custom algorithm for detecting cell based on object shape
 
 - Kasra segmentations - since cells are only inside tubes, use tube segmentations to mark areas for prediction?
 
@@ -72,6 +68,12 @@
 - - -
 
 *Done*
+
+- 3D segmentations
+    - use for tracking (size, shape, etc.)
+    - could even use a custom algorithm for detecting cell based on object shape
+
+- Review mean pixel intensity calculation
 
 - Create `eval_track.py` which takes Pia's and Silja's labels and compares them with `tracked_centroids.pkl` (use SciPy matching optimization)
   - Construct evaluation version of tracked_centroids from their labels
