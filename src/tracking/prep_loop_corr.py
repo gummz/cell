@@ -253,7 +253,8 @@ def inside_loop(frames, pr_trajs, loops):
             if overlap > in_loop[idx]:
                 in_loop[idx] = round(overlap, 4)
 
-        # TODO: alternative, faster, vectorized version
+        # TODO: alternative, faster, 
+        # completely vectorized version
         # (UNFINISHED)
         # cells_tp = pr_trajs[pr_trajs.frame == tp]
         # masks = cells_tp['mask']
@@ -367,51 +368,11 @@ def overlap_hull(points, hull, tol=1e-12):
         Overlap between cell mask and loop's convex hull.
         Between 0 and 1 (inclusive).
     '''
-    return np.sum(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol) / len(points)
+    return np.sum(np.all(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol, 0)) / len(points)
 
 
-def overlap_hull2(points, hull, tol=1e-12):
-    '''
-    Returns the ratio of overlap between a cell and 
-    the convex hull of a loop boundary.
 
-    Input
-    ----------
-    points : np.ndarray
-        Cell mask.
-    hull : scipy.spatial.ConvexHull
-        Convex hull of loop boundary.
-    tol : float
-        Tolerance for numerical errors.
 
-    Output
-    ----------
-    float
-        Ratio of overlap between cell and convex hull.
-    '''
-    # check if cell is completely inside loop
-    if hull.find_simplex(points, tol=tol) >= 0:
-        return 1
-
-    # check if cell is completely outside loop
-    if hull.find_simplex(points[0], tol=tol) < 0:
-        return 0
-
-    # cell overlaps with loop
-    # get the convex hull of the cell
-    cell_hull = scipy.spatial.ConvexHull(points)
-
-    # get the volume of the convex hull
-    cell_vol = cell_hull.volume
-
-    # get the volume of the intersection of the cell and loop
-    # the intersection is the convex hull of the intersection of the points
-    # of the cell and the points of the loop
-    pts = np.concatenate([points, hull.points])
-    inter_hull = scipy.spatial.ConvexHull(pts)
-    inter_vol = inter_hull.volume
-
-    return inter_vol / cell_vol
 
 
 def dist_to_loop(frames, pr_trajs, loops):
@@ -482,7 +443,7 @@ def is_beta_cell(frames, pr_trajs):
         ascending = np.sum(grad > 0) / len(grad) > grad_thresh
         risen = np.sum(intensity > threshold) / len(intensity) > risen_thresh
         reach = np.max(intensity) > threshold
-        if any((ascending, risen, reach)):
+        if any((ascending, risen and reach)):
             dim_to_bright[i] = True
 
     dim_to_bright_id = [np.unique(cell.particle)[0]
@@ -490,20 +451,6 @@ def is_beta_cell(frames, pr_trajs):
                         if idxbool]
 
     return pr_trajs.particle.isin(dim_to_bright_id)
-
-
-def nearest_loop(row, loops):
-    '''
-    Find the nearest loop to a particle.
-
-    Algorithm:
-    1. Sample one coordinate from all loops.
-    2. Keep the four loops with the smallest
-        distance to the sample.
-    3. Take many coordinate samples and return the loop
-        with the smallest distance to the particle.
-    '''
-    pass
 
 
 def prep_file(save_loops, load_loops,
@@ -584,29 +531,39 @@ def prep_cells_w_loops(experiment_name, save_loops, load_loops):
                                 filter_prefix, file_ext)
 
     for pred_dir in tqdm(select_dirs, desc='Prediction'):
-        pr_trajs = prep_file(draft_file, save_loops, load_loops,
+        print(f'\n{pred_dir} is being processed.')
+        csv_path = osp.join(pred_path, pred_dir,
+                            'tracked_centroids_loops.csv')
+        if osp.exists(csv_path):
+            print(
+                f'File {csv_path} already exists.\nSkipping loop processing.\n')
+            continue
+
+        pr_trajs = prep_file(save_loops, load_loops,
                              pred_path, loop_files, pred_dir)
 
-        if pr_trajs:
-            csv_path = osp.join(pred_path, pred_dir,
-                                'tracked_centroids_loops.csv')
-            pr_trajs.to_csv(csv_path, index=False)
+        # re-save the file if either in_loop or dist_loop
+        # has been populated with values
+        if (pr_trajs is not None and
+                (np.sum(pr_trajs.in_loop) or np.sum(pr_trajs.dist_loop))):
+            (pr_trajs
+             .drop(columns=['mask'], errors='ignore')
+             .to_csv(csv_path, index=False, sep=';'))
 
 
 if __name__ == '__main__':
-    experiment_name = 'pred_2'
-    draft_file = 'LI_2019-02-05_emb5_pos4'
+    experiment_name = 'nouse'
 
-    save_loops = False  # save condensed loops to disk
+    save_loops = True  # save condensed loops to disk
     load_loops = True  # load condensed loops from disk
 
     # redundant to save loaded loops to disk
-    save_loops = False if load_loops else save_loops
+    # save_loops = False if load_loops else save_loops
 
     tic = time()
     np.random.seed(42)
     utils.set_cwd(__file__)
     pr_trajs = prep_cells_w_loops(
-        experiment_name, draft_file, save_loops, load_loops)
+        experiment_name, save_loops, load_loops)
 
     print(f'prep_loop_corr: Time elapsed: {utils.time_report(tic, time())}.')
