@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 
 class CenterLink():
@@ -59,15 +61,15 @@ class CenterChain():
         # of two separate chains of links which were matched with
         # a common center.
         links = [center]
-        next = center.get_next()
+        next_cent = center.get_next()
 
-        while next:
-            links.append(next)
+        while next_cent:
+            links.append(next_cent)
 
             # cell has banana shape with
             # pointy ends facing up;
             # this is the end point
-            if type(next.get_prev()) in [CenterLink, list]:
+            if type(next_cent.get_prev()) in [CenterLink, list]:
                 # type is either CenterLink or list,
                 # so `next` has one or more previous links
                 pass
@@ -75,25 +77,34 @@ class CenterChain():
             # cell has banana shape with
             # pointy ends facing down;
             # this is the starting point
-            if type(next) in [CenterLink, list]:
+            if type(next_cent) in [CenterLink, list]:
                 # type is either CenterLink or list,
                 # so current center (`center`) has one or more
                 # next links
                 pass
 
-            next = next.get_next()
-            if next in links:
+            next_cent = next_cent.get_next()
+            if next_cent in links:
                 raise RuntimeError('Circular list of links detected')
 
         centers = [link.get_center()
                    for link in links]
         intensities = [link.get_intensity()
                        for link in links]
-        masks = [link.get_mask()
-                 for link in links]
+
+        # get final 3D mask of cell
+        # masks = np.stack([np.hstack((link.get_mask(), link.get_center()[2]))
+        #                   for link in links])
+        masks = []
+        for link in links:
+            mask = link.get_mask()
+            z = np.ones(len(mask)) * link.get_center()[2]
+            mask = np.column_stack((mask, z))
+            masks.append(mask)
+        mask = np.int16(np.row_stack(masks))
 
         center_mean = np.round(np.mean(centers, axis=0), 2)
-        intensity = np.round(np.mean(intensities, axis=0), 10)
+        intensity = np.round(np.mean(intensities, axis=0), 4)
 
         owner = links[0].chain
         if owner not in [self, None]:  # links already have an owner chain
@@ -124,7 +135,7 @@ class CenterChain():
             link.chain = self
         self.intensity = intensity
         self.links = links
-        self.masks = masks
+        self.mask = mask
 
     def __len__(self):
         return len(self.links)
@@ -139,13 +150,17 @@ class CenterChain():
     def get_intensity(self):
         return self.intensity
 
+    def get_mask(self):
+        return self.mask
+
     def get_links(self):
         return self.links
 
     def get_state(self):
         x, y, z = self.get_center()
         intensity = self.get_intensity()
-        return x, y, z, intensity
+        mask = self.get_mask()
+        return x, y, z, intensity, mask
 
     def set_center(self, center):
         self.center = center
@@ -270,30 +285,29 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
     image_iter = zip(timepoint, masks_tot, bboxes_tot)
     for z, (z_slice, masks, bboxes) in enumerate(image_iter):  # each slice
         centers = []
+        z_slice = z_slice.cpu().numpy()
 
         for mask, bbox in zip(masks, bboxes):  # each box in slice
+            mask = mask[0].detach().cpu().numpy()
             center = get_bbox_center(bbox, z)
 
             # Mask coordinates in original slice
-            mask_nonzero = np.argwhere(mask.detach().cpu())
+            mask_nonzero = np.argwhere(mask)
+            nonzero = np.nonzero(mask)
 
             # Get cell coordinates in original image (z_slice)
-            region = z_slice[mask_nonzero].detach().cpu()
+            region = z_slice[nonzero]
 
             # Calculate average pixel intensity
-            intensity = np.mean(region.numpy())
-            if intensity == np.nan or math.isnan(intensity):
-                pass
+            intensity = np.mean(region)
 
             center_link = CenterLink(center, intensity, mask_nonzero)
             centers.append(center_link)
 
         centers_tot.append(centers)
 
-    for i, centers in enumerate(centers_tot):  # each slice
-        for j, center in enumerate(centers):  # each center in slice
-            if i == len(centers_tot) - 1:
-                continue
+    for i, centers in enumerate(centers_tot[:-1]):  # each slice except last
+        for j, center in enumerate(centers):
             # search in the direction of z-dimension
             # a total of `searchrange` pixels in all directions
             closest_center = find_closest_center(
@@ -304,12 +318,6 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
 
             center.set_next(closest_center)
 
-    # Get only first link of each chain because that's all we need
-    # (link is first occurring part of each cell)
-    # link = cell occurrence in slice, chain = whole cell
-    # links = [
-    #     center for centers in centers_tot for center in centers if center.get_prev() is None]
-
     # get first link of every chain
     # (chain = whole cell, link = slice of cell)
     chains = [
@@ -319,20 +327,5 @@ def get_chains(timepoint: np.array, preds: list, searchrange: int = 10):
         if link.get_prev() is None and
         link.get_center() is not None
     ]
-    # Get chains (= whole cells)
-    # which contains average pixel intensity and average center
-    # for the whole chain (i.e. over all links in the chain)
-    # chains = [CenterChain(link).get_state()
-    #           for link in links
-    #           if not np.isnan(link.get_center()).any()]
-
-    # chains = [[(center.get_center(), center.get_intensity())
-    #            for center in centers]
-    #           for centers in chains]
-
-    # chains = [[(center[0], center[1],
-    #             center[2], center.get_intensity())
-    #            for center in centers]
-    #           for centers in chains]
 
     return chains

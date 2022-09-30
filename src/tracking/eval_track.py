@@ -10,10 +10,13 @@ import numpy as np
 import scipy.optimize as sciopt
 import glob
 from time import time
+import ast
+import matplotlib.pyplot as plt
 
 
 def find_json_files(gt_dir_path):
     iterable = os.walk(osp.join(gt_dir_path))
+    json_files = None
     for folders, subfolders, files in iterable:
         json_files = sorted([file for file in files
                              if file.endswith('.json')])
@@ -23,6 +26,7 @@ def find_json_files(gt_dir_path):
             break
     else:
         cell_images = False
+
     return json_files, cell_images
 
 
@@ -59,9 +63,10 @@ def get_timepoints(png_files, cell_images):
     return timepoints
 
 
-def evaluate(pred_dir_path, json_files, cell_images,
-             timepoints, threshold=80):
-    pred_trajs = get_pr_trajs(pred_dir_path, timepoints)
+def eval_file(pred_dir_path, json_files, cell_images,
+              timepoints, threshold=80):
+    pred_trajs = get_pr_trajs(pred_dir_path, timepoints,
+                              columns=['frame', 'x', 'y', 'z', 'particle'])
     gt_trajs = get_gt_trajs(json_files if json_files else None,
                             cell_images)
     # TODO: do not return traj_score_matrix from match_trajs,
@@ -71,20 +76,30 @@ def evaluate(pred_dir_path, json_files, cell_images,
 
     # NB: sum of traj_score_matrix[row_ind, col_ind]
     # are the AssA scores
-    score = compute_score(row_ind, col_ind, traj_score_matrix,
-                          traj_matrix, pred_trajs, gt_trajs,
-                          threshold)
+    scores = compute_score(row_ind, col_ind, traj_score_matrix,
+                           traj_matrix, pred_trajs, gt_trajs,
+                           threshold)
 
     # precision
 
     # recall
 
-    return score
+    return scores
 
 
-def get_pr_trajs(pred_dir_path, timepoints=None, groupby='particle'):
+def get_pr_trajs(pred_dir_path, timepoints=None,
+                 groupby='particle', columns=None):
     track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
-    tracked_centroids = pd.read_csv(track_path, header=0)
+    if columns:
+        tracked_centroids = pd.read_csv(track_path, header=0,
+                                        sep=';', usecols=columns)
+        if 'mask' in columns:
+            tracked_centroids['mask'] = (tracked_centroids['mask']
+                                         .apply(ast.literal_eval)
+                                         .apply(np.asarray))
+    else:
+        tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
+
     if timepoints:
         time_range = range(min(timepoints), max(timepoints) + 1)
         tc_filter = tracked_centroids[tracked_centroids['frame'].isin(
@@ -139,12 +154,8 @@ def compute_traj_matrix(frames, pr_trajs, gt_trajs, threshold=80):
     traj_matrix = pd.DataFrame(index=range(len(pr_trajs.groups)),
                                columns=range(len(gt_trajs.groups)),
                                dtype=object)
-    for i, pr_label in enumerate(pr_trajs.groups):
-        pr_traj = pr_trajs.get_group(pr_label)[columns]
-        for j, gt_label in enumerate(gt_trajs.groups):
-
-            gt_traj = gt_trajs.get_group(gt_label)[columns]
-
+    for i, (_, pr_traj) in enumerate(pr_trajs):
+        for j, (_, gt_traj) in enumerate(gt_trajs):
             similarity, arrays = compute_similarity(
                 frames, pr_traj, gt_traj, threshold)
 
@@ -269,20 +280,27 @@ def compute_score(row_ind, col_ind, traj_score_matrix,
     Compute HOTA score.
     '''
     # associative score
-    AssA = 0
+    AssA, AssPr, AssRe = 0, 0, 0
     for i, j in zip(row_ind, col_ind):
         tp_idx, fn_idx, fp_idx = traj_matrix.iloc[i, j]
         TPA = np.sum(tp_idx)
         FNA = np.sum(fn_idx)
         FPA = np.sum(fp_idx)
         AssA += TPA / (TPA + FNA + FPA)
+        AssPr += TPA / (TPA + FPA)
+        AssRe += TPA / (TPA + FNA)
+    len_rows = np.max((1, len(row_ind)))
+    AssA /= len_rows
+    AssPr /= len_rows
+    AssRe /= len_rows
 
     # detection score
     pred_frames = pred_trajs.obj.groupby('frame')
     gt_frames = gt_trajs.obj.groupby('frame')
-    DetA = compute_DetA(pred_frames, gt_frames, threshold)
+    DetA, DetPr, DetRe = compute_DetA(pred_frames, gt_frames, threshold)
 
-    return np.sqrt(AssA * DetA)
+    return (np.sqrt(AssA * DetA), AssA, AssPr, AssRe,
+            DetA, DetPr, DetRe)
 
 
 def compute_DetA(pred_frames, gt_frames, threshold):
@@ -305,13 +323,22 @@ def compute_DetA(pred_frames, gt_frames, threshold):
             fp_tot += dist_matrix.shape[0] - len(row_ind)
             fp_tot += np.sum(matrix_thresh == 0)
 
-        DetA = 1 / (tp_tot + fn_tot + fp_tot)
+        DetA = tp_tot / (tp_tot + fn_tot + fp_tot)
+        DetPr = tp_tot / (tp_tot + fp_tot)
+        DetRe = tp_tot / (tp_tot + fn_tot)
     elif not pred_frames and gt_frames:
         DetA = 1 / len(gt_frames)
+        DetPr = 0
+        DetRe = 0
     elif pred_frames and not gt_frames:
         DetA = 1 / len(pred_frames)
+        DetPr = 0
+        DetRe = 1
+    elif not pred_frames and not gt_frames:
+        DetA = 1
+        DetPr = DetRe = DetA
 
-    return DetA
+    return DetA, DetPr, DetRe
 
 
 def compute_dist_matrix(pred_frame, gt_frame):
@@ -322,25 +349,25 @@ def compute_dist_matrix(pred_frame, gt_frame):
     return dist_matrix
 
 
-if __name__ == '__main__':
-    mode = 'test'
-    experiment_name = 'pred_1'
-
-    tic = time()
+def evaluate(mode, experiment_name):
     root_dir = c.DATA_DIR if osp.exists(
         c.DATA_DIR) else c.PROJECT_DATA_DIR_FULL
     groundtruth_path = osp.join(root_dir, 'pred', 'eval', 'track_2D', mode)
-    gt_dirs = sorted(os.listdir(groundtruth_path))
+    gt_dirs = sorted(osp.splitext(gtdir)[0]
+                     for gtdir in os.listdir(groundtruth_path)
+                     if 'LI' in gtdir)
     pred_path = osp.join(root_dir, 'pred', experiment_name)
     pred_dirs = os.listdir(pred_path)
 
-    score_tot = {}
+    score_tot = []
     # approximate the HOTA integral (Luiten et al. p. 8)
     # by averaging over different localization thresholds
-    for alpha in (80,):  # np.linspace(5, 100, 5):
+    for alpha in np.linspace(30, 200, 5):
         threshold = alpha
         score_alpha = {}
         for gt_dir in gt_dirs:
+            if 'LI_2018-11-20_emb6_pos2' in gt_dir:
+                test = 0
             gt_dir_path = osp.join(groundtruth_path, gt_dir)
             pred_dir_path = osp.join(pred_path, gt_dir)
 
@@ -349,13 +376,44 @@ if __name__ == '__main__':
 
             timepoints = get_timepoints(png_files, cell_images)
 
-            score = evaluate(pred_dir_path, json_files, cell_images,
-                             timepoints, threshold)
+            scores = eval_file(pred_dir_path, json_files, cell_images,
+                               timepoints, threshold)
 
-            score_alpha[gt_dir] = score
+            score_tot.append((gt_dir, round(alpha, 2), *np.round(scores, 3)))
 
-        score_tot[np.round(alpha, 2)] = score_alpha
+    return pd.DataFrame(score_tot, columns=['filename', 'alpha', 'HOTA',
+                                            'AssA', 'AssPr', 'AssRe',
+                                            'DetA', 'DetPr', 'DetRe'])
+
+
+if __name__ == '__main__':
+    mode = 'test'
+    experiment_name = 'pred_1'
+
+    tic = time()
+    utils.set_cwd(__file__)
+    score_tot = evaluate(mode, experiment_name)
 
     print(f'eval_track completed in {utils.time_report(tic, time())}.')
-    print('Scores:\n')
-    print(*score_tot)
+    out_dir = osp.join('../..', 'reports')
+    score_tot.to_csv(osp.join(out_dir, 'scores_full.csv'), index=False)
+    metric_columns = ['HOTA', 'AssA', 'AssPr', 'AssRe',
+                      'DetA', 'DetPr', 'DetRe']
+    mean = pd.DataFrame(dict(zip(metric_columns,
+                                 np.round(score_tot[metric_columns].mean().values, 4))),
+                                 index=[0])
+    mean.to_csv(osp.join(out_dir, 'scores_mean.csv'), index=False, header=True)
+    print(f'Scores saved to\n\t {out_dir}.')
+    print('Scores:')
+    print(mean)
+
+    # save plots
+    plot_path = osp.join(out_dir, 'figures', 'hota_scores.png')
+    plt.plot(score_tot.groupby('alpha').mean()['HOTA'])
+    plt.xlabel('Localization threshold')
+    plt.ylabel('HOTA score')
+    plt.title('HOTA score as function of\nlocalization threshold')
+    plt.savefig(plot_path)
+    print(f'Plot saved to\n\t{plot_path}.')
+
+    plt.show()

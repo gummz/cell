@@ -60,8 +60,8 @@ def create_movie(location, time_range=None):
 
 def prepare_3d(timepoint):
     points = np.array(timepoint)
-    _, X, Y, Z, I, P = [array[0]
-                        for array in np.split(points.T, 6)]
+    _, X, Y, Z, I, _, P = [array[0]
+                           for array in np.split(points.T, 7)]
     return (X, Y, Z, I,
             np.array(P, dtype=int), get_cmap())
 

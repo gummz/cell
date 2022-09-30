@@ -15,6 +15,7 @@ from PIL import Image
 from aicsimageio import AICSImage
 import src.tracking.track_cells as tracker
 from src.visualization import plot
+from time import time
 
 
 def get_predictions(model,
@@ -86,7 +87,7 @@ def threshold_masks(masks, threshold=0.8):
     '''
     Thresholds masks to make more concise
     segmentations (i.e., model has to be more certain
-    in its predictions).
+    in its mask predictions).
     '''
     dtype, device = masks.dtype, masks.device
     threshold = torch.tensor(threshold, dtype=dtype,
@@ -98,7 +99,8 @@ def threshold_masks(masks, threshold=0.8):
 
 def remove_boxes(bboxes, scores,
                  accept_range=(0.5, 1), nms_threshold=0.3):
-    if not bboxes:
+
+    if not torch.any(bboxes):
         return torch.tensor([], dtype=torch.int64)
 
     # select = reject uncertain predictions
@@ -283,7 +285,7 @@ def handle_predictions(device, model, output_dir, save_pred,
     if load_pred:
         # load predictions from disk
         preds = pickle.load(
-            open(osp.join(output_dir, f'preds_{t}.pkl'), 'rb'))
+            open(osp.join(output_dir, f'predictions_t{t}.pkl'), 'rb'))
     else:
         preds = get_predictions(
             model, device, timepoint, accept_range=accept_range)
@@ -296,7 +298,17 @@ def handle_predictions(device, model, output_dir, save_pred,
 def save_predictions(preds, output_dir, t):
     '''
     Saves predictions to file.
+
+    Inputs:
+        preds: list(torch.Tensor) - list of predictions
+        output_dir: str - directory to save predictions to
+        t: int - timepoint to save predictions for
+
+    Outputs:
+        None
     '''
+    if not osp.exists(output_dir):
+        utils.make_dir(output_dir)
     with open(osp.join(output_dir, f'predictions_t{t}.pkl'), 'wb') as f:
         pickle.dump(preds, f)
 
@@ -307,9 +319,13 @@ def prepare_model_input(timepoint, device):
     class is not being used.
 
     Inputs:
-        array: the data to be prepared for the Mask R-CNN.
+        timepoint: the data to be prepared for the Mask R-CNN.
         This array can contain individual slices, an entire
         timepoint, or multiple timepoints.
+        device: torch.device - device to predict on
+
+    Output:
+        list(torch.Tensor) - list of tensors to predict on
     '''
 
     timepoint = utils.normalize(np.int16(timepoint), 0, 1, cv2.CV_32F, device)
@@ -326,7 +342,7 @@ def prepare_model_input(timepoint, device):
     img_filter, args = c.FILTERS['bilateral']
     timepoint = [img_filter(z_slice.cpu().numpy().squeeze(), *args)
                  for z_slice in timepoint]
-    timepoint = torch.tensor(timepoint, device=device)
+    timepoint = torch.tensor(np.array(timepoint), device=device)
 
     return timepoint.unsqueeze(1)
 
@@ -350,14 +366,9 @@ def predict_file(load, device, model,
         centroids = predict(data, time_range, accept_range,
                             device, model, output_dir,
                             save_pred, load_pred)
-        try:
-            data.close()
-            print(f'File {name} closed successfully.')
-        except AttributeError as e:
-            print(f'File {name} raised error upon closing:\n{e}')
 
     centroids_np = [(t, centroid[0], centroid[1],
-                     centroid[2], centroid[3])
+                     centroid[2], centroid[3], centroid[4].tolist())
                     for t, timepoint in zip(time_range, centroids)
                     for centroid in timepoint]
 
@@ -373,30 +384,26 @@ def save_tracks(name, output_dir, time_start, time_end,
     pickle.dump(centroids, open(
         osp.join(output_dir, 'centroids_save.pkl'), 'wb'))
 
-    np.savetxt(
-        osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'),
-        centroids_np)
+    # np.savetxt(
+    #     osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'),
+    #     centroids_np)
 
     pickle.dump(tracked_centroids,
                 open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
 
-    tracked_centroids.to_csv(osp.join(
-        output_dir, 'tracked_centroids.csv'), sep=';')
+    (tracked_centroids
+     .sort_values(['frame', 'particle'])
+     .to_csv(osp.join(
+         output_dir, 'tracked_centroids.csv'), sep=';', index=False))
 
     location = osp.join(output_dir, 'timepoints')
+    time_range = range(time_start, time_end) if time_end else None
     plot.save_figures(tracked_centroids, location)
     utils.png_to_movie(time_range, location)
 
 
-if __name__ == '__main__':
-    mode = 'val'
-    load = False
-    experiment_name = 'pred_2'
-    accept_range = (0.91, 1)
-    model_id = c.MODEL_STR
-    save_pred = True
-    load_pred = False
-
+def start_predict(mode, load, experiment_name, accept_range, model_id,
+                  save_pred, load_pred, time_start, time_end):
     utils.set_cwd(__file__)
     # Running on CUDA?
     device = utils.set_device()
@@ -405,29 +412,53 @@ if __name__ == '__main__':
     model = utils.get_model(model_id, device)
     model.to(device)
 
-    # Choose time range
-    time_start = 150
-    time_end = 155  # endpoint excluded
-    time_range = None  # range(time_start, time_end)
+    time_range = range(time_start, time_end) if time_end else None
 
     # 1. Choose raw data file(s)
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
     files = c.RAW_FILES[mode].keys()
     files = utils.add_ext(files)
+    # development purposes:
+    files = [file for file in files if '2019-02-05_emb5_pos4' in file]
+    
     len_files = len(files)
 
     for i, name in enumerate(files):
-        print('Predicting file', name,
+        print('Predicting', name,
               f'(file {i + 1}/{len_files})...', end='')
         output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
-                                  experiment_name, name)
+                              experiment_name, osp.splitext(name)[0])
         utils.make_dir(output_dir)
         predict_file(load, device,
                      model, output_dir, name,
                      time_range, accept_range,
                      save_pred, load_pred)
         print('done.')
-        # break
 
-    print('predict_model.py complete')
+
+if __name__ == '__main__':
+    mode = 'test'  # for which embryos to predict
+    load = False  # load complete tracks? useful for reproducing figures and movie
+    experiment_name = 'pred_2'  # name of folder to save predictions to
+    accept_range = (0.91, 1)  # how certain the model should be
+    model_id = c.MODEL_STR  # model to use
+
+    # whether to save or load predictions from disk
+    # different from variable `load` above;
+    # `save_pred` and `load_pred` only load the raw mask predictions,
+    # and not the complete cell trajectories, which the `load` variable
+    # above does
+    save_pred = False
+    load_pred = False
+
+    # choose time range
+    # endpoint excluded
+    time_start = 0
+    time_end = None  # Set to None to predict from time_start to final timepoint
+
+    tic = time()
+    start_predict(mode, load, experiment_name, accept_range,
+                  model_id, save_pred, load_pred, time_start, time_end)
+
+    print(f'predict_model.py complete in {utils.time_report(tic, time())}.')
