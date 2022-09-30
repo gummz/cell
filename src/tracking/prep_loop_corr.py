@@ -32,6 +32,21 @@ This script:
 
 
 def set_paths(experiment_name):
+    '''
+    Set paths to data.
+
+    Parameters
+    ----------
+    experiment_name : str
+        Name of experiment.
+
+    Returns
+    -------
+    pred_path : str
+        Path to directory containing prediction files.
+    loops_path : str
+        Path to directory containing loop files.
+    '''
     if osp.exists(c.RAW_DATA_DIR):  # on DTU HPC cluster
         root_dir = osp.join(c.RAW_DATA_DIR, '..')
         pred_path = osp.join(c.DATA_DIR, 'pred', experiment_name)
@@ -45,6 +60,25 @@ def set_paths(experiment_name):
 
 def get_loop_files(loops_path, pred_dirs,
                    filter_prefix, file_ext):
+    '''
+    Get loop files from directory.
+
+    Parameters
+    ----------
+    loops_path : str
+        Path to directory containing loop files.
+    pred_dirs : list
+        List of prediction directories.
+    filter_prefix : str
+        Prefix to filter loop files by.
+    file_ext : str
+        File extension to filter loop files by.
+
+    Returns
+    -------
+    loop_files : list
+        List of loop files.
+    '''
     pred_dirs_noext = [osp.splitext(file)[0]
                        for file in pred_dirs]
 
@@ -68,10 +102,22 @@ def get_loop_files(loops_path, pred_dirs,
 def matrix_to_terse(frames, loops):
     '''
     Condense loops into a terse representation.
+
+    Parameters
+    ----------
+    frames : np.ndarray
+        1D array of frame indices.
+    loops : np.ndarray
+        5D array of loop matrices.
+
+    Returns
+    -------
+    terse_loops : np.ndarray
+        2D array of loop information.
     '''
     loops_terse = []
-    for frame in tqdm(frames, desc='Condensing loops: frame'):
 
+    for frame in tqdm(frames, desc='Condensing loops: frame'):
         loops_comp = loops[frame, :, :, :, 0].compute()
 
         unique, counts = np.unique(loops_comp, return_counts=True)
@@ -124,10 +170,10 @@ def get_loops(loop_path, name,
         # print()
         if osp.exists(name):
             loops = pd.read_csv(name)
-            print(f'Loaded loops file from {name}.')
+            print(f'\tLoaded loops file from\n\t\t{name}.')
         else:
             print(
-                f'Loop file not found: {name} (check for typos).\nGenerating new loops file.')
+                f'\tLoop file not found:\n\t\t{name}\n\t\t(check for typos).\n\tGenerating new loops file.')
             loops, frames = get_loops(loop_path, name,
                                       frames, load=False)
         if frames is not None:
@@ -151,7 +197,6 @@ def terse_to_disk(save_path, frames, loops):
 
 
 def process_loops(frames, pr_trajs, loops):
-    pr_trajs = pr_trajs[pr_trajs.frame.isin(frames)]
     in_loop = inside_loop(frames, pr_trajs, loops)
     dist_loop = dist_to_loop(frames, pr_trajs, loops)
     is_beta = is_beta_cell(frames, pr_trajs)
@@ -176,21 +221,22 @@ def inside_loop(frames, pr_trajs, loops):
     '''
     coord_col = ['x', 'y', 'z']
     in_loop = np.zeros(len(pr_trajs), dtype=np.float32)
+    in_loop2 = np.zeros(len(pr_trajs), dtype=np.float32)
 
     for (tp, _), loop in tqdm(loops.groupby(['timepoint', 'loop_id']),
-                              desc='Analysis per loop'):
-        if tp != 0 or _ != 84:
-            continue
+                              desc='Add in_loop column'):
+
         loop_coord = loop[coord_col].values
 
         # check if loop is 3-dimensional
         if not loop_3d_check(loop_coord):
             # loop is not 3-dimensional since for at least one of
             # x, y, or z, there is only one unique value
-            # so we cannot create a convex hull'
+            # so we cannot create a convex hull
 
             # so we perform a 2D-to-3D stretch of the loop
             loop_coord = stretch_to_3d(loop_coord)
+
 
         # loop is 3-dimensional
         # this can be further vectorized
@@ -198,7 +244,6 @@ def inside_loop(frames, pr_trajs, loops):
         # and then dividing by the number of mask coordinates for each cell
         # so only one call to overlap_hull would be needed,
         # for the entire pr_trajs array
-
         hull = scipy.spatial.ConvexHull(loop_coord, qhull_options='QJ')
 
         for idx, cell in pr_trajs[pr_trajs.frame == tp].iterrows():
@@ -277,10 +322,12 @@ def stretch_to_3d(loop_coord):
 
             stretch = np.repeat(np.arange(low, high), n_coord)
             loop_coord = np.column_stack((copies, stretch))
+
             if dim == 0:
                 loop_coord = loop_coord[:, (2, 0, 1)]
             elif dim == 1:
                 loop_coord = loop_coord[:, (0, 2, 1)]
+
     return loop_coord
 
 
@@ -304,7 +351,7 @@ def loop_3d_check(loop):
 
 def overlap_hull(points, hull, tol=1e-12):
     '''
-    Returns the ratio of overlap between a cell and 
+    Returns the ratio of overlap between a cell and
     the convex hull of a loop boundary.
 
     Input
