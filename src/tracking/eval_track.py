@@ -11,6 +11,7 @@ import scipy.optimize as sciopt
 import glob
 from time import time
 import ast
+import matplotlib.pyplot as plt
 
 
 def find_json_files(gt_dir_path):
@@ -154,12 +155,6 @@ def compute_traj_matrix(frames, pr_trajs, gt_trajs, threshold=80):
                                dtype=object)
     for i, (_, pr_traj) in enumerate(pr_trajs):
         for j, (_, gt_traj) in enumerate(gt_trajs):
-    for i, pr_label in enumerate(pr_trajs.groups):
-        pr_traj = pr_trajs.get_group(pr_label)[columns]
-        for j, gt_label in enumerate(gt_trajs.groups):
-
-            gt_traj = gt_trajs.get_group(gt_label)[columns]
-
             similarity, arrays = compute_similarity(
                 frames, pr_traj, gt_traj, threshold)
 
@@ -358,11 +353,12 @@ def evaluate(mode, experiment_name):
         c.DATA_DIR) else c.PROJECT_DATA_DIR_FULL
     groundtruth_path = osp.join(root_dir, 'pred', 'eval', 'track_2D', mode)
     gt_dirs = sorted(osp.splitext(gtdir)[0]
-                     for gtdir in os.listdir(groundtruth_path))
+                     for gtdir in os.listdir(groundtruth_path)
+                     if 'LI' in gtdir)
     pred_path = osp.join(root_dir, 'pred', experiment_name)
     pred_dirs = os.listdir(pred_path)
 
-    score_tot = {}
+    score_tot = []
     # approximate the HOTA integral (Luiten et al. p. 8)
     # by averaging over different localization thresholds
     for alpha in np.linspace(30, 200, 5):
@@ -379,10 +375,10 @@ def evaluate(mode, experiment_name):
 
             timepoints = get_timepoints(png_files, cell_images)
 
-            score = eval_file(pred_dir_path, json_files, cell_images,
-                              timepoints, threshold)
+            scores = eval_file(pred_dir_path, json_files, cell_images,
+                               timepoints, threshold)
 
-            score_alpha[gt_dir] = score
+            score_tot.append((gt_dir, round(alpha, 2), *np.round(scores, 3)))
 
     return pd.DataFrame(score_tot, columns=['filename', 'alpha', 'HOTA',
                                             'AssA', 'AssPr', 'AssRe',
@@ -390,12 +386,33 @@ def evaluate(mode, experiment_name):
 
 
 if __name__ == '__main__':
-    mode = 'val'
+    mode = 'test'
     experiment_name = 'pred_1'
 
     tic = time()
+    utils.set_cwd(__file__)
     score_tot = evaluate(mode, experiment_name)
 
     print(f'eval_track completed in {utils.time_report(tic, time())}.')
-    print('Scores:\n')
-    print(*score_tot)
+    out_dir = osp.join('../..', 'reports')
+    score_tot.to_csv(osp.join(out_dir, 'scores_full.csv'), index=False)
+    metric_columns = ['HOTA', 'AssA', 'AssPr', 'AssRe',
+                      'DetA', 'DetPr', 'DetRe']
+    mean = pd.DataFrame(dict(zip(metric_columns,
+                                 np.round(score_tot[metric_columns].mean().values, 4))),
+                                 index=[0])
+    mean.to_csv(osp.join(out_dir, 'scores_mean.csv'), index=False, header=True)
+    print(f'Scores saved to\n\t {out_dir}.')
+    print('Scores:')
+    print(mean)
+
+    # save plots
+    plot_path = osp.join(out_dir, 'figures', 'hota_scores.png')
+    plt.plot(score_tot.groupby('alpha').mean()['HOTA'])
+    plt.xlabel('Localization threshold')
+    plt.ylabel('HOTA score')
+    plt.title('HOTA score as function of\nlocalization threshold')
+    plt.savefig(plot_path)
+    print(f'Plot saved to\n\t{plot_path}.')
+
+    plt.show()
