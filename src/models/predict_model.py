@@ -171,6 +171,10 @@ def remove_boxes(bboxes, scores,
         if area <= 4:
             idx[i] = False
 
+    # take 50 best matches, so reject those that
+    # are not top 50 in score
+    # idx[torch.argsort(scores)[:-50]] = False
+
     return idx
 
 
@@ -453,14 +457,22 @@ def filter_files(output_dir, files):
     tmp_files = files.copy()
     files = [file for file in files
              if utils.get_dir_size(osp.join(output_dir, osp.splitext(file)[0])) < 50000]
-    print('\nPredictions for the following files were found:')
-    print('\n'.join([file for file in tmp_files if file not in files]))
-    print('Predictions will therefore not be made for these files.\n')
+    found = [file for file in tmp_files if file not in files]
+    if found:
+        print('\nPredictions for the following files were found:')
+        print('\n'.join(found))
+        print('Predictions will therefore not be made for these files.\n')
+    else:
+        print('No predictions were found.')
     # remove files with .czi extension
     print('Removing files with .czi extension:')
     tmp_files = files.copy()
     files = [file for file in files if '.czi' not in file]
     print('\n'.join([file for file in tmp_files if file not in files]), '\n')
+
+    files = [file for file in files if osp.splitext(file)[0] not in c.FILES_NOUSE]
+    print('Selecting only allowed files (according to excel sheet). They are:')
+    print('\n'.join(files))
     return files
 
 
@@ -470,7 +482,7 @@ if __name__ == '__main__':
     #   and so on for train and val files
     mode = 'all'  # for which embryos to predict
     load = False  # load complete tracks? useful for reproducing figures and movie
-    experiment_name = 'pred_2'  # name of folder to save predictions to
+    experiment_name = 'nouse'  # name of folder to save predictions to
     accept_range = (0.91, 1)  # how certain the model should be
     model_id = c.MODEL_STR  # model to use
 
