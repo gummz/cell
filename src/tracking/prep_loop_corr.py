@@ -371,10 +371,6 @@ def overlap_hull(points, hull, tol=1e-12):
     return np.sum(np.all(hull.equations[:, :-1] @ points.T + np.repeat(hull.equations[:, -1][None, :], len(points), axis=0).T <= tol, 0)) / len(points)
 
 
-
-
-
-
 def dist_to_loop(frames, pr_trajs, loops):
     '''
     Calculates the distance matrix between cell centers and loop coordinates.
@@ -429,11 +425,11 @@ def is_beta_cell(frames, pr_trajs):
     threshold = 0.07
     grad_thresh = 0.55
     risen_thresh = 0.5
-    particles = [item[1] for item in pr_trajs.groupby('particle')]
+    ids = [item[1] for item in pr_trajs.groupby('id')]
 
-    dim_to_bright = np.full(len(particles), False)
-    for i, cell in tqdm(enumerate(particles), desc='Add "is beta cell?" column'):
-        intensity = cell.intensity.values
+    dim_to_bright = np.full(len(ids), False)
+    for i, cell in tqdm(enumerate(ids), desc='Add "is beta cell?" column'):
+        intensity = cell.mean_intensity.values
 
         # skip tracks that were present at the start
         if np.all(frames[:3] == range(3)) and np.all(intensity[:3] > threshold / 2):
@@ -446,11 +442,11 @@ def is_beta_cell(frames, pr_trajs):
         if any((ascending, risen and reach)):
             dim_to_bright[i] = True
 
-    dim_to_bright_id = [np.unique(cell.particle)[0]
-                        for cell, idxbool in zip(particles, dim_to_bright)
+    dim_to_bright_id = [np.unique(cell.id)[0]
+                        for cell, idxbool in zip(ids, dim_to_bright)
                         if idxbool]
 
-    return pr_trajs.particle.isin(dim_to_bright_id)
+    return pr_trajs.id.isin(dim_to_bright_id)
 
 
 def prep_file(save_loops, load_loops,
@@ -487,7 +483,7 @@ def prep_file(save_loops, load_loops,
 
     # load predictions
     pred_dir_path = osp.join(pred_path, pred_dir)
-    pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None)
+    pr_trajs = evtr.get_pr_trajs(pred_dir_path, groupby=None, mask=True)
     frames = np.unique(pr_trajs.frame.values)
     fr_min, fr_max = min(frames), max(frames)
 
@@ -518,7 +514,7 @@ def prep_cells_w_loops(experiment_name, save_loops, load_loops):
     filter_prefix = 'cyctpy15'
     file_ext = 'tif'
     pred_path, loops_path = set_paths(experiment_name)
-    utils.make_dir(osp.join(pred_path, 'loops'))
+    utils.make_dir(osp.join(pred_path, '..', '..', 'loops'))
 
     # can choose only predicted dirs, or all files in /raw_data/
     select_dirs = sorted(os.listdir(pred_path))
