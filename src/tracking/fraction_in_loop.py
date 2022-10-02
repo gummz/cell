@@ -38,16 +38,13 @@ first):
 
 if __name__ == '__main__':
     experiment_name = 'pred_2'
-    pred_dir = '/home/gummz/cell/data/interim/pred/pred_2'
+    pred_dir = osp.join(c.PROJECT_DATA_DIR, c.PRED_DIR,
+                        experiment_name)
 
     utils.set_cwd(__file__)
-    pattern = osp.join(pred_dir, '*', '*.csv')
+    pattern = osp.join(pred_dir, '*', 
+    'tracked_centroids_loops_t*.csv')
     pred_files = glob.glob(pattern, recursive=True)
-    dev_check = ('/home/gummz/cell/data/interim/pred/pred_2/LI_2018-12-07_emb5_pos2/tracked_centroids_loops.csv',
-    '/home/gummz/cell/data/interim/pred/pred_2/LI_2018-12-07_emb6_pos3/tracked_centroids_loops.csv',
-    '/home/gummz/cell/data/interim/pred/pred_2/LI_2018-12-18_emb4_pos4/tracked_centroids_loops.csv',
-    '/home/gummz/cell/data/interim/pred/pred_2/LI_2020-05-06_emb7_pos4/tracked_centroids_loops.csv')
-    pred_files = [file for file in pred_files if file in dev_check]
     
     names = pd.Series([osp.basename(osp.dirname(pred_path))
             for pred_path in pred_files])
