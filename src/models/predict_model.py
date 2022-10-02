@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 import pickle
 import os.path as osp
@@ -170,6 +171,10 @@ def remove_boxes(bboxes, scores,
         if area <= 4:
             idx[i] = False
 
+    # take 50 best matches, so reject those that
+    # are not top 50 in score
+    # idx[torch.argsort(scores)[:-50]] = False
+
     return idx
 
 
@@ -250,8 +255,8 @@ def predict_timepoint(data, device, model, output_dir,
                                accept_range=accept_range)
 
     # draw bounding boxes on slice for debugging
-    viz.output_sample(osp.join(output_dir, 'debug'), t,
-                      timepoint_raw, preds, 1024, device)
+    # viz.output_sample(osp.join(output_dir, 'debug'), t,
+    #                   timepoint_raw, preds, 1024, device)
 
     # adjust slices from being model inputs to being
     # inputs to get_chains
@@ -388,18 +393,24 @@ def save_tracks(name, output_dir, time_start, time_end,
     #     osp.join(output_dir, f'{name}_{time_start}_{time_end}.csv'),
     #     centroids_np)
 
+    name = f'tracked_centroids_t{time_start}_{time_end}'
     pickle.dump(tracked_centroids,
-                open(osp.join(output_dir, 'tracked_centroids.pkl'), 'wb'))
+                open(osp.join(output_dir, f'{name}.pkl'), 'wb'))
+    tracked_centroids = tracked_centroids.sort_values(['frame', 'id'])
 
-    (tracked_centroids
-     .sort_values(['frame', 'particle'])
-     .to_csv(osp.join(
-         output_dir, 'tracked_centroids.csv'), sep=';', index=False))
+    utils.to_csv(tracked_centroids,
+                 osp.join(output_dir, f'{name}_withmask.csv'),
+                 sep=';')
 
-    location = osp.join(output_dir, 'timepoints')
-    time_range = range(time_start, time_end) if time_end else None
-    plot.save_figures(tracked_centroids, location)
-    utils.png_to_movie(time_range, location)
+    cols_nomask = [col for col in tracked_centroids.columns if col != 'mask']
+    utils.to_csv(tracked_centroids[cols_nomask],
+                 osp.join(output_dir, f'{name}_nomask.csv'),
+                 sep=';')
+
+    # location = osp.join(output_dir, 'timepoints')
+    # time_range = range(time_start, time_end) if time_end else None
+    # plot.save_figures(tracked_centroids, location)
+    # utils.png_to_movie(time_range, location)
 
 
 def start_predict(mode, load, experiment_name, accept_range, model_id,
@@ -417,30 +428,61 @@ def start_predict(mode, load, experiment_name, accept_range, model_id,
     # 1. Choose raw data file(s)
     # names = listdir(c.RAW_DATA_DIR)
     # names = [name for name in names if '.czi' not in name]
-    files = c.RAW_FILES[mode].keys()
-    files = utils.add_ext(files)
-    # development purposes:
-    files = [file for file in files if '2019-02-05_emb5_pos4' in file]
-    
-    len_files = len(files)
+    if mode != 'all':
+        files = c.RAW_FILES[mode].keys()
+        files = utils.add_ext(files)
+    else:
+        files = os.listdir(c.RAW_DATA_DIR)
 
+    output_dir = osp.join(c.DATA_DIR, c.PRED_DIR, experiment_name)
+    files = filter_files(output_dir, files)
+
+    len_files = len(files)
     for i, name in enumerate(files):
         print('Predicting', name,
-              f'(file {i + 1}/{len_files})...', end='')
-        output_dir = osp.join(c.DATA_DIR, c.PRED_DIR,
-                              experiment_name, osp.splitext(name)[0])
-        utils.make_dir(output_dir)
+              f'(file {i + 1}/{len_files})...')
+        output_path = osp.join(output_dir, osp.splitext(name)[0])
+        utils.make_dir(output_path)
         predict_file(load, device,
-                     model, output_dir, name,
+                     model, output_path, name,
                      time_range, accept_range,
                      save_pred, load_pred)
-        print('done.')
+        print('done.\n')
+
+
+def filter_files(output_dir, files):
+    # remove files from consideration that have already been processed
+    # files below 50000 bytes are considered empty and therefore
+    # will be removed from consideration
+    tmp_files = files.copy()
+    files = [file for file in files
+             if utils.get_dir_size(osp.join(output_dir, osp.splitext(file)[0])) < 50000]
+    found = [file for file in tmp_files if file not in files]
+    if found:
+        print('\nPredictions for the following files were found:')
+        print('\n'.join(found))
+        print('Predictions will therefore not be made for these files.\n')
+    else:
+        print('No predictions were found.')
+    # remove files with .czi extension
+    print('Removing files with .czi extension:')
+    tmp_files = files.copy()
+    files = [file for file in files if '.czi' not in file]
+    print('\n'.join([file for file in tmp_files if file not in files]), '\n')
+
+    files = [file for file in files if osp.splitext(file)[0] not in c.FILES_NOUSE]
+    print('Selecting only allowed files (according to excel sheet). They are:')
+    print('\n'.join(files))
+    return files
 
 
 if __name__ == '__main__':
-    mode = 'test'  # for which embryos to predict
+    # set mode = 'all' to predict all files
+    # set mode = 'test' to predict test files
+    #   and so on for train and val files
+    mode = 'all'  # for which embryos to predict
     load = False  # load complete tracks? useful for reproducing figures and movie
-    experiment_name = 'pred_2'  # name of folder to save predictions to
+    experiment_name = 'nouse'  # name of folder to save predictions to
     accept_range = (0.91, 1)  # how certain the model should be
     model_id = c.MODEL_STR  # model to use
 

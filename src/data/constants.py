@@ -91,6 +91,24 @@ RAW_FILES = {
     'test': RAW_FILES_TEST
 }
 
+FILES_NOUSE = ['LI 2018-09-28_emb3_pos2', 'LI 2018-09-28_emb5_pos1',
+               'LI 2018-31-10_emb1_pos1', 'LI 2018-12-18_emb3_pos1',
+               'LI 2019-04-11 _emb5_pos1', 'LI 2019-06-13_emb2_pos1',
+               'LI 2019-06-13_emb2_pos2', 'LI 2019-06-13_emb2_pos3',
+               'LI 2019_11-08_emb5_pos3', 'LI 2019_11-08_emb5_pos4',
+               'LI_2020_07_02_emb3_pos1', 'LI 2020-09-24_emb2_pos1',
+               'LI 2020-09-24_emb2_pos2',
+               'LI 2016-03-04_emb5_pos1', 'LI 2018-31-10_emb4_pos2',
+               'LI 2018-12-07_emb5_pos1', 'LI 2018-12-18_emb4_pos3',
+               'LI 2019-01-17_emb1_pos2', 'LI_2019-02-05_emb5_pos4 ',
+               'LI 2019-06-13_emb2_pos3', 'LI 2019-08-30_emb2_pos2',
+               'LI 2019_11-21_emb6_pos1']
+
+FILES_PREF = ['LI_2018-12-07_emb5_pos2', 'LI_2018-12-07_emb6_pos3',
+              'LI_2018-12-18_emb4_pos4', 'LI_2019-01-17_emb7_pos3',
+              'LI_2019-07-03_emb7_pos3', 'LI_2020-05-06_emb7_pos3',
+              'LI_2020-05-06_emb7_pos4', ]
+
 # RAW_FILES = RAW_FILES_GENERALIZE  # testing for generalization
 #  'LI_2020-06-17_emb3_pos5.czi']
 START_IDX = 0

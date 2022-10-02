@@ -88,15 +88,18 @@ def eval_file(pred_dir_path, json_files, cell_images,
 
 
 def get_pr_trajs(pred_dir_path, timepoints=None,
-                 groupby='particle', columns=None):
-    track_path = osp.join(pred_dir_path, 'tracked_centroids.csv')
+                 groupby='particle', mask=False, columns=None):
+    mask_str = 'withmask' if mask else 'nomask'
+    name = [file for file in os.listdir(pred_dir_path) if mask_str in file][0]
+    track_path = osp.join(pred_dir_path, name)
     if columns:
         tracked_centroids = pd.read_csv(track_path, header=0,
                                         sep=';', usecols=columns)
         if 'mask' in columns:
-            tracked_centroids['mask'] = (tracked_centroids['mask']
-                                         .apply(ast.literal_eval)
-                                         .apply(np.asarray))
+    if mask:
+                tracked_centroids['mask'] = (tracked_centroids['mask']
+                                             .apply(ast.literal_eval)
+                                             .apply(np.asarray))
     else:
         tracked_centroids = pd.read_csv(track_path, header=0, sep=';')
 
